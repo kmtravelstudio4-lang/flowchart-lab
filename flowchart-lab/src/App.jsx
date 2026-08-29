@@ -7,7 +7,7 @@ import {
   Tv, Video, Search, ExternalLink, Bookmark, HelpCircle,
   FileText, CornerDownRight, RefreshCw, AlertCircle, Heart,
   Smile, Star, Trophy, Rocket, GraduationCap, CheckCircle,
-  Clock, CheckSquare, HelpCircle as QuestionIcon
+  Clock, CheckSquare, Plus, Trash2, Edit3, Move
 } from 'lucide-react';
 
 // --- Sound Effects using Web Audio API ---
@@ -27,11 +27,18 @@ const playSound = (type, soundEnabled = true) => {
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
       osc.start();
       osc.stop(ctx.currentTime + 0.08);
+    } else if (type === 'drop') {
+      osc.frequency.setValueAtTime(350, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(700, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
     } else if (type === 'success') {
-      osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
-      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
-      osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2); // G5
-      osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.3); // C6
+      osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2);
+      osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.3);
       gain.gain.setValueAtTime(0.18, ctx.currentTime);
       gain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.3);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
@@ -54,11 +61,78 @@ const playSound = (type, soundEnabled = true) => {
       osc.stop(ctx.currentTime + 0.25);
     }
   } catch (e) {
-    console.error("Audio playback error:", e);
+    console.error("Audio error:", e);
   }
 };
 
-// --- Flowchart Symbols Guide for Grade 6 (ป.6) ---
+// --- Pool of Flowchart Symbols for Random Drag & Drop Mission 1 ---
+const SYMBOL_ITEMS_POOL = [
+  {
+    id: 'sym_term_start',
+    shape: 'terminator',
+    shapeName: 'วงรีขอบมน (Oval)',
+    symbolText: 'เริ่มต้น (Start)',
+    category: 'เริ่มต้น / สิ้นสุด',
+    icon: '🟢',
+    hint: 'ใช้ระบุจุดเริ่มต้นการทำงานของโปรแกรม'
+  },
+  {
+    id: 'sym_process',
+    shape: 'process',
+    shapeName: 'สี่เหลี่ยมผืนผ้า (Rectangle)',
+    symbolText: 'คำนวณเงินรวม = ราคา × จำนวน',
+    category: 'การประมวลผล',
+    icon: '🟦',
+    hint: 'ใช้สำหรับการคำนวณตัวเลข หรือการลงมือปฏิบัติงาน'
+  },
+  {
+    id: 'sym_io',
+    shape: 'inputOutput',
+    shapeName: 'สี่เหลี่ยมด้านขนาน (Parallelogram)',
+    symbolText: 'รับค่าคะแนนสอบ (Input Score)',
+    category: 'รับเข้า / แสดงผล',
+    icon: '▱',
+    hint: 'ใช้รับข้อมูลหรือแสดงผลลัพธ์ทั่วไป'
+  },
+  {
+    id: 'sym_decision',
+    shape: 'decision',
+    shapeName: 'สี่เหลี่ยมข้าวหลามตัด (Diamond)',
+    symbolText: 'คะแนนสอบ >= 50 ?',
+    category: 'การตัดสินใจ / เงื่อนไข',
+    icon: '🔶',
+    hint: 'ใช้ตรวจสอบเงื่อนไข มีทางออก จริง หรือ เท็จ'
+  },
+  {
+    id: 'sym_display',
+    shape: 'display',
+    shapeName: 'รูปทรงจอภาพ (Display)',
+    symbolText: 'แสดงผล "ยินดีด้วยคุณผ่านเกณฑ์"',
+    category: 'แสดงผลหน้าจอ',
+    icon: '🖥️',
+    hint: 'ใช้แสดงข้อความหรือผลลัพธ์ออกทางจอภาพ'
+  },
+  {
+    id: 'sym_connector',
+    shape: 'connector',
+    shapeName: 'วงกลมเล็ก (Circle)',
+    symbolText: 'จุดเชื่อมต่อ A',
+    category: 'จุดเชื่อมต่อ',
+    icon: '⭕',
+    hint: 'ใช้เชื่อมเส้นทางในหน้าเดียวกัน เพื่อไม่ให้เส้นตัดกัน'
+  },
+  {
+    id: 'sym_term_end',
+    shape: 'terminator',
+    shapeName: 'วงรีขอบมน (Oval)',
+    symbolText: 'สิ้นสุด (End)',
+    category: 'เริ่มต้น / สิ้นสุด',
+    icon: '🔴',
+    hint: 'ใช้ระบุจุดสิ้นสุดเมื่อโปรแกรมทำงานเสร็จสิ้น'
+  }
+];
+
+// --- Standard Symbols for Guide ---
 const PRIMARY_SYMBOLS = [
   {
     id: 'terminator',
@@ -280,128 +354,6 @@ const QUIZ_QUESTIONS = [
   }
 ];
 
-// --- 4 P.6 Missions + Mission 5 is the 10-Question Quiz ---
-const MISSIONS = [
-  {
-    id: 1,
-    type: 'puzzle',
-    title: 'ภารกิจที่ 1: หุ่นยนต์ชงนมสดหวานมัน 🥛',
-    subtitle: 'โครงสร้างแบบเรียงลำดับ (Sequence)',
-    level: 'ระดับ ป.6 พื้นฐาน',
-    difficultyColor: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-    icon: '🥛',
-    description: 'ช่วยน้องโค้ดดี้ (Cody Bot) จัดลำดับขั้นตอนการชงนมสดหวานมันแสนอร่อยให้ถูกต้องทีละสเต็ป!',
-    expectedOutput: 'นมสดหวานมันพร้อมดื่มแล้ว!',
-    correctOrderIds: ['m1_start', 'm1_step1', 'm1_step2', 'm1_step3', 'm1_step4', 'm1_end'],
-    blocks: [
-      { id: 'm1_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
-      { id: 'm1_step1', text: 'เทนมสดรสจืดลงในแก้ว', shape: 'process' },
-      { id: 'm1_step2', text: 'ตักน้ำตาล 1 ช้อนและคนให้ละลาย', shape: 'process' },
-      { id: 'm1_step3', text: 'ใส่น้ำแข็งก้อนลงไปให้เต็มแก้ว', shape: 'process' },
-      { id: 'm1_step4', text: 'แสดงผล "นมสดเย็นพร้อมเสิร์ฟ"', shape: 'display' },
-      { id: 'm1_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
-    ],
-    executionTrace: [
-      { step: 0, blockId: 'm1_start', msg: '🤖 น้องโค้ดดี้เริ่มเตรียมอุปกรณ์ชงนมสด', vars: { สถานะ: 'เริ่มภารกิจ' } },
-      { step: 1, blockId: 'm1_step1', msg: '🥛 เทนมสดรสจืดปริมาณ 200 มล. ลงแก้ว', vars: { วัตถุดิบ: 'นมสดในแก้ว' } },
-      { step: 2, blockId: 'm1_step2', msg: '🥄 ตักน้ำตาล 1 ช้อนโต๊ะ แล้วคนจนละลายหอมหวาน', vars: { ความหวาน: 'พอดี' } },
-      { step: 3, blockId: 'm1_step3', msg: '🧊 ตักน้ำแข็งใส่แก้วจนเย็นชื่นใจ', vars: { ความเย็น: 'เย็นสดชื่น' } },
-      { step: 4, blockId: 'm1_step4', msg: '🎉 แสดงผลหน้าจอ: นมสดหวานมันพร้อมดื่มแล้วจ้า!', vars: { เครื่องดื่ม: 'พร้อมเสิร์ฟ' } },
-      { step: 5, blockId: 'm1_end', msg: '🏁 ภารกิจสำเร็จ ยอดเยี่ยมมากครับ!', vars: { สรุปผล: 'ผ่านด่าน 1' } }
-    ]
-  },
-  {
-    id: 2,
-    type: 'puzzle',
-    title: 'ภารกิจที่ 2: เครื่องคิดเงินร้านขนมสหกรณ์ 🍰',
-    subtitle: 'การรับค่าข้อมูล (Input) และคำนวณ (Process)',
-    level: 'ระดับ ป.6 ปานกลาง',
-    difficultyColor: 'text-blue-700 bg-blue-50 border-blue-200',
-    icon: '🍰',
-    description: 'สร้างผังงานสำหรับคิดเงินค่าขนม โดยรับราคาขนม (ชิ้นละ 15 บาท) และจำนวนชิ้น (3 ชิ้น) แล้วคำนวณเงินรวม',
-    expectedOutput: 'ยอดรวมเงินค่าขนม = 45 บาท',
-    correctOrderIds: ['m2_start', 'm2_input', 'm2_calc', 'm2_display', 'm2_end'],
-    blocks: [
-      { id: 'm2_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
-      { id: 'm2_input', text: 'รับค่า ราคาขนม (Price) และ จำนวนชิ้น (Qty)', shape: 'inputOutput' },
-      { id: 'm2_calc', text: 'คำนวณ ราคารวม = Price × Qty', shape: 'process' },
-      { id: 'm2_display', text: 'แสดงผลลัพธ์ ยอดเงินที่ต้องจ่าย', shape: 'display' },
-      { id: 'm2_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
-    ],
-    executionTrace: [
-      { step: 0, blockId: 'm2_start', msg: '🤖 เปิดระบบเครื่องคิดเงินร้านสหกรณ์', vars: {} },
-      { step: 1, blockId: 'm2_input', msg: '📥 รับข้อมูล: ราคาขนม 15 บาท, ซื้อ 3 ชิ้น', vars: { Price: 15, Qty: 3 } },
-      { step: 2, blockId: 'm2_calc', msg: '⚙️ คำนวณคณิตศาสตร์: 15 × 3 = 45 บาท', vars: { Price: 15, Qty: 3, Total: 45 } },
-      { step: 3, blockId: 'm2_display', msg: '🖥️ หน้าจอแสดงยอดชำระ: "ยอดเงินรวม = 45 บาท"', vars: { Price: 15, Qty: 3, Total: 45 } },
-      { step: 4, blockId: 'm2_end', msg: '🏁 ปริ้นต์ใบเสร็จและจบการคิดเงิน', vars: { สถานะ: 'จ่ายเงินเรียบร้อย' } }
-    ]
-  },
-  {
-    id: 3,
-    type: 'puzzle',
-    title: 'ภารกิจที่ 3: เครื่องคัดกรองวัดไข้หน้าโรงเรียน 🩺',
-    subtitle: 'โครงสร้างแบบตัดสินใจ (Decision / If-Else)',
-    level: 'ระดับ ป.6 ท้าทาย',
-    difficultyColor: 'text-indigo-700 bg-indigo-50 border-indigo-200',
-    icon: '🩺',
-    description: 'ช่วยโรงเรียนคัดกรองวัดไข้ โดยสแกนอุณหภูมิ ถ้ามากกว่า 37.5°C ให้แจ้งพบครูพยาบาล ถ้าไม่เกินให้เข้าเรียนได้',
-    expectedOutput: 'อุณหภูมิปกติ ยินดีต้อนรับเข้าโรงเรียน!',
-    correctOrderIds: ['m3_start', 'm3_input', 'm3_decision', 'm3_output', 'm3_end'],
-    blocks: [
-      { id: 'm3_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
-      { id: 'm3_input', text: 'สแกนวัดอุณหภูมิร่างกาย (Temp)', shape: 'inputOutput' },
-      { id: 'm3_decision', text: 'ตรวจสอบเงื่อนไข Temp > 37.5 °C ?', shape: 'decision' },
-      { id: 'm3_output', text: 'แสดงผล "ผ่านเข้าห้องเรียนได้" หรือ "พบคุณครูพยาบาล"', shape: 'display' },
-      { id: 'm3_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
-    ],
-    executionTrace: [
-      { step: 0, blockId: 'm3_start', msg: '🤖 เครื่องวัดไข้เปิดพร้อมทำงานหน้าประตูโรงเรียน', vars: {} },
-      { step: 1, blockId: 'm3_input', msg: '📥 สแกนหน้าผากนักเรียน: ได้ค่า Temp = 36.6 °C', vars: { Temp: 36.6 } },
-      { step: 2, blockId: 'm3_decision', msg: '🔶 ตรวจสอบ 36.6 > 37.5 หรือไม่? -> ผลคือ "เท็จ (ไม่ใช่)"', vars: { Temp: 36.6, มีไข้: 'ไม่มี' } },
-      { step: 3, blockId: 'm3_output', msg: '🖥️ หน้าจอแสดงไฟเขียว: "อุณหภูมิปกติ เข้าห้องเรียนได้เลยครับ"', vars: { ผลการตรวจ: 'ผ่าน' } },
-      { step: 4, blockId: 'm3_end', msg: '🏁 สิ้นสุดการตรวจคัดกรองนักเรียนคนนี้', vars: { สถานะ: 'เสร็จสิ้น' } }
-    ]
-  },
-  {
-    id: 4,
-    type: 'puzzle',
-    title: 'ภารกิจที่ 4: หุ่นยนต์กระโดดตบ 5 ครั้ง ฟิตร่างกาย 🏃‍♂️',
-    subtitle: 'โครงสร้างแบบวนซ้ำ (Loop / Repetition)',
-    level: 'ระดับ ป.6 ผู้เชี่ยวชาญ',
-    difficultyColor: 'text-violet-700 bg-violet-50 border-violet-200',
-    icon: '🏃‍♂️',
-    description: 'เขียนผังงานวนซ้ำ สั่งให้น้องโค้ดดี้กระโดดตบออกกำลังกายให้ครบ 5 ครั้ง โดยนับรอบ Count=1 ถึง 5',
-    expectedOutput: 'กระโดดตบครบ 5 ครั้ง ร่างกายแข็งแรง!',
-    correctOrderIds: ['m4_start', 'm4_init', 'm4_check', 'm4_action', 'm4_display', 'm4_end'],
-    blocks: [
-      { id: 'm4_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
-      { id: 'm4_init', text: 'กำหนดตัวนับรอบ Count = 1', shape: 'process' },
-      { id: 'm4_check', text: 'ตรวจสอบเงื่อนไข Count <= 5 ?', shape: 'decision' },
-      { id: 'm4_action', text: 'กระโดดตบ 1 ครั้ง และเพิ่ม Count = Count + 1', shape: 'process' },
-      { id: 'm4_display', text: 'แสดงผล "ออกกำลังกายครบ 5 ครั้งแล้ว!"', shape: 'display' },
-      { id: 'm4_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
-    ],
-    executionTrace: [
-      { step: 0, blockId: 'm4_start', msg: '🤖 น้องโค้ดดี้เตรียมตัวออกกำลังกายคาบพละ', vars: {} },
-      { step: 1, blockId: 'm4_init', msg: '⚙️ ตั้งค่าเริ่มต้น: ตัวนับรอบ Count = 1', vars: { Count: 1 } },
-      { step: 2, blockId: 'm4_check', msg: '🔶 ตรวจสอบ 1 <= 5 (จริง) -> ให้เริ่มกระโดด', vars: { Count: 1 } },
-      { step: 3, blockId: 'm4_action', msg: '🏃‍♂️ กระโดดตบครั้งที่ 1, 2, 3, 4, 5 จนครบ!', vars: { Count: 6, กระโดดครบ: '5 ครั้ง' } },
-      { step: 4, blockId: 'm4_display', msg: '🖥️ แสดงผล: "เย้! กระโดดตบครบ 5 ครั้งแล้ว ร่างกายแข็งแรง"', vars: { สุขภาพ: 'แข็งแรง 100%' } },
-      { step: 5, blockId: 'm4_end', msg: '🏁 จบคาบออกกำลังกายอย่างสมบูรณ์แบบ!', vars: { สรุปผล: 'สำเร็จ' } }
-    ]
-  },
-  {
-    id: 5,
-    type: 'quiz',
-    title: 'ภารกิจที่ 5: แบบทดสอบวัดความรู้ผังงาน ป.6 (10 ข้อ) 🏆',
-    subtitle: 'แบบทดสอบประเมินผลสัมฤทธิ์ (Final Quiz 10 ข้อ)',
-    level: 'ด่านทดสอบความรู้ 10 ข้อ',
-    difficultyColor: 'text-amber-700 bg-amber-50 border-amber-300',
-    icon: '🏆',
-    description: 'ทดสอบความรู้ความเข้าใจเรื่องผังงานและสัญลักษณ์วิทยาการคำนวณ ป.6 จำนวน 10 ข้อ พร้อมเฉลยและใบประกาศคะแนน!'
-  }
-];
-
 // --- Educational YouTube Lessons for Grade 6 ---
 const VIDEO_LESSONS = [
   {
@@ -446,139 +398,255 @@ const VIDEO_LESSONS = [
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('game'); // 'game' | 'guide' | 'video'
+  // Navigation Tabs: 'game' | 'sandbox' | 'guide' | 'video'
+  const [activeTab, setActiveTab] = useState('game');
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Video Tab State
-  const [selectedVideo, setSelectedVideo] = useState(VIDEO_LESSONS[0]);
-  const [customYoutubeUrl, setCustomYoutubeUrl] = useState('');
-  const [customVideoId, setCustomVideoId] = useState(null);
+  // --- Game State (5 Missions) ---
+  const [currentMissionIdx, setCurrentMissionIdx] = useState(0); // 0=DragDrop Sym, 1=Milk, 2=Shop, 3=Temp, 4=Quiz
 
-  // Game State
-  const [currentMissionIdx, setCurrentMissionIdx] = useState(0);
+  // Drag & Drop State for Mission 1 (Randomized Symbol Matching)
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragTargets, setDragTargets] = useState([]); // Slots to fill
+  const [dragAvailablePool, setDragAvailablePool] = useState([]); // Available items to drag
+  const [dragPlacedAnswers, setDragPlacedAnswers] = useState({}); // { [slotId]: item }
+  const [dragResult, setDragResult] = useState(null);
+
+  // Standard Puzzle Missions State (Missions 2-4)
   const [placedSlots, setPlacedSlots] = useState([]);
   const [availableBlocks, setAvailableBlocks] = useState([]);
-  const [gameResult, setGameResult] = useState(null);
-  const [completedMissions, setCompletedMissions] = useState({});
+  const [puzzleResult, setPuzzleResult] = useState(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simStep, setSimStep] = useState(0);
   const [simLogs, setSimLogs] = useState([]);
   const [simVars, setSimVars] = useState({});
 
-  // --- Quiz Mode State (Mission 5) ---
-  const [quizAnswers, setQuizAnswers] = useState({}); // { [questionId]: selectedOptionIndex }
+  // Quiz State (Mission 5)
+  const [quizAnswers, setQuizAnswers] = useState({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
-  const [currentQuizQuestionIdx, setCurrentQuizQuestionIdx] = useState(0);
 
-  const currentMission = MISSIONS[currentMissionIdx];
+  // Completed Missions Record
+  const [completedMissions, setCompletedMissions] = useState({});
 
+  // --- Sandbox Studio State ---
+  const [sandboxNodes, setSandboxNodes] = useState([
+    { id: 'sb_1', shape: 'terminator', text: 'เริ่มต้น (Start)' },
+    { id: 'sb_2', shape: 'inputOutput', text: 'รับค่าตัวเลข X' },
+    { id: 'sb_3', shape: 'process', text: 'คำนวณ Y = X + 10' },
+    { id: 'sb_4', shape: 'display', text: 'แสดงผลลัพธ์ Y' },
+    { id: 'sb_5', shape: 'terminator', text: 'สิ้นสุด (End)' }
+  ]);
+  const [sandboxRunning, setSandboxRunning] = useState(false);
+  const [sandboxLogs, setSandboxLogs] = useState([]);
+
+  // --- Video Tab State ---
+  const [selectedVideo, setSelectedVideo] = useState(VIDEO_LESSONS[0]);
+  const [customYoutubeUrl, setCustomYoutubeUrl] = useState('');
+  const [customVideoId, setCustomVideoId] = useState(null);
+
+  // Initialize mission whenever level changes
   useEffect(() => {
-    initMission(currentMissionIdx);
+    initLevel(currentMissionIdx);
   }, [currentMissionIdx]);
 
-  const initMission = (idx) => {
-    const mission = MISSIONS[idx];
-    if (mission.type === 'puzzle') {
-      const shuffled = [...mission.blocks].sort(() => Math.random() - 0.5);
-      setAvailableBlocks(shuffled);
-      setPlacedSlots([]);
-      setGameResult(null);
-      setIsSimulating(false);
-      setSimStep(0);
-      setSimLogs([]);
-      setSimVars({});
-    } else {
-      // Quiz mode init
+  const initLevel = (idx) => {
+    if (idx === 0) {
+      // Mission 1: Randomize 4 symbols from pool
+      const shuffledPool = [...SYMBOL_ITEMS_POOL].sort(() => Math.random() - 0.5);
+      const selected = shuffledPool.slice(0, 4);
+      
+      // Targets are ordered placeholders
+      const targets = selected.map((item, i) => ({
+        slotId: `slot_${i}`,
+        correctItemId: item.id,
+        category: item.category,
+        shapeName: item.shapeName,
+        hint: item.hint
+      }));
+
+      // Available items are shuffled
+      const poolShuffled = [...selected].sort(() => Math.random() - 0.5);
+
+      setDragTargets(targets);
+      setDragAvailablePool(poolShuffled);
+      setDragPlacedAnswers({});
+      setDragResult(null);
+    } else if (idx === 1) {
+      // Mission 2: Milk
+      initPuzzleLevel([
+        { id: 'm1_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
+        { id: 'm1_step1', text: 'เทนมสดรสจืดลงในแก้ว', shape: 'process' },
+        { id: 'm1_step2', text: 'ตักน้ำตาล 1 ช้อนและคนให้ละลาย', shape: 'process' },
+        { id: 'm1_step3', text: 'ใส่น้ำแข็งก้อนลงไปให้เต็มแก้ว', shape: 'process' },
+        { id: 'm1_step4', text: 'แสดงผล "นมสดเย็นพร้อมเสิร์ฟ"', shape: 'display' },
+        { id: 'm1_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
+      ], ['m1_start', 'm1_step1', 'm1_step2', 'm1_step3', 'm1_step4', 'm1_end']);
+    } else if (idx === 2) {
+      // Mission 3: Shop Calculator
+      initPuzzleLevel([
+        { id: 'm2_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
+        { id: 'm2_input', text: 'รับค่า ราคาขนม (Price), จำนวนชิ้น (Qty)', shape: 'inputOutput' },
+        { id: 'm2_calc', text: 'คำนวณ ราคารวม = Price × Qty', shape: 'process' },
+        { id: 'm2_display', text: 'แสดงผลลัพธ์ ยอดเงินที่ต้องจ่าย', shape: 'display' },
+        { id: 'm2_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
+      ], ['m2_start', 'm2_input', 'm2_calc', 'm2_display', 'm2_end']);
+    } else if (idx === 3) {
+      // Mission 4: Temp Decision
+      initPuzzleLevel([
+        { id: 'm3_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
+        { id: 'm3_input', text: 'สแกนวัดอุณหภูมิร่างกาย (Temp)', shape: 'inputOutput' },
+        { id: 'm3_decision', text: 'ตรวจสอบเงื่อนไข Temp > 37.5 °C ?', shape: 'decision' },
+        { id: 'm3_output', text: 'แสดงผล "เข้าห้องเรียนได้" หรือ "พบครูพยาบาล"', shape: 'display' },
+        { id: 'm3_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
+      ], ['m3_start', 'm3_input', 'm3_decision', 'm3_output', 'm3_end']);
+    } else if (idx === 4) {
+      // Mission 5: Quiz
       setQuizAnswers({});
       setQuizSubmitted(false);
-      setCurrentQuizQuestionIdx(0);
     }
   };
 
-  const handleSelectBlock = (block) => {
-    playSound('click', soundEnabled);
-    if (isSimulating) return;
-    setAvailableBlocks(prev => prev.filter(b => b.id !== block.id));
-    setPlacedSlots(prev => [...prev, block]);
-    setGameResult(null);
+  const initPuzzleLevel = (blocks, correctOrder) => {
+    const shuffled = [...blocks].sort(() => Math.random() - 0.5);
+    setAvailableBlocks(shuffled);
+    setPlacedSlots([]);
+    setPuzzleResult(null);
+    setIsSimulating(false);
+    setSimStep(0);
+    setSimLogs([]);
+    setSimVars({});
   };
 
-  const handleRemoveBlock = (index) => {
-    playSound('click', soundEnabled);
-    if (isSimulating) return;
-    const blockToRemove = placedSlots[index];
-    setPlacedSlots(prev => prev.filter((_, i) => i !== index));
-    setAvailableBlocks(prev => [...prev, blockToRemove]);
-    setGameResult(null);
+  // --- Drag & Drop Handlers for Mission 1 ---
+  const handleDragStart = (e, item) => {
+    setDraggedItem(item);
+    e.dataTransfer.setData('text/plain', item.id);
   };
 
-  const handleVerify = () => {
+  const handleDropOnSlot = (e, slotId) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+    playSound('drop', soundEnabled);
+
+    // If slot already had an item, return it to pool
+    const existing = dragPlacedAnswers[slotId];
+    let newPool = dragAvailablePool.filter(it => it.id !== draggedItem.id);
+    if (existing) {
+      newPool.push(existing);
+    }
+
+    setDragPlacedAnswers(prev => ({ ...prev, [slotId]: draggedItem }));
+    setDragAvailablePool(newPool);
+    setDraggedItem(null);
+    setDragResult(null);
+  };
+
+  const handleRemoveFromSlot = (slotId) => {
+    const item = dragPlacedAnswers[slotId];
+    if (!item) return;
+    playSound('click', soundEnabled);
+    const newAnswers = { ...dragPlacedAnswers };
+    delete newAnswers[slotId];
+    setDragPlacedAnswers(newAnswers);
+    setDragAvailablePool(prev => [...prev, item]);
+    setDragResult(null);
+  };
+
+  // Click-to-place fallback for mobile on Mission 1
+  const handleQuickPlace = (item) => {
+    // Find first empty target slot
+    const emptySlot = dragTargets.find(t => !dragPlacedAnswers[t.slotId]);
+    if (!emptySlot) return;
+    playSound('drop', soundEnabled);
+    setDragPlacedAnswers(prev => ({ ...prev, [emptySlot.slotId]: item }));
+    setDragAvailablePool(prev => prev.filter(it => it.id !== item.id));
+    setDragResult(null);
+  };
+
+  const handleVerifyDragDrop = () => {
+    const filledCount = Object.keys(dragPlacedAnswers).length;
+    if (filledCount < dragTargets.length) {
+      playSound('error', soundEnabled);
+      setDragResult({
+        success: false,
+        message: `น้องๆ ยังวางไม่ครบทุกช่องนะจ๊ะ (วางไปแล้ว ${filledCount}/${dragTargets.length} ช่อง) ลากวางให้ครบก่อนนะ!`
+      });
+      return;
+    }
+
+    let allCorrect = true;
+    dragTargets.forEach(target => {
+      const placed = dragPlacedAnswers[target.slotId];
+      if (!placed || placed.id !== target.correctItemId) {
+        allCorrect = false;
+      }
+    });
+
+    if (allCorrect) {
+      playSound('success', soundEnabled);
+      setDragResult({
+        success: true,
+        message: '🎉 ยอดเยี่ยมมากครับ! ลากสัญลักษณ์ Flowchart มาจับคู่กับหน้าที่ได้ถูกต้อง 100% เต็ม!'
+      });
+      setCompletedMissions(prev => ({ ...prev, 0: true }));
+    } else {
+      playSound('error', soundEnabled);
+      setDragResult({
+        success: false,
+        message: '❌ ยังมีสัญลักษณ์ที่วางสลับที่กันอยู่ ลองอ่านคำใบ้รูปทรงและหน้าที่ แล้วจัดวางใหม่อีกรอบนะครับ'
+      });
+    }
+  };
+
+  // Puzzle verify (Missions 2-4)
+  const handleVerifyPuzzle = () => {
     if (placedSlots.length === 0) {
       playSound('error', soundEnabled);
-      setGameResult({
+      setPuzzleResult({
         success: false,
-        message: 'น้องๆ อย่าลืมคลิกเลือกบล็อกผังงานมาวางก่อนทดสอบนะจ๊ะ! 😊'
+        message: 'กรุณาเลือกวางบล็อกผังงานก่อนทดสอบครับ'
       });
       return;
     }
 
     const currentIds = placedSlots.map(b => b.id);
-    const targetIds = currentMission.correctOrderIds;
+    let correctIds = [];
+    if (currentMissionIdx === 1) correctIds = ['m1_start', 'm1_step1', 'm1_step2', 'm1_step3', 'm1_step4', 'm1_end'];
+    if (currentMissionIdx === 2) correctIds = ['m2_start', 'm2_input', 'm2_calc', 'm2_display', 'm2_end'];
+    if (currentMissionIdx === 3) correctIds = ['m3_start', 'm3_input', 'm3_decision', 'm3_output', 'm3_end'];
 
-    const isMatch = currentIds.length === targetIds.length && 
-                    currentIds.every((id, idx) => id === targetIds[idx]);
+    const isMatch = currentIds.length === correctIds.length && 
+                    currentIds.every((id, idx) => id === correctIds[idx]);
 
     if (isMatch) {
       playSound('success', soundEnabled);
-      setGameResult({
+      setPuzzleResult({
         success: true,
-        message: `🌟 เยี่ยมยอดมากครับน้อง ป.6! เรียงลำดับผังงานของ "${currentMission.title}" ได้ถูกต้อง 100% เต็ม!`
+        message: `🌟 ถูกต้องสมบูรณ์แบบ! เรียงผังงานได้ถูกต้องตามหลักการวิชาวิทยาการคำนวณ ป.6`
       });
-      setCompletedMissions(prev => ({ ...prev, [currentMission.id]: true }));
-      startSimulation();
+      setCompletedMissions(prev => ({ ...prev, [currentMissionIdx]: true }));
+      // Run trace
+      setIsSimulating(true);
+      setSimStep(0);
+      let st = 0;
+      const interval = setInterval(() => {
+        if (st < placedSlots.length) {
+          setSimStep(st);
+          setSimLogs(prev => [...prev, `✅ ทำงานขั้นตอนที่ ${st + 1}: ${placedSlots[st].text}`]);
+          playSound('step', soundEnabled);
+          st++;
+        } else {
+          clearInterval(interval);
+          setIsSimulating(false);
+        }
+      }, 1000);
     } else {
       playSound('error', soundEnabled);
-      setGameResult({
+      setPuzzleResult({
         success: false,
-        message: '💡 ลำดับขั้นตอนยังไม่ถูกต้องนะ ลองตรวจดูจุดเริ่มต้น สิ้นสุด และลำดับการทำงานใหม่อีกรอบนะครับ สู้ๆ!'
+        message: '❌ ลำดับขั้นตอนยังไม่ถูกต้อง ลองตรวจดูจุดเริ่มต้น สิ้นสุด และการคำนวณใหม่อีกครั้งครับ'
       });
     }
-  };
-
-  const startSimulation = () => {
-    setIsSimulating(true);
-    setSimStep(0);
-    setSimLogs([]);
-    setSimVars({});
-
-    const trace = currentMission.executionTrace;
-    let stepIndex = 0;
-
-    const interval = setInterval(() => {
-      if (stepIndex < trace.length) {
-        const item = trace[stepIndex];
-        setSimStep(stepIndex);
-        setSimLogs(prev => [...prev, item.msg]);
-        setSimVars(item.vars || {});
-        playSound('step', soundEnabled);
-        stepIndex++;
-      } else {
-        clearInterval(interval);
-        setIsSimulating(false);
-      }
-    }, 1100);
-  };
-
-  const handleAutoSolve = () => {
-    playSound('click', soundEnabled);
-    const correctMap = new Map(currentMission.blocks.map(b => [b.id, b]));
-    const ordered = currentMission.correctOrderIds.map(id => correctMap.get(id));
-    setPlacedSlots(ordered);
-    setAvailableBlocks([]);
-    setGameResult({
-      success: true,
-      message: '✨ ใส่เฉลยลำดับผังงานที่ถูกต้องให้น้องๆ แล้วจ้า! กดปุ่ม "รันผังงาน" เพื่อดูหุ่นยนต์ทำงานได้เลย'
-    });
   };
 
   // Quiz Handling
@@ -589,57 +657,84 @@ export default function App() {
   };
 
   const handleSubmitQuiz = () => {
-    const answeredCount = Object.keys(quizAnswers).length;
-    if (answeredCount < QUIZ_QUESTIONS.length) {
+    if (Object.keys(quizAnswers).length < QUIZ_QUESTIONS.length) {
       playSound('error', soundEnabled);
-      alert(`น้องๆ ตอบคำถามไปแล้ว ${answeredCount}/10 ข้อ กรุณาตอบให้ครบทุกข้อก่อนส่งคำตอบนะครับ! 😊`);
+      alert('กรุณาตอบคำถามให้ครบทั้ง 10 ข้อก่อนส่งคำตอบครับ 😊');
       return;
     }
-
     playSound('success', soundEnabled);
     setQuizSubmitted(true);
-    setCompletedMissions(prev => ({ ...prev, 5: true }));
-  };
-
-  const handleResetQuiz = () => {
-    playSound('click', soundEnabled);
-    setQuizAnswers({});
-    setQuizSubmitted(false);
-    setCurrentQuizQuestionIdx(0);
+    setCompletedMissions(prev => ({ ...prev, 4: true }));
   };
 
   const calculateQuizScore = () => {
     let score = 0;
     QUIZ_QUESTIONS.forEach(q => {
-      if (quizAnswers[q.id] === q.correctAnswer) {
-        score += 1;
-      }
+      if (quizAnswers[q.id] === q.correctAnswer) score += 1;
     });
     return score;
+  };
+
+  // Sandbox studio runner
+  const handleRunSandbox = () => {
+    playSound('click', soundEnabled);
+    setSandboxRunning(true);
+    setSandboxLogs(['🚀 เริ่มต้นประมวลผลผังงานในห้องทดลอง...']);
+    let step = 0;
+    const intv = setInterval(() => {
+      if (step < sandboxNodes.length) {
+        const node = sandboxNodes[step];
+        setSandboxLogs(prev => [...prev, `▶️ [${node.shape.toUpperCase()}] : ${node.text}`]);
+        playSound('step', soundEnabled);
+        step++;
+      } else {
+        clearInterval(intv);
+        setSandboxLogs(prev => [...prev, '🏁 ประมวลผลผังงานเสร็จสมบูรณ์ 100%!']);
+        setSandboxRunning(false);
+        playSound('success', soundEnabled);
+      }
+    }, 900);
+  };
+
+  const handleAddSandboxNode = (shape) => {
+    playSound('click', soundEnabled);
+    const names = {
+      terminator: 'สิ้นสุด (End)',
+      process: 'คำนวณค่าตัวแปร',
+      inputOutput: 'รับข้อมูลเข้า (Input)',
+      decision: 'ตรวจสอบเงื่อนไข ?',
+      display: 'แสดงผลหน้าจอ'
+    };
+    const newNode = {
+      id: `sb_${Date.now()}`,
+      shape,
+      text: names[shape] || 'บล็อกคำสั่ง'
+    };
+    setSandboxNodes(prev => [...prev, newNode]);
+  };
+
+  const handleRemoveSandboxNode = (id) => {
+    playSound('click', soundEnabled);
+    setSandboxNodes(prev => prev.filter(n => n.id !== id));
   };
 
   const handleLoadCustomUrl = (e) => {
     e.preventDefault();
     if (!customYoutubeUrl.trim()) return;
-    
     let id = customYoutubeUrl.trim();
-    if (id.includes('v=')) {
-      id = id.split('v=')[1].split('&')[0];
-    } else if (id.includes('youtu.be/')) {
-      id = id.split('youtu.be/')[1].split('?')[0];
-    } else if (id.includes('embed/')) {
-      id = id.split('embed/')[1].split('?')[0];
-    }
+    if (id.includes('v=')) id = id.split('v=')[1].split('&')[0];
+    else if (id.includes('youtu.be/')) id = id.split('youtu.be/')[1].split('?')[0];
+    else if (id.includes('embed/')) id = id.split('embed/')[1].split('?')[0];
 
     setCustomVideoId(id);
     setSelectedVideo({
       id: 'custom',
-      title: 'วิดีโอการสอนที่คุณครู/นักเรียนเลือกเอง (Custom Video)',
+      title: 'วิดีโอที่คุณครู/นักเรียนระบุ (Custom Stream)',
       creator: 'YouTube Embed',
       duration: 'กำหนดเอง',
       youtubeId: id,
-      description: 'กำลังเปิดดูวิดีโอที่คุณครูหรือนักเรียนระบุไว้ในหน้านี้',
-      keyPoints: ['ดูคลิปการสอนผังงานแบบเรียลไทม์ได้โดยตรงในหน้านี้']
+      description: 'กำลังเล่นวิดีโอการเรียนรู้จากลิงก์ที่คุณระบุในระบบ',
+      keyPoints: ['ดูวิดีโอการสอนแบบเรียลไทม์ได้โดยตรงในหน้านี้']
     });
   };
 
@@ -648,7 +743,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50/80 via-white to-sky-50 text-slate-800 font-['Prompt',sans-serif] antialiased flex flex-col selection:bg-blue-600 selection:text-white">
       
-      {/* --- Top Navigation Header (Bright & Friendly Grade 6 Theme) --- */}
+      {/* --- Top Header --- */}
       <header className="border-b border-blue-100 bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -660,11 +755,11 @@ export default function App() {
                 <h1 className="text-xl sm:text-2xl font-extrabold bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 bg-clip-text text-transparent tracking-tight">
                   Flowchart Lab ป.6
                 </h1>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold border border-blue-200 shadow-xs">
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold border border-blue-200">
                   วิทยาการคำนวณ
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">ห้องเรียนรู้และเกมผังงานมหาสนุก สำหรับนักเรียนชั้นประถมศึกษาปีที่ 6</p>
+              <p className="text-xs text-slate-500 font-medium">เกม Drag & Drop ผังงาน • ห้องทดลองสร้างผังงาน • ข้อสอบ 10 ข้อ</p>
             </div>
           </div>
 
@@ -673,27 +768,33 @@ export default function App() {
             <nav className="flex items-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200">
               <button
                 onClick={() => { setActiveTab('game'); playSound('click', soundEnabled); }}
-                className={`px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center space-x-1.5 ${
-                  activeTab === 'game' 
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-                    : 'text-slate-600 hover:text-blue-700'
+                className={`px-3 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center space-x-1.5 ${
+                  activeTab === 'game' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-600 hover:text-blue-700'
                 }`}
               >
                 <Trophy className="w-4 h-4 text-amber-300" />
-                <span>เกม & แบบทดสอบ</span>
+                <span>เกมภารกิจ</span>
                 {Object.keys(completedMissions).length > 0 && (
                   <span className="ml-1 text-xs bg-amber-400 text-slate-900 font-black px-1.5 py-0.2 rounded-full">
-                    {Object.keys(completedMissions).length}/{MISSIONS.length} ★
+                    {Object.keys(completedMissions).length}/5 ★
                   </span>
                 )}
               </button>
 
               <button
+                onClick={() => { setActiveTab('sandbox'); playSound('click', soundEnabled); }}
+                className={`px-3 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center space-x-1.5 ${
+                  activeTab === 'sandbox' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-600 hover:text-blue-700'
+                }`}
+              >
+                <Code2 className="w-4 h-4 text-sky-300" />
+                <span>ห้องทดลองสร้างผังงาน</span>
+              </button>
+
+              <button
                 onClick={() => { setActiveTab('guide'); playSound('click', soundEnabled); }}
-                className={`px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center space-x-1.5 ${
-                  activeTab === 'guide' 
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-                    : 'text-slate-600 hover:text-blue-700'
+                className={`px-3 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center space-x-1.5 ${
+                  activeTab === 'guide' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-600 hover:text-blue-700'
                 }`}
               >
                 <BookOpen className="w-4 h-4" />
@@ -702,21 +803,18 @@ export default function App() {
 
               <button
                 onClick={() => { setActiveTab('video'); playSound('click', soundEnabled); }}
-                className={`px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center space-x-1.5 ${
-                  activeTab === 'video' 
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-                    : 'text-slate-600 hover:text-blue-700'
+                className={`px-3 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center space-x-1.5 ${
+                  activeTab === 'video' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-slate-600 hover:text-blue-700'
                 }`}
               >
                 <Tv className="w-4 h-4 text-rose-500" />
-                <span>ดูวิดีโอสอน ป.6</span>
+                <span>วิดีโอสอน</span>
               </button>
             </nav>
 
-            {/* Sound Switcher */}
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              title={soundEnabled ? 'ปิดเสียงเอฟเฟกต์' : 'เปิดเสียงเอฟเฟกต์'}
+              title={soundEnabled ? 'ปิดเสียง' : 'เปิดเสียง'}
               className="p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-300 shadow-sm transition"
             >
               {soundEnabled ? <Volume2 className="w-5 h-5 text-blue-600" /> : <VolumeX className="w-5 h-5 text-slate-400" />}
@@ -725,447 +823,404 @@ export default function App() {
         </div>
       </header>
 
-      {/* --- Main Workspace Area --- */}
+      {/* --- Main Container --- */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         
-        {/* ================= TAB 1: MISSIONS & QUIZ ================= */}
+        {/* ================= TAB 1: GAME MISSIONS ================= */}
         {activeTab === 'game' && (
           <div className="space-y-6">
             
-            {/* Level Selector Banner */}
-            <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
+            {/* Level Selector Header */}
+            <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm shadow-blue-500/5">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-start space-x-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-2xl shrink-0 shadow-xs">
-                    {currentMission.icon}
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-blue-600 font-bold mb-0.5 flex items-center space-x-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>ภารกิจท้าทายวิทยาการคำนวณ ป.6</span>
                   </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-wider text-blue-600 font-bold mb-0.5 flex items-center space-x-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>{currentMission.subtitle}</span>
-                    </div>
-                    <h2 className="text-xl font-black text-slate-900 flex items-center space-x-2">
-                      <span>{currentMission.title}</span>
-                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${currentMission.difficultyColor}`}>
-                        {currentMission.level}
-                      </span>
-                    </h2>
-                    <p className="text-sm text-slate-600 mt-1">{currentMission.description}</p>
-                  </div>
+                  <h2 className="text-xl font-black text-slate-900 flex items-center space-x-2">
+                    {currentMissionIdx === 0 && 'ด่าน 1: 🧩 แดรกแอนด์ดร็อป (Drag & Drop) สัญลักษณ์ Flowchart (สุ่มโจทย์ใหม่ทุกรอบ)'}
+                    {currentMissionIdx === 1 && 'ด่าน 2: 🥛 หุ่นยนต์ชงนมสดหวานมัน (โครงสร้างเรียงลำดับ)'}
+                    {currentMissionIdx === 2 && 'ด่าน 3: 🍰 คิดเงินร้านขนมสหกรณ์ (การรับค่า & คำนวณ)'}
+                    {currentMissionIdx === 3 && 'ด่าน 4: 🩺 เครื่องคัดกรองวัดไข้หน้าโรงเรียน (โครงสร้าง If-Else)'}
+                    {currentMissionIdx === 4 && 'ด่าน 5: 🏆 แบบทดสอบวัดความรู้ผังงาน ป.6 (10 ข้อท้ายบท)'}
+                  </h2>
                 </div>
 
-                {/* Level Tabs */}
+                {/* Level Tabs (1 to 5) */}
                 <div className="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0">
-                  {MISSIONS.map((m, idx) => {
-                    const isDone = completedMissions[m.id];
-                    const isCurrent = idx === currentMissionIdx;
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => {
-                          setCurrentMissionIdx(idx);
-                          playSound('click', soundEnabled);
-                        }}
-                        className={`flex items-center space-x-1.5 px-4 py-2.5 rounded-2xl font-bold text-sm transition-all border shrink-0 ${
-                          isCurrent
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/30'
-                            : isDone
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-blue-300'
-                        }`}
-                      >
-                        <span>{m.icon}</span>
-                        <span>{m.id === 5 ? 'ด่าน 5 (แบบทดสอบ 10 ข้อ)' : `ด่าน ${m.id}`}</span>
-                        {isDone && <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 ml-0.5" />}
-                      </button>
-                    );
-                  })}
+                  {['ด่าน 1 (Drag & Drop)', 'ด่าน 2 (ชงนม)', 'ด่าน 3 (คิดเงิน)', 'ด่าน 4 (วัดไข้)', 'ด่าน 5 (ข้อสอบ 10 ข้อ)'].map((name, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => { setCurrentMissionIdx(idx); playSound('click', soundEnabled); }}
+                      className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all border shrink-0 flex items-center space-x-1.5 ${
+                        currentMissionIdx === idx
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-600/30'
+                          : completedMissions[idx]
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{name}</span>
+                      {completedMissions[idx] && <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
 
-            {/* ================= IF CURRENT MISSION IS PUZZLE (ด่าน 1-4) ================= */}
-            {currentMission.type === 'puzzle' && (
+            {/* ===== LEVEL 1: DRAG & DROP SYMBOL MATCHING (สุ่มโจทย์ทุกครั้งที่เริ่มเกม) ===== */}
+            {currentMissionIdx === 0 && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white rounded-3xl p-6 shadow-lg shadow-blue-600/20">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs px-3 py-1 rounded-full bg-white/20 font-bold border border-white/30">
+                        🎲 โหมดสุ่มโจทย์อัตโนมัติ (Random Generator)
+                      </span>
+                      <h3 className="text-xl font-black mt-2">
+                        ลากวางบล็อกสัญลักษณ์ Flowchart ให้ตรงกับหน้าที่และรูปทรง!
+                      </h3>
+                      <p className="text-xs text-blue-100 mt-1">
+                        👉 วิธีเล่น: ลากบล็อกสัญลักษณ์จากฝั่งขวามาปล่อย (Drop) ลงในช่องคำถามฝั่งซ้าย (หรือคลิกเพื่อส่งลงช่องว่างทันที)
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => initLevel(0)}
+                      className="bg-white text-blue-700 hover:bg-blue-50 font-bold px-4 py-2.5 rounded-2xl transition shadow flex items-center space-x-1.5 text-xs shrink-0 self-start sm:self-center"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>สุ่มโจทย์ชุดใหม่</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  
+                  {/* Left Column: Drop Target Slots (7 cols) */}
+                  <div className="lg:col-span-7 space-y-4">
+                    <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
+                      <h4 className="font-extrabold text-slate-900 text-base mb-4 flex items-center space-x-2">
+                        <Move className="w-5 h-5 text-blue-600" />
+                        <span>ช่องเป้าหมายที่ต้องนำสัญลักษณ์มาวาง ({dragTargets.length} ช่อง)</span>
+                      </h4>
+
+                      <div className="space-y-3.5">
+                        {dragTargets.map((target, idx) => {
+                          const placed = dragPlacedAnswers[target.slotId];
+
+                          return (
+                            <div
+                              key={target.slotId}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={(e) => handleDropOnSlot(e, target.slotId)}
+                              className={`p-4 rounded-2xl border-2 transition-all min-h-[105px] flex flex-col justify-between ${
+                                placed 
+                                  ? 'border-blue-400 bg-blue-50/50 shadow-sm' 
+                                  : 'border-dashed border-blue-200 bg-slate-50/70 hover:bg-blue-50/30'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-xs font-black bg-blue-600 text-white px-2 py-0.5 rounded-lg">
+                                      ช่องที่ {idx + 1}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-800">
+                                      หน้าที่: {target.category}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    💡 <strong>คำใบ้รูปทรง:</strong> {target.shapeName} ({target.hint})
+                                  </p>
+                                </div>
+
+                                {placed && (
+                                  <button
+                                    onClick={() => handleRemoveFromSlot(target.slotId)}
+                                    title="คลิกเพื่อนำออก"
+                                    className="text-rose-500 hover:text-rose-700 bg-white p-1 rounded-lg border border-rose-200 shadow-xs"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Target Drop Content */}
+                              <div className="mt-2 pt-2 border-t border-slate-200/60">
+                                {placed ? (
+                                  <div className="flex items-center space-x-2.5 text-xs font-bold text-blue-900 bg-white p-2 rounded-xl border border-blue-200 shadow-xs animate-fadeIn">
+                                    <span className="text-lg">{placed.icon}</span>
+                                    <span>{placed.symbolText}</span>
+                                    <span className="ml-auto text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
+                                      {placed.shapeName}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-2 text-xs text-blue-400 font-semibold italic">
+                                    ⬇️ ลากบล็อกสัญลักษณ์มาวางที่นี่ (Drop Here)
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Verify Button & Result */}
+                      <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+                        <button
+                          onClick={handleVerifyDragDrop}
+                          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-4 px-6 rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2 transition-all transform active:scale-98 text-base"
+                        >
+                          <CheckSquare className="w-5 h-5" />
+                          <span>ตรวจคำตอบการจับคู่ (Verify Matching)</span>
+                        </button>
+
+                        {dragResult && (
+                          <div className={`p-4 rounded-2xl border flex items-start space-x-3 transition-all ${
+                            dragResult.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-rose-50 border-rose-300 text-rose-900'
+                          }`}>
+                            {dragResult.success ? <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" /> : <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />}
+                            <div>
+                              <p className="text-sm font-bold">{dragResult.message}</p>
+                              {dragResult.success && (
+                                <p className="text-xs text-emerald-700 mt-1">
+                                  เก่งมากครับ! กดสุ่มโจทย์ใหม่ หรือคลิกเลือกด่าน 2 ด้านบนเพื่อไปทำภารกิจต่อไปได้เลย
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Available Draggable Items (5 cols) */}
+                  <div className="lg:col-span-5 space-y-4">
+                    <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-extrabold text-slate-900 text-base flex items-center space-x-2">
+                          <Layers className="w-5 h-5 text-blue-600" />
+                          <span>บล็อกสัญลักษณ์ที่ต้องนำไปวาง</span>
+                        </h4>
+                        <span className="text-xs bg-blue-100 text-blue-800 font-bold px-2.5 py-1 rounded-full">
+                          เหลือ {dragAvailablePool.length} อัน
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-4">
+                        คลิกค้างแล้วลาก (Drag) หรือคลิกเพื่อส่งลงช่องว่างอัตโนมัติ
+                      </p>
+
+                      <div className="space-y-3 min-h-[220px]">
+                        {dragAvailablePool.length === 0 ? (
+                          <div className="text-center py-10 border-2 border-dashed border-emerald-200 bg-emerald-50/50 rounded-2xl">
+                            <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-1.5" />
+                            <p className="text-sm font-black text-emerald-800">นำบล็อกทั้งหมดไปวางแล้ว!</p>
+                            <p className="text-xs text-emerald-600 mt-0.5">กดปุ่มตรวจคำตอบฝั่งซ้ายได้เลยจ้า</p>
+                          </div>
+                        ) : (
+                          dragAvailablePool.map((item) => (
+                            <div
+                              key={item.id}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, item)}
+                              onClick={() => handleQuickPlace(item)}
+                              title="ลากไปวางในช่อง หรือคลิกเพื่อเลือก"
+                              className="p-4 rounded-2xl bg-slate-50 hover:bg-blue-50/80 border-2 border-slate-200 hover:border-blue-400 hover:shadow-md cursor-grab active:cursor-grabbing transition-all flex items-center justify-between group"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <span className="text-2xl">{item.icon}</span>
+                                <div>
+                                  <div className="text-sm font-bold text-slate-800 group-hover:text-blue-700">
+                                    {item.symbolText}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                    รูปทรง: <span className="text-blue-600 font-bold">{item.shapeName}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <span className="text-xs bg-blue-600 text-white font-bold px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition shadow">
+                                ลากเลย ➡️
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* ===== LEVEL 2, 3, 4: PUZZLE FLOWCHART MISSIONS ===== */}
+            {(currentMissionIdx >= 1 && currentMissionIdx <= 3) && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
-                {/* Left Column: Flowchart Canvas Area */}
+                {/* Left: Canvas */}
                 <div className="lg:col-span-7 space-y-4">
                   <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
                     <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
                       <div className="flex items-center space-x-2">
                         <div className="w-3 h-3 rounded-full bg-blue-600 animate-ping" />
-                        <h3 className="font-extrabold text-slate-900 text-base">
-                          กระดานผังงานของน้องๆ (Flowchart Canvas)
-                        </h3>
+                        <h3 className="font-extrabold text-slate-900 text-base">กระดานผังงาน (Flowchart Canvas)</h3>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={handleAutoSolve}
-                          className="text-xs px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-bold transition flex items-center space-x-1"
-                        >
-                          <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                          <span>เฉลยคำตอบ</span>
-                        </button>
-                        <button
-                          onClick={() => initMission(currentMissionIdx)}
-                          className="text-xs px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 font-bold transition flex items-center space-x-1"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>เริ่มใหม่</span>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => initLevel(currentMissionIdx)}
+                        className="text-xs px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-rose-50 font-bold transition flex items-center space-x-1"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>รีเซ็ตกระดาน</span>
+                      </button>
                     </div>
 
-                    {/* Flowchart Drop Slot Container */}
+                    {/* Canvas Slot Container */}
                     <div className="space-y-3 min-h-[380px] bg-gradient-to-b from-blue-50/40 to-slate-50/60 rounded-3xl p-6 border-2 border-dashed border-blue-200/80 flex flex-col items-center justify-start">
                       {placedSlots.length === 0 ? (
                         <div className="my-auto text-center py-12 px-4">
                           <div className="w-16 h-16 rounded-3xl bg-blue-100 text-blue-600 mx-auto flex items-center justify-center mb-3 shadow-sm text-3xl">
                             🧩
                           </div>
-                          <p className="font-extrabold text-slate-800 text-base">กระดานผังงานยังว่างอยู่ครับ</p>
-                          <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
-                            คลิกเลือกบล็อกสัญลักษณ์จากกล่อง "บล็อกคำสั่งที่พร้อมใช้งาน" ทางขวา เพื่อนำมาจัดเรียงผังงานทีละขั้นตอน
-                          </p>
+                          <p className="font-extrabold text-slate-800 text-base">กระดานผังงานยังว่างอยู่</p>
+                          <p className="text-xs text-slate-500 mt-1 max-w-xs">คลิกเลือกบล็อกสัญลักษณ์จากด้านขวาเพื่อนำมาเรียงผังงาน</p>
                         </div>
                       ) : (
-                        placedSlots.map((block, index) => {
-                          const isNodeActive = isSimulating && simStep === index;
-
-                          return (
-                            <React.Fragment key={`${block.id}-${index}`}>
-                              {/* Visual Connecting Arrow */}
-                              {index > 0 && (
-                                <div className="flex flex-col items-center my-0.5">
-                                  <div className={`w-0.5 h-4 ${isNodeActive ? 'bg-blue-600' : 'bg-blue-300'}`} />
-                                  <ArrowDown className={`w-4 h-4 -mt-1 ${isNodeActive ? 'text-blue-600 animate-bounce' : 'text-blue-400'}`} />
-                                </div>
-                              )}
-
-                              {/* Node Block Shape Card */}
-                              <div 
-                                onClick={() => handleRemoveBlock(index)}
-                                title="คลิกเพื่อนำบล็อกออกจากผังงาน"
-                                className={`group cursor-pointer relative transition-all duration-300 transform hover:scale-102 ${
-                                  isNodeActive 
-                                    ? 'ring-4 ring-blue-500 shadow-xl shadow-blue-500/30 scale-105' 
-                                    : 'hover:border-rose-400'
-                                }`}
-                              >
-                                {block.shape === 'decision' ? (
-                                  <div className="py-2">
-                                    <div className="relative border-2 border-indigo-400 bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-8 py-4 rounded-2xl shadow-md flex items-center justify-center space-x-2">
-                                      <span className="text-sm font-bold">{block.text}</span>
-                                      <span className="text-[10px] bg-white/25 px-2 py-0.5 rounded-full font-bold">
-                                        ตัดสินใจ ?
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : block.shape === 'inputOutput' ? (
-                                  <div className="border-2 border-amber-400 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-7 py-3 rounded-xl shadow-md flex items-center justify-between space-x-4 min-w-[280px] transform -skew-x-6">
-                                    <div className="transform skew-x-6 flex items-center space-x-2">
-                                      <span className="text-base">▱</span>
-                                      <span className="text-sm font-bold">{block.text}</span>
-                                    </div>
-                                    <span className="transform skew-x-6 text-[10px] bg-black/20 text-white px-2 py-0.5 rounded-full font-bold">รับ/แสดงค่า</span>
-                                  </div>
-                                ) : block.shape === 'terminator' ? (
-                                  <div className="border-2 border-emerald-400 bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-3 rounded-full shadow-md flex items-center justify-center space-x-2 min-w-[260px]">
-                                    <span className="text-sm font-bold">{block.text}</span>
-                                    <span className="text-xs text-emerald-200">●</span>
-                                  </div>
-                                ) : (
-                                  <div className="border-2 border-blue-400 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3.5 rounded-2xl shadow-md flex items-center justify-between space-x-3 min-w-[280px]">
-                                    <span className="text-sm font-bold">{block.text}</span>
-                                    <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-bold">การปฏิบัติงาน</span>
-                                  </div>
-                                )}
-
-                                {/* Hover badge to remove */}
-                                <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-rose-500 text-white rounded-full p-1 shadow-md">
-                                  <XCircle className="w-4 h-4" />
-                                </div>
+                        placedSlots.map((block, index) => (
+                          <React.Fragment key={`${block.id}-${index}`}>
+                            {index > 0 && (
+                              <div className="flex flex-col items-center my-0.5">
+                                <div className="w-0.5 h-4 bg-blue-300" />
+                                <ArrowDown className="w-4 h-4 -mt-1 text-blue-500" />
                               </div>
-                            </React.Fragment>
-                          );
-                        })
+                            )}
+                            <div 
+                              onClick={() => {
+                                playSound('click', soundEnabled);
+                                const blockToRemove = placedSlots[index];
+                                setPlacedSlots(prev => prev.filter((_, i) => i !== index));
+                                setAvailableBlocks(prev => [...prev, blockToRemove]);
+                                setPuzzleResult(null);
+                              }}
+                              className="group cursor-pointer relative transition-all transform hover:scale-102"
+                            >
+                              <div className={`px-6 py-3 rounded-2xl shadow-md border-2 text-white font-bold text-sm min-w-[260px] flex items-center justify-between ${
+                                block.shape === 'terminator' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 border-emerald-400 rounded-full' :
+                                block.shape === 'decision' ? 'bg-gradient-to-r from-indigo-600 to-blue-600 border-indigo-400' :
+                                block.shape === 'inputOutput' ? 'bg-gradient-to-r from-amber-500 to-amber-600 border-amber-400 transform -skew-x-6' :
+                                'bg-gradient-to-r from-blue-600 to-blue-700 border-blue-400'
+                              }`}>
+                                <span>{block.text}</span>
+                                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">{block.shape}</span>
+                              </div>
+                              <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-rose-500 text-white rounded-full p-1 shadow">
+                                <XCircle className="w-4 h-4" />
+                              </div>
+                            </div>
+                          </React.Fragment>
+                        ))
                       )}
                     </div>
 
-                    {/* Actions & Result Display */}
+                    {/* Actions */}
                     <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <button
-                          onClick={handleVerify}
-                          disabled={isSimulating}
-                          className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-4 px-6 rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2 transition-all transform active:scale-98 disabled:opacity-50 text-base"
-                        >
-                          <Play className="w-5 h-5 fill-current" />
-                          <span>ตรวจคำตอบ & รันผังงาน (Simulate)</span>
-                        </button>
+                      <button
+                        onClick={handleVerifyPuzzle}
+                        disabled={isSimulating}
+                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white font-black py-4 px-6 rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2 transition-all transform active:scale-98 text-base"
+                      >
+                        <Play className="w-5 h-5 fill-current" />
+                        <span>ตรวจคำตอบ & รันผังงาน (Simulate)</span>
+                      </button>
 
-                        {currentMissionIdx < MISSIONS.length - 1 && completedMissions[currentMission.id] && (
-                          <button
-                            onClick={() => {
-                              setCurrentMissionIdx(prev => prev + 1);
-                              playSound('click', soundEnabled);
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-5 rounded-2xl flex items-center space-x-1.5 shadow-lg shadow-emerald-600/25 transition animate-bounce"
-                          >
-                            <span>ไปด่านถัดไป</span>
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Result Banner */}
-                      {gameResult && (
-                        <div className={`p-4 rounded-2xl border flex items-start space-x-3 transition-all ${
-                          gameResult.success 
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900' 
-                            : 'bg-rose-50 border-rose-300 text-rose-900'
-                        }`}>
-                          {gameResult.success ? (
-                            <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
-                          ) : (
-                            <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
-                          )}
-                          <div>
-                            <p className="text-sm font-bold">{gameResult.message}</p>
-                            {gameResult.success && (
-                              <p className="text-xs text-emerald-700 mt-1 font-medium">
-                                🤖 หุ่นยนต์กำลังจำลองการรันผังงานทีละขั้นตอนในกล่องด้านขวามือครับ
-                              </p>
-                            )}
-                          </div>
+                      {puzzleResult && (
+                        <div className={`p-4 rounded-2xl border flex items-start space-x-3 ${puzzleResult.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-rose-50 border-rose-300 text-rose-900'}`}>
+                          {puzzleResult.success ? <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" /> : <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0" />}
+                          <p className="text-sm font-bold">{puzzleResult.message}</p>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Right Column: Available Blocks + Live Console */}
-                <div className="lg:col-span-5 space-y-6">
-                  
-                  {/* Available Blocks Pool */}
+                {/* Right: Available Blocks */}
+                <div className="lg:col-span-5 space-y-4">
                   <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                        <Layers className="w-5 h-5 text-blue-600" />
-                        <h3 className="font-extrabold text-slate-900 text-base">บล็อกคำสั่งที่พร้อมใช้งาน</h3>
-                      </div>
-                      <span className="text-xs bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1 rounded-full font-bold">
-                        เหลือ {availableBlocks.length} บล็อก
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mb-4">👉 คลิกบล็อกด้านล่างเพื่อนำไปเรียงในผังงานตามลำดับขั้นตอน</p>
-
-                    <div className="space-y-2.5 min-h-[170px]">
-                      {availableBlocks.length === 0 ? (
-                        <div className="text-center py-8 border-2 border-dashed border-emerald-200 bg-emerald-50/50 rounded-2xl">
-                          <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-1.5" />
-                          <p className="text-sm font-black text-emerald-800">นำบล็อกทั้งหมดไปวางบนผังงานแล้วจ้า!</p>
-                          <p className="text-xs text-emerald-600 mt-0.5">กดปุ่มสีน้ำเงิน "ตรวจคำตอบ & รันผังงาน" ได้เลย</p>
+                    <h4 className="font-extrabold text-slate-900 text-base mb-3">บล็อกคำสั่งที่พร้อมใช้งาน ({availableBlocks.length})</h4>
+                    <div className="space-y-2.5">
+                      {availableBlocks.map(block => (
+                        <div
+                          key={block.id}
+                          onClick={() => {
+                            playSound('click', soundEnabled);
+                            setAvailableBlocks(prev => prev.filter(b => b.id !== block.id));
+                            setPlacedSlots(prev => [...prev, block]);
+                            setPuzzleResult(null);
+                          }}
+                          className="p-3.5 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 cursor-pointer transition flex items-center justify-between group"
+                        >
+                          <span className="text-sm font-bold text-slate-800 group-hover:text-blue-700">{block.text}</span>
+                          <span className="text-xs bg-blue-600 text-white font-bold px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition">เลือก +</span>
                         </div>
-                      ) : (
-                        availableBlocks.map((block) => (
-                          <div
-                            key={block.id}
-                            onClick={() => handleSelectBlock(block)}
-                            className="group p-3.5 rounded-2xl bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 hover:shadow-md hover:shadow-blue-500/10 cursor-pointer transition-all flex items-center justify-between"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <span className="text-xl">
-                                {block.shape === 'terminator' ? '🟢' : block.shape === 'decision' ? '🔶' : block.shape === 'inputOutput' ? '▱' : '🟦'}
-                              </span>
-                              <div>
-                                <p className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition">
-                                  {block.text}
-                                </p>
-                                <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-blue-50 text-blue-700 border-blue-200">
-                                  {block.shape === 'terminator' ? 'เริ่มต้น/จบ' : block.shape === 'decision' ? 'การตัดสินใจ' : block.shape === 'inputOutput' ? 'รับ/แสดงผล' : 'การทำงาน'}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="opacity-0 group-hover:opacity-100 transition p-1.5 bg-blue-600 text-white rounded-xl shadow">
-                              <ArrowRight className="w-3.5 h-3.5" />
-                            </div>
-                          </div>
-                        ))
-                      )}
+                      ))}
                     </div>
                   </div>
-
-                  {/* Simulation Terminal & Variable Watcher */}
-                  <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm shadow-blue-500/5">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100 text-xs">
-                      <div className="flex items-center space-x-2 text-slate-700">
-                        <Terminal className="w-4 h-4 text-blue-600" />
-                        <span className="font-extrabold text-slate-900 text-sm">การทำงานของหุ่นยนต์ (Simulator)</span>
-                      </div>
-                      {isSimulating && (
-                        <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full font-bold text-[11px] flex items-center space-x-1">
-                          <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping inline-block" />
-                          <span>รันขั้นตอนที่ #{simStep + 1}</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Variables Watch Card */}
-                    <div className="bg-gradient-to-r from-blue-50/90 to-sky-50/90 p-3 rounded-2xl border border-blue-100 mb-3">
-                      <div className="text-xs text-blue-800 font-bold mb-1.5 flex items-center space-x-1">
-                        <Code2 className="w-3.5 h-3.5 text-blue-600" />
-                        <span>ค่าตัวแปรในระบบ (Live Variables):</span>
-                      </div>
-                      {Object.keys(simVars).length === 0 ? (
-                        <p className="text-slate-400 text-xs italic">ยังไม่มีตัวแปรที่กำลังประมวลผล</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {Object.entries(simVars).map(([k, v]) => (
-                            <span key={k} className="text-xs bg-white px-2.5 py-1 rounded-xl border border-blue-200 text-blue-900 font-bold shadow-xs">
-                              {k}: <strong className="text-indigo-600 font-black">{String(v)}</strong>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Terminal Log Output */}
-                    <div className="space-y-2 text-xs bg-slate-900 text-emerald-400 p-4 rounded-2xl min-h-[110px] max-h-[140px] overflow-y-auto shadow-inner font-mono">
-                      {simLogs.length === 0 ? (
-                        <p className="text-slate-500 italic">กดปุ่ม "ตรวจคำตอบ & รันผังงาน" เพื่อดูน้องโค้ดดี้ทำงานแบบสดๆ</p>
-                      ) : (
-                        simLogs.map((log, i) => (
-                          <div key={i} className="flex items-start space-x-2 animate-fadeIn">
-                            <span className="text-blue-400 font-bold">&gt;</span>
-                            <span className="text-slate-100">{log}</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
                 </div>
 
               </div>
             )}
 
-            {/* ================= IF CURRENT MISSION IS QUIZ (ด่าน 5: 10 ข้อ) ================= */}
-            {currentMission.type === 'quiz' && (
+            {/* ===== LEVEL 5: 10-QUESTION QUIZ ===== */}
+            {currentMissionIdx === 4 && (
               <div className="space-y-6">
-                
-                {/* Quiz Header Info */}
-                <div className="bg-white border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-sm shadow-blue-500/5">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200 mb-2">
-                        <Trophy className="w-4 h-4 text-amber-500" />
-                        <span>แบบทดสอบท้ายบทเรียน วิทยาการคำนวณ ป.6 (10 ข้อ)</span>
-                      </div>
-                      <h3 className="text-2xl font-black text-slate-900">
-                        แบบทดสอบวัดความรู้เรื่องผังงาน (Flowchart Quiz)
-                      </h3>
-                      <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                        คลิกเลือกคำตอบที่ถูกต้องที่สุดในแต่ละข้อ เมื่อทำครบทั้ง 10 ข้อแล้วให้กดปุ่ม "ส่งคำตอบและดูผลคะแนน"
-                      </p>
+                      <span className="text-xs bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-full border border-amber-300">
+                        🏆 แบบทดสอบท้ายบท 10 ข้อ
+                      </span>
+                      <h3 className="text-2xl font-black text-slate-900 mt-2">แบบทดสอบวัดผลสัมฤทธิ์ วิทยาการคำนวณ ป.6</h3>
                     </div>
-
-                    {/* Progress Badge */}
-                    <div className="bg-blue-50 border border-blue-200 p-4 rounded-2xl text-center shrink-0">
-                      <div className="text-xs font-bold text-blue-700">ตอบไปแล้ว</div>
-                      <div className="text-2xl font-black text-blue-900 mt-0.5">
-                        {Object.keys(quizAnswers).length} / {QUIZ_QUESTIONS.length}
-                      </div>
-                      <div className="text-[11px] text-blue-600 mt-0.5">ข้อ</div>
+                    <div className="text-right">
+                      <div className="text-xs font-bold text-slate-500">ตอบไปแล้ว</div>
+                      <div className="text-2xl font-black text-blue-700">{Object.keys(quizAnswers).length} / 10</div>
                     </div>
                   </div>
                 </div>
 
-                {/* Questions List */}
                 <div className="space-y-4">
-                  {QUIZ_QUESTIONS.map((q, idx) => {
-                    const selectedOpt = quizAnswers[q.id];
-                    const isAnswered = selectedOpt !== undefined;
-                    const isCorrect = selectedOpt === q.correctAnswer;
-
+                  {QUIZ_QUESTIONS.map((q) => {
+                    const selected = quizAnswers[q.id];
+                    const isCorrect = selected === q.correctAnswer;
                     return (
-                      <div 
-                        key={q.id}
-                        className={`bg-white border rounded-3xl p-6 transition-all shadow-sm ${
-                          quizSubmitted 
-                            ? isCorrect 
-                              ? 'border-emerald-300 bg-emerald-50/30' 
-                              : 'border-rose-300 bg-rose-50/30'
-                            : isAnswered 
-                            ? 'border-blue-300 shadow-md shadow-blue-500/5' 
-                            : 'border-blue-100'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3 mb-4">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-2xl">{q.icon}</span>
-                            <h4 className="text-base font-extrabold text-slate-900">
-                              {q.question}
-                            </h4>
-                          </div>
+                      <div key={q.id} className={`bg-white border rounded-3xl p-6 shadow-sm ${quizSubmitted ? (isCorrect ? 'border-emerald-300 bg-emerald-50/20' : 'border-rose-300 bg-rose-50/20') : 'border-blue-100'}`}>
+                        <div className="flex items-start justify-between mb-3">
+                          <h4 className="font-extrabold text-base text-slate-900">{q.question}</h4>
                           {quizSubmitted && (
-                            <div>
-                              {isCorrect ? (
-                                <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-full text-xs font-black flex items-center space-x-1">
-                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>ถูกต้อง +1</span>
-                                </span>
-                              ) : (
-                                <span className="bg-rose-100 text-rose-800 border border-rose-300 px-3 py-1 rounded-full text-xs font-black flex items-center space-x-1">
-                                  <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                                  <span>ตอบผิด 0</span>
-                                </span>
-                              )}
-                            </div>
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-black ${isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                              {isCorrect ? 'ถูกต้อง +1' : 'ผิด 0'}
+                            </span>
                           )}
                         </div>
 
-                        {/* Options */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {q.options.map((opt, optIdx) => {
-                            const isChosen = selectedOpt === optIdx;
-                            const isThisCorrect = q.correctAnswer === optIdx;
-
-                            let optionStyle = 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300';
-                            
-                            if (quizSubmitted) {
-                              if (isThisCorrect) {
-                                optionStyle = 'bg-emerald-100 border-emerald-400 text-emerald-950 font-bold ring-2 ring-emerald-400/30';
-                              } else if (isChosen && !isThisCorrect) {
-                                optionStyle = 'bg-rose-100 border-rose-400 text-rose-950 font-bold line-through';
-                              } else {
-                                optionStyle = 'bg-slate-50 border-slate-200 text-slate-400 opacity-60';
-                              }
-                            } else if (isChosen) {
-                              optionStyle = 'bg-blue-600 text-white border-blue-600 font-bold shadow-md shadow-blue-600/20';
-                            }
-
-                            return (
-                              <button
-                                key={optIdx}
-                                disabled={quizSubmitted}
-                                onClick={() => handleSelectQuizOption(q.id, optIdx)}
-                                className={`p-4 rounded-2xl border text-left text-sm transition-all flex items-center justify-between ${optionStyle}`}
-                              >
-                                <span>{opt}</span>
-                                {isChosen && !quizSubmitted && (
-                                  <CheckCircle className="w-4 h-4 text-white shrink-0 ml-2" />
-                                )}
-                              </button>
-                            );
-                          })}
+                          {q.options.map((opt, optIdx) => (
+                            <button
+                              key={optIdx}
+                              disabled={quizSubmitted}
+                              onClick={() => handleSelectQuizOption(q.id, optIdx)}
+                              className={`p-3.5 rounded-2xl border text-left text-sm font-semibold transition ${
+                                selected === optIdx ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-50'
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
                         </div>
 
-                        {/* Detailed explanation shown after submission */}
                         {quizSubmitted && (
-                          <div className="mt-4 pt-3 border-t border-slate-100 text-xs bg-white p-3.5 rounded-2xl border border-slate-200">
-                            <span className="font-bold text-blue-700">📖 คำอธิบายเฉลย: </span>
-                            <span className="text-slate-700">{q.explanation}</span>
+                          <div className="mt-3 text-xs bg-white p-3 rounded-xl border border-slate-200 text-slate-700">
+                            <strong className="text-blue-700">เฉลย: </strong>{q.explanation}
                           </div>
                         )}
                       </div>
@@ -1173,425 +1228,257 @@ export default function App() {
                   })}
                 </div>
 
-                {/* Submit & Score Banner */}
-                <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
+                {/* Submit Quiz Banner */}
+                <div className="bg-white border border-blue-100 rounded-3xl p-6 text-center">
                   {!quizSubmitted ? (
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="text-xs text-slate-500">
-                        {Object.keys(quizAnswers).length === QUIZ_QUESTIONS.length ? (
-                          <span className="text-emerald-600 font-bold flex items-center space-x-1">
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>น้องๆ ตอบครบทั้ง 10 ข้อแล้ว พร้อมส่งคำตอบครับ!</span>
-                          </span>
-                        ) : (
-                          <span>ตอบไปแล้ว {Object.keys(quizAnswers).length} จาก 10 ข้อ (กรุณาตอบให้ครบทุกข้อ)</span>
-                        )}
-                      </div>
-
-                      <button
-                        onClick={handleSubmitQuiz}
-                        className="w-full sm:w-auto bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-4 px-8 rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center space-x-2 transition-all transform active:scale-98 text-base"
-                      >
-                        <Award className="w-5 h-5" />
-                        <span>ส่งคำตอบและดูผลคะแนน (Submit Quiz)</span>
-                      </button>
-                    </div>
+                    <button
+                      onClick={handleSubmitQuiz}
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-4 px-8 rounded-2xl shadow-lg shadow-blue-600/30 text-base"
+                    >
+                      ส่งคำตอบและดูผลคะแนน (10 ข้อ)
+                    </button>
                   ) : (
-                    /* Final Score Card Certificate */
-                    <div className="text-center py-6 space-y-4">
-                      <div className="inline-flex p-4 rounded-3xl bg-amber-50 border-2 border-amber-300 text-amber-500 shadow-md">
-                        <Trophy className="w-12 h-12 animate-bounce" />
-                      </div>
-                      
-                      <h3 className="text-2xl sm:text-3xl font-black text-slate-900">
-                        🎉 ผลคะแนนแบบทดสอบ ป.6 ของคุณ
-                      </h3>
-
-                      <div className="inline-block bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-8 py-4 rounded-3xl shadow-xl shadow-blue-600/25">
-                        <div className="text-xs text-blue-200 font-bold uppercase tracking-wider">คะแนนที่ได้</div>
-                        <div className="text-4xl sm:text-5xl font-black mt-1">
-                          {calculateQuizScore()} <span className="text-2xl text-blue-200">/ 10</span>
-                        </div>
-                        <div className="text-xs text-amber-300 font-bold mt-1">
-                          {calculateQuizScore() >= 8 ? '🌟 ระดับยอดเยี่ยมมาก! (เกรด 4)' : calculateQuizScore() >= 5 ? '👍 ผ่านเกณฑ์ประเมิน (เกรดดี)' : '📖 ทบทวนบทเรียนอีกนิดนะ สู้ๆ!'}
-                        </div>
-                      </div>
-
-                      <p className="text-sm text-slate-600 max-w-md mx-auto">
-                        สามารถเลื่อนขึ้นไปตรวจดูเฉลยละเอียดและเหตุผลในแต่ละข้อด้านบนได้เลยครับ
-                      </p>
-
-                      <div className="pt-3">
-                        <button
-                          onClick={handleResetQuiz}
-                          className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 px-6 rounded-2xl border border-slate-300 transition flex items-center space-x-2 mx-auto"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                          <span>ทำแบบทดสอบใหม่อีกครั้ง</span>
-                        </button>
-                      </div>
+                    <div className="space-y-3">
+                      <h4 className="text-2xl font-black text-slate-900">คะแนนของคุณ: {calculateQuizScore()} / 10</h4>
+                      <button
+                        onClick={() => { setQuizAnswers({}); setQuizSubmitted(false); }}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-6 rounded-xl border border-slate-300 text-xs"
+                      >
+                        ทำแบบทดสอบใหม่อีกครั้ง
+                      </button>
                     </div>
                   )}
                 </div>
-
               </div>
             )}
 
           </div>
         )}
 
-        {/* ================= TAB 2: GRADE 6 FLOWCHART HANDBOOK ================= */}
+        {/* ================= TAB 2: FLOWCHART SANDBOX STUDIO (ห้องทดลองสร้างผังงาน) ================= */}
+        {activeTab === 'sandbox' && (
+          <div className="space-y-6">
+            <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full">
+                    🧪 ห้องทดลองสร้างผังงานอิสระ (Sandbox Studio)
+                  </span>
+                  <h2 className="text-xl font-black text-slate-900 mt-2">
+                    ออกแบบและจำลองการรันผังงานด้วยตัวเอง
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    คลิกเพิ่มบล็อกสัญลักษณ์ ปรับแก้ข้อความ และกดปุ่มรันผังงานเพื่อดูการทำงานได้ทันที
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleRunSandbox}
+                  disabled={sandboxRunning || sandboxNodes.length === 0}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-blue-600/25 flex items-center space-x-2 transition self-start sm:self-center disabled:opacity-50"
+                >
+                  <Play className="w-5 h-5 fill-current" />
+                  <span>{sandboxRunning ? 'กำลังรันผังงาน...' : 'รันผังงาน (Execute Flow)'}</span>
+                </button>
+              </div>
+
+              {/* Add Block Toolbar */}
+              <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-600 mr-2">+ เพิ่มบล็อก:</span>
+                <button onClick={() => handleAddSandboxNode('terminator')} className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs hover:bg-emerald-100">
+                  🟢 เริ่ม/จบ
+                </button>
+                <button onClick={() => handleAddSandboxNode('process')} className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-300 font-bold text-xs hover:bg-blue-100">
+                  🟦 ประมวลผล (Process)
+                </button>
+                <button onClick={() => handleAddSandboxNode('inputOutput')} className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 font-bold text-xs hover:bg-amber-100">
+                  ▱ รับ/แสดงผล (I/O)
+                </button>
+                <button onClick={() => handleAddSandboxNode('decision')} className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-300 font-bold text-xs hover:bg-indigo-100">
+                  🔶 ตัดสินใจ (Decision)
+                </button>
+                <button onClick={() => handleAddSandboxNode('display')} className="px-3 py-1.5 rounded-xl bg-cyan-50 text-cyan-700 border border-cyan-300 font-bold text-xs hover:bg-cyan-100">
+                  🖥️ หน้าจอ (Display)
+                </button>
+              </div>
+            </div>
+
+            {/* Sandbox Canvas & Console Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Canvas List */}
+              <div className="lg:col-span-7 bg-white border border-blue-100 rounded-3xl p-6 shadow-sm min-h-[400px]">
+                <h4 className="font-extrabold text-slate-900 text-base mb-4">ผังงานของคุณ ({sandboxNodes.length} บล็อก)</h4>
+                
+                <div className="space-y-3 flex flex-col items-center">
+                  {sandboxNodes.map((node, idx) => (
+                    <React.Fragment key={node.id}>
+                      {idx > 0 && (
+                        <div className="flex flex-col items-center my-0.5">
+                          <div className="w-0.5 h-3 bg-blue-300" />
+                          <ArrowDown className="w-4 h-4 -mt-1 text-blue-500" />
+                        </div>
+                      )}
+                      <div className="w-full max-w-md p-3.5 rounded-2xl border-2 border-blue-200 bg-slate-50 flex items-center justify-between shadow-xs">
+                        <div className="flex items-center space-x-2.5 flex-1 mr-2">
+                          <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
+                            #{idx + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={node.text}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSandboxNodes(prev => prev.map(n => n.id === node.id ? { ...n, text: val } : n));
+                            }}
+                            className="bg-white border border-slate-300 rounded-xl px-3 py-1 text-xs font-bold text-slate-800 flex-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleRemoveSandboxNode(node.id)}
+                          className="text-rose-500 hover:text-rose-700 p-1 rounded-lg border border-slate-200 bg-white"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+
+              {/* Console Output */}
+              <div className="lg:col-span-5 bg-slate-950 border border-slate-800 rounded-3xl p-5 shadow-xl font-mono text-xs text-slate-200 min-h-[300px]">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+                  <div className="flex items-center space-x-2 text-emerald-400 font-bold">
+                    <Terminal className="w-4 h-4" />
+                    <span>Live Simulator Console</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-slate-300">
+                  {sandboxLogs.length === 0 ? (
+                    <p className="text-slate-600 italic">กดปุ่ม "รันผังงาน" เพื่อดูผลการทำงานแบบ Step-by-Step</p>
+                  ) : (
+                    sandboxLogs.map((log, i) => (
+                      <div key={i} className="animate-fadeIn">
+                        <span className="text-blue-400">&gt; </span>{log}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* ================= TAB 3: FLOWCHART HANDBOOK ================= */}
         {activeTab === 'guide' && (
           <div className="space-y-8">
-            
-            {/* Guide Header Banner */}
-            <div className="bg-white border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-sm shadow-blue-500/5">
+            <div className="bg-white border border-blue-100 rounded-3xl p-8 shadow-sm">
               <div className="max-w-4xl">
-                <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200 mb-3">
-                  <GraduationCap className="w-4 h-4 text-blue-600" />
-                  <span>หลักสูตรวิทยาการคำนวณ ชั้นประถมศึกษาปีที่ 6</span>
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                  คู่มือสัญลักษณ์ผังงาน (Flowchart) ฉบับเข้าใจง่ายสำหรับ ป.6
+                <span className="text-xs bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full">
+                  📚 คู่มือสัญลักษณ์มาตรฐาน วิทยาการคำนวณ ป.6
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
+                  สารานุกรมรูปทรงสัญลักษณ์ผังงาน (Flowchart Handbook)
                 </h2>
-                <p className="text-slate-600 mt-2 text-sm sm:text-base leading-relaxed font-normal">
-                  ผังงาน (Flowchart) คือ การใช้รูปภาพสัญลักษณ์แทนลำดับขั้นตอนการแก้ปัญหาหรือการสั่งงานคอมพิวเตอร์ ช่วยให้เรามองเห็นภาพรวม คิดอย่างเป็นขั้นตอน และแก้ปัญหาได้อย่างถูกต้องแม่นยำ
+                <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                  สรุปความหมายและวิธีใช้งานสัญลักษณ์ผังงานมาตรฐาน ANSI/ISO ทุกรูปทรงสำหรับนักเรียนชั้น ป.6
                 </p>
               </div>
             </div>
 
-            {/* 1. All Standard Symbols for Grade 6 */}
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <Layers className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-black text-slate-900">
-                  สัญลักษณ์ผังงานที่น้องๆ ป.6 ต้องรู้ ({PRIMARY_SYMBOLS.length} สัญลักษณ์หลัก)
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {PRIMARY_SYMBOLS.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className="bg-white border border-blue-100 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-500/10 rounded-3xl p-6 transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      {/* Visual Shape Preview Box */}
-                      <div className="h-32 bg-gradient-to-br from-blue-50/50 via-slate-50 to-sky-50/30 rounded-2xl border border-blue-100 flex items-center justify-center p-4 mb-4">
-                        {item.shapeType === 'oval' && (
-                          <div className={`border-2 border-emerald-400 bg-gradient-to-r ${item.colorGradient} text-white px-7 py-2.5 rounded-full text-xs font-bold shadow-md`}>
-                            เริ่มต้น / สิ้นสุด
-                          </div>
-                        )}
-                        {item.shapeType === 'rectangle' && (
-                          <div className={`border-2 border-blue-400 bg-gradient-to-r ${item.colorGradient} text-white px-7 py-3 rounded-xl text-xs font-bold shadow-md`}>
-                            การปฏิบัติงาน / คำนวณ
-                          </div>
-                        )}
-                        {item.shapeType === 'parallelogram' && (
-                          <div className={`border-2 border-amber-400 bg-gradient-to-r ${item.colorGradient} text-white px-7 py-2.5 rounded-lg transform -skew-x-12 text-xs font-bold shadow-md`}>
-                            <span className="transform skew-x-12 inline-block">รับข้อมูล / แสดงผล</span>
-                          </div>
-                        )}
-                        {item.shapeType === 'diamond' && (
-                          <div className={`border-2 border-indigo-400 bg-gradient-to-r ${item.colorGradient} text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-md`}>
-                            เงื่อนไขตัดสินใจ ?
-                          </div>
-                        )}
-                        {item.shapeType === 'displayShape' && (
-                          <div className={`border-2 border-cyan-400 bg-gradient-to-r ${item.colorGradient} text-white px-6 py-2.5 rounded-l-2xl rounded-r-sm text-xs font-bold shadow-md`}>
-                            แสดงผลทางหน้าจอ
-                          </div>
-                        )}
-                        {item.shapeType === 'circle' && (
-                          <div className={`border-2 border-rose-400 bg-gradient-to-r ${item.colorGradient} text-white w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shadow-md`}>
-                            A
-                          </div>
-                        )}
-                        {item.shapeType === 'arrow' && (
-                          <div className="flex items-center space-x-2 text-slate-700 font-bold text-sm">
-                            <span className="w-12 h-1 bg-slate-700 rounded-full" />
-                            <ArrowRight className="w-6 h-6 text-slate-800 -ml-2" />
-                          </div>
-                        )}
-                      </div>
-
-                      <h4 className="font-extrabold text-slate-900 text-base flex items-center space-x-2">
-                        <span>{item.icon}</span>
-                        <span>{item.name}</span>
-                      </h4>
-                      <p className="text-xs font-bold text-blue-600 mt-0.5">
-                        รูปทรง: {item.shapeName}
-                      </p>
-
-                      <p className="text-xs text-slate-600 mt-2.5 leading-relaxed font-normal">
-                        {item.simpleExplain}
-                      </p>
-
-                      <div className="mt-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
-                        <span className="text-slate-500 font-bold">💡 ตัวอย่าง: </span>
-                        <span className="text-indigo-700 font-bold">{item.example}</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold ${item.badge}`}>
-                        {item.category}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-medium">วิทยาการคำนวณ ป.6</span>
-                    </div>
+            {/* Symbol Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {PRIMARY_SYMBOLS.map((item) => (
+                <div key={item.id} className="bg-white border border-blue-100 hover:border-blue-300 rounded-3xl p-6 transition shadow-sm">
+                  <div className="h-28 bg-gradient-to-br from-blue-50/60 to-slate-50 rounded-2xl border border-blue-100 flex items-center justify-center p-4 mb-4">
+                    <span className={`border-2 text-white font-bold text-xs px-6 py-2 rounded-xl shadow bg-gradient-to-r ${item.colorGradient}`}>
+                      {item.name.split(' ')[0]}
+                    </span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 2. Core 3 Flowchart Control Structures */}
-            <div className="bg-white border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-sm shadow-blue-500/5">
-              <div className="flex items-center space-x-2 mb-2">
-                <Compass className="w-5 h-5 text-blue-600" />
-                <h3 className="text-xl font-black text-slate-900">
-                  โครงสร้างผังงาน 3 รูปแบบหลักที่ ป.6 ต้องรู้
-                </h3>
-              </div>
-              <p className="text-xs text-slate-500 mb-6">
-                การแก้ปัญหาและการเขียนโปรแกรมทุกอย่าง จะประกอบด้วย 3 รูปแบบโครงสร้างนี้เสมอ
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {PRIMARY_STRUCTURES.map((struct, idx) => (
-                  <div key={idx} className={`border rounded-3xl p-6 ${struct.color} flex flex-col justify-between`}>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-2xl">{struct.icon}</span>
-                        <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${struct.badge}`}>
-                          รูปแบบที่ {idx + 1}
-                        </span>
-                      </div>
-                      <h4 className="font-extrabold text-base mb-1">{struct.title}</h4>
-                      <p className="text-xs font-bold text-blue-600 mb-2">{struct.subtitle}</p>
-                      <p className="text-xs leading-relaxed opacity-90 mb-4 font-normal">{struct.desc}</p>
-                      
-                      <div className="space-y-1.5 text-xs font-bold bg-white/80 p-3.5 rounded-2xl border border-slate-200/60 mb-3">
-                        <div className="text-[10px] text-slate-500 font-normal mb-1">ลำดับขั้นตอนตัวอย่าง:</div>
-                        {struct.exampleSteps.map((st, sIdx) => (
-                          <div key={sIdx} className="flex items-center space-x-1.5 text-slate-800">
-                            <Check className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                            <span>{st}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  <h4 className="font-extrabold text-slate-900 text-base">{item.icon} {item.name}</h4>
+                  <p className="text-xs font-bold text-blue-600 mt-0.5">รูปทรง: {item.shapeName}</p>
+                  <p className="text-xs text-slate-600 mt-2">{item.simpleExplain}</p>
+                  <div className="mt-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs">
+                    <strong>ตัวอย่าง: </strong>{item.example}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-
-            {/* 3. Friendly Tips for Writing Flowcharts */}
-            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white rounded-3xl p-6 sm:p-8 shadow-lg shadow-blue-600/20">
-              <h3 className="text-lg font-black flex items-center space-x-2 mb-3">
-                <Sparkles className="w-5 h-5 text-amber-300" />
-                <span>เคล็ดลับ 4 ข้อง่ายๆ ในการวาดผังงานให้ได้คะแนนเต็ม 💯</span>
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 text-xs">
-                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/15">
-                  <div className="font-black text-amber-300 text-sm mb-1">1. เริ่มและจบเสมอ</div>
-                  <p className="text-blue-100">อย่าลืมใส่ "เริ่มต้น" ที่หัว และ "สิ้นสุด" ที่ท้ายผังงานทุกครั้ง</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/15">
-                  <div className="font-black text-amber-300 text-sm mb-1">2. มีหัวลูกศรชี้</div>
-                  <p className="text-blue-100">เส้นเชื่อมทุกเส้นต้องมีหัวลูกศรชี้ทิศทางเสมอ จากบนลงล่าง</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/15">
-                  <div className="font-black text-amber-300 text-sm mb-1">3. สัญลักษณ์ถูกต้อง</div>
-                  <p className="text-blue-100">ใช้สี่เหลี่ยมผืนผ้าเมื่อคำนวณ และใช้ข้าวหลามตัดเมื่อตัดสินใจ</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/15">
-                  <div className="font-black text-amber-300 text-sm mb-1">4. ข้อความสั้นกระชับ</div>
-                  <p className="text-blue-100">เขียนข้อความสั้นๆ ได้ใจความ ไม่เขียนยาวจนล้นรูปสัญลักษณ์</p>
-                </div>
-              </div>
-            </div>
-
           </div>
         )}
 
-        {/* ================= TAB 3: GRADE 6 VIDEO LESSONS ================= */}
+        {/* ================= TAB 4: VIDEO LEARNING ================= */}
         {activeTab === 'video' && (
           <div className="space-y-6">
-            
-            {/* Header Video Bar */}
-            <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
+            <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200 mb-2">
-                    <Video className="w-4 h-4 text-rose-600" />
-                    <span>ห้องเรียนรู้วิดีโอและการสอนสด (Grade 6 Video Classroom)</span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                    ดูวิดีโอคลิปการสอนผังงาน ป.6 แบบเข้าใจง่าย
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                    คลิกเลือกบทเรียน ป.6 ด้านล่าง หรือวางลิงก์ YouTube ที่ต้องการเพื่อเปิดดูในหน้านี้ได้ทันที
-                  </p>
+                  <span className="text-xs bg-rose-50 text-rose-700 font-bold px-3 py-1 rounded-full border border-rose-200">
+                    📺 ห้องเรียนรู้วิดีโอ ป.6 (YouTube Live Stream)
+                  </span>
+                  <h2 className="text-xl font-black text-slate-900 mt-2">ดูคลิปการสอนผังงานแบบเรียลไทม์ในหน้านี้</h2>
                 </div>
 
-                {/* Custom YouTube URL input form */}
                 <form onSubmit={handleLoadCustomUrl} className="flex items-center space-x-2">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="วางลิงก์ YouTube ที่ต้องการ..."
-                      value={customYoutubeUrl}
-                      onChange={(e) => setCustomYoutubeUrl(e.target.value)}
-                      className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs w-60 sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-md shadow-rose-600/20 flex items-center space-x-1"
-                  >
-                    <span>เปิดดู</span>
-                    <Play className="w-3 h-3 fill-current" />
+                  <input
+                    type="text"
+                    placeholder="วางลิงก์ YouTube ที่ต้องการ..."
+                    value={customYoutubeUrl}
+                    onChange={(e) => setCustomYoutubeUrl(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs w-60 sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  />
+                  <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow">
+                    เปิดดูคลิป
                   </button>
                 </form>
               </div>
             </div>
 
-            {/* Video Main Player + Playlist Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              
-              {/* Left Column: Embedded Real-time YouTube Player (8 Cols) */}
-              <div className="lg:col-span-8 space-y-4">
-                <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm shadow-blue-500/5">
-                  
-                  {/* YouTube Embed Container */}
-                  <div className="relative w-full overflow-hidden rounded-2xl bg-black aspect-video shadow-lg border border-slate-800">
-                    <iframe
-                      className="w-full h-full absolute inset-0"
-                      src={`https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0`}
-                      title={selectedVideo.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-
-                  {/* Video Details Box */}
-                  <div className="mt-4 pt-3 border-t border-slate-100">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <h3 className="text-lg font-black text-slate-900">
-                        {selectedVideo.title}
-                      </h3>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-full border border-rose-200 font-bold flex items-center space-x-1">
-                          <Video className="w-3 h-3" />
-                          <span>{selectedVideo.creator}</span>
-                        </span>
-                        <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-mono font-bold">
-                          ⏱️ {selectedVideo.duration}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-slate-600 mt-2 leading-relaxed font-normal">
-                      {selectedVideo.description}
-                    </p>
-
-                    {/* Key takeaways for Grade 6 */}
-                    <div className="mt-4 bg-gradient-to-r from-blue-50/80 to-sky-50/80 p-4 rounded-2xl border border-blue-100">
-                      <div className="text-xs font-black text-blue-900 mb-2 flex items-center space-x-1.5">
-                        <Bookmark className="w-3.5 h-3.5 text-blue-600" />
-                        <span>สรุปหัวใจสำคัญของบทเรียนนี้ (Key Takeaways):</span>
-                      </div>
-                      <div className="space-y-1.5 text-xs text-slate-700 font-medium">
-                        {selectedVideo.keyPoints.map((point, idx) => (
-                          <div key={idx} className="flex items-center space-x-2">
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span>{point}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+              <div className="lg:col-span-8 bg-white border border-blue-100 rounded-3xl p-5 shadow-sm">
+                <div className="relative w-full overflow-hidden rounded-2xl bg-black aspect-video shadow-lg">
+                  <iframe
+                    className="w-full h-full absolute inset-0"
+                    src={`https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0`}
+                    title={selectedVideo.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-100">
+                  <h3 className="text-lg font-black text-slate-900">{selectedVideo.title}</h3>
+                  <p className="text-xs text-slate-600 mt-1">{selectedVideo.description}</p>
                 </div>
               </div>
 
-              {/* Right Column: Video Playlist Selector (4 Cols) */}
-              <div className="lg:col-span-4 space-y-4">
-                <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm shadow-blue-500/5">
-                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
-                    <div className="flex items-center space-x-2">
-                      <Tv className="w-4 h-4 text-blue-600" />
-                      <h4 className="font-extrabold text-slate-900 text-sm">บทเรียนวิดีโอ ป.6</h4>
-                    </div>
-                    <span className="text-[11px] text-slate-500 font-bold">
-                      {VIDEO_LESSONS.length} ตอน
-                    </span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {VIDEO_LESSONS.map((video, idx) => {
-                      const isSelected = selectedVideo.id === video.id && !customVideoId;
-                      return (
-                        <div
-                          key={video.id}
-                          onClick={() => {
-                            setSelectedVideo(video);
-                            setCustomVideoId(null);
-                            playSound('click', soundEnabled);
-                          }}
-                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-blue-50/90 border-blue-400 shadow-md shadow-blue-500/10 ring-2 ring-blue-400/20'
-                              : 'bg-slate-50 hover:bg-blue-50/50 border-slate-200 hover:border-blue-200'
-                          }`}
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                              isSelected ? 'bg-blue-600 text-white shadow' : 'bg-slate-200 text-slate-600'
-                            }`}>
-                              {isSelected ? <Play className="w-4 h-4 fill-current" /> : <span className="font-bold text-xs">#{idx + 1}</span>}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h5 className={`text-xs font-bold line-clamp-2 leading-snug ${
-                                isSelected ? 'text-blue-900' : 'text-slate-800'
-                              }`}>
-                                {video.title}
-                              </h5>
-                              <div className="flex items-center justify-between text-[10px] text-slate-500 mt-2">
-                                <span className="text-rose-600 font-bold">{video.creator}</span>
-                                <span>{video.duration}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* External YouTube Shortcut Button */}
-                  <div className="mt-5 pt-3 border-t border-slate-100 text-center">
-                    <a
-                      href="https://www.youtube.com/results?search_query=%E0%B8%9C%E0%B8%B1%E0%B8%87%E0%B8%87%E0%B8%B2%E0%B8%99+Flowchart+%E0%B8%9B.6+%E0%B8%A7%E0%B8%B4%E0%B8%97%E0%B8%A2%E0%B8%B2%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%84%E0%B8%B3%E0%B8%99%E0%B8%A7%E0%B8%93"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center space-x-1.5 text-xs text-blue-600 hover:text-blue-800 font-bold hover:underline"
+              <div className="lg:col-span-4 bg-white border border-blue-100 rounded-3xl p-5 shadow-sm">
+                <h4 className="font-extrabold text-slate-900 text-sm mb-3">บทเรียนวิดีโอแนะนำ</h4>
+                <div className="space-y-3">
+                  {VIDEO_LESSONS.map((video, idx) => (
+                    <div
+                      key={video.id}
+                      onClick={() => { setSelectedVideo(video); setCustomVideoId(null); playSound('click', soundEnabled); }}
+                      className="p-3 rounded-2xl border bg-slate-50 hover:bg-blue-50 cursor-pointer transition"
                     >
-                      <span>ค้นหาคลิปสอนผังงาน ป.6 เพิ่มเติม</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
+                      <h5 className="text-xs font-bold text-slate-800 line-clamp-2">{video.title}</h5>
+                      <span className="text-[10px] text-rose-600 font-bold mt-1 block">{video.creator} ({video.duration})</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-
             </div>
           </div>
         )}
 
       </main>
 
-      {/* --- Global Footer --- */}
+      {/* --- Footer --- */}
       <footer className="border-t border-blue-100 bg-white/90 py-5 text-center text-xs text-slate-500">
         <p className="font-bold text-slate-700">Flowchart Lab ป.6 • ห้องทดลองผังงานและการแก้ปัญหา วิชาวิทยาการคำนวณ</p>
-        <p className="mt-1 text-[11px]">ดีไซน์สว่างสีขาว-น้ำเงินสดใส • ฟอนต์ Prompt ทันสมัย • แบบทดสอบ 10 ข้อพร้อมเฉลยละเอียด</p>
+        <p className="mt-1 text-[11px]">ด่าน 1 Drag & Drop สุ่มโจทย์ใหม่ • ห้องทดลองสร้างผังงาน Sandbox • วิดีโอสด YouTube • แบบทดสอบ 10 ข้อ</p>
       </footer>
     </div>
   );
