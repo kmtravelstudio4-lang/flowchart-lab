@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, RotateCcw, CheckCircle2, XCircle, Award, Sparkles, 
   BookOpen, Layers, ArrowRight, ArrowDown, 
-  Volume2, VolumeX, ChevronRight, Check,
+  Volume2, VolumeX, ChevronRight, ChevronLeft, Check,
   Zap, Terminal, ShieldAlert, Cpu, Lightbulb, Compass, Code2,
   Tv, Video, Search, ExternalLink, Bookmark, HelpCircle,
   FileText, CornerDownRight, RefreshCw, AlertCircle, Heart,
   Smile, Star, Trophy, Rocket, GraduationCap, CheckCircle,
-  Clock, CheckSquare, Plus, Trash2, Edit3, Move
+  Clock, CheckSquare, Plus, Trash2, Edit3, Move, User, Printer,
+  Calendar, CheckCheck
 } from 'lucide-react';
 
 // --- Sound Effects using Web Audio API ---
@@ -65,11 +66,10 @@ const playSound = (type, soundEnabled = true) => {
   }
 };
 
-// --- Standard Flowchart Geometric SVG Renderer (รูปทรงมาตรฐาน ANSI/ISO 100% ตรงตามหลักวิชาการ) ---
-const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px', className = '' }) => {
+// --- Standard Flowchart Geometric SVG Renderer (รูปทรงมาตรฐาน ANSI/ISO 100%) ---
+const FlowchartShapeSvg = ({ shape, label = '', height = '65px', className = '' }) => {
   switch (shape) {
     case 'terminator':
-      // วงรีขอบมน / Stadium Oval
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <defs>
@@ -86,7 +86,6 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
       );
 
     case 'process':
-      // สี่เหลี่ยมผืนผ้า / Rectangle
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <defs>
@@ -97,13 +96,12 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
           </defs>
           <rect x="10" y="8" width="180" height="48" rx="4" ry="4" fill="url(#procGrad)" stroke="#1e40af" strokeWidth="2.5" />
           <text x="100" y="38" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="13" fontFamily="Prompt, sans-serif">
-            {label || 'Process (การคำนวณ / ปฏิบัติงาน)'}
+            {label || 'Process (คำนวณ / ปฏิบัติงาน)'}
           </text>
         </svg>
       );
 
     case 'inputOutput':
-      // สี่เหลี่ยมด้านขนาน / Parallelogram
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <defs>
@@ -120,7 +118,6 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
       );
 
     case 'decision':
-      // สี่เหลี่ยมข้าวหลามตัด / Diamond
       return (
         <svg viewBox="0 0 200 75" className={`w-full max-h-[85px] drop-shadow-md ${className}`}>
           <defs>
@@ -137,7 +134,6 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
       );
 
     case 'display':
-      // ทรงจอแสดงผล / Display Shape (หัวโค้งมนซ้าย ตัดตรงขวา)
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <defs>
@@ -154,7 +150,6 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
       );
 
     case 'manualInput':
-      // สี่เหลี่ยมคางหมูด้านบนเอียง / Manual Input (Keyboard)
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <defs>
@@ -171,7 +166,6 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
       );
 
     case 'document':
-      // เอกสารกระดาษขอบล่างเป็นคลื่น / Document
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <defs>
@@ -188,7 +182,6 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
       );
 
     case 'preparation':
-      // หกเหลี่ยม / Preparation (Loop setup)
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <defs>
@@ -205,7 +198,6 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
       );
 
     case 'connector':
-      // วงกลมจุดเชื่อมต่อในหน้า / On-page Connector
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <defs>
@@ -222,7 +214,6 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
       );
 
     case 'offpageConnector':
-      // ห้าเหลี่ยมชี้ลง / Off-page Connector
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <defs>
@@ -239,7 +230,6 @@ const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px',
       );
 
     case 'flowLine':
-      // ลูกศรทิศทางการทำงาน / Flow Line
       return (
         <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
           <line x1="25" y1="32" x2="155" y2="32" stroke="#334155" strokeWidth="4" />
@@ -459,6 +449,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 1,
     question: '1. สัญลักษณ์ใดในผังงาน ใช้แทนจุด "เริ่มต้น" (Start) และ "สิ้นสุด" (End)?',
+    shapeType: 'terminator',
     icon: '🟢',
     options: [
       'ก. สี่เหลี่ยมผืนผ้า (Rectangle)',
@@ -472,6 +463,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 2,
     question: '2. สัญลักษณ์ "สี่เหลี่ยมผืนผ้า" (Rectangle / Process) มีหน้าที่ตรงกับข้อใดมากที่สุด?',
+    shapeType: 'process',
     icon: '🟦',
     options: [
       'ก. การประมวลผล การคำนวณ หรือการปฏิบัติงาน',
@@ -485,6 +477,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 3,
     question: '3. หากต้องการเขียนผังงานเพื่อตรวจสอบว่า "คะแนนสอบ >= 50 หรือไม่" ควรเลือกใช้สัญลักษณ์ใด?',
+    shapeType: 'decision',
     icon: '🔶',
     options: [
       'ก. สี่เหลี่ยมด้านขนาน (Parallelogram)',
@@ -498,6 +491,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 4,
     question: '4. สัญลักษณ์ "สี่เหลี่ยมด้านขนาน" (Parallelogram) ทำหน้าที่อะไรในผังงาน?',
+    shapeType: 'inputOutput',
     icon: '▱',
     options: [
       'ก. กำหนดจุดเริ่มต้นของโปรแกรม',
@@ -511,6 +505,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 5,
     question: '5. โครงสร้างผังงานที่สั่งให้ทำคำสั่งเดิมซ้ำๆ จนกว่าจะครบตามเงื่อนไข เรียกว่าโครงสร้างแบบใด?',
+    shapeType: 'preparation',
     icon: '🔄',
     options: [
       'ก. โครงสร้างแบบเรียงลำดับ (Sequence)',
@@ -524,6 +519,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 6,
     question: '6. ข้อใดคือ "ทิศทางการไหล" (Flow Line) ของผังงานที่ถูกต้องตามมาตรฐานสากล?',
+    shapeType: 'flowLine',
     icon: '➡️',
     options: [
       'ก. ไหลจากล่างขึ้นบนเสมอ',
@@ -537,6 +533,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 7,
     question: '7. "ถ้าอุณหภูมิ > 37.5°C ให้แจ้งว่ามีไข้ ถ้าไม่ใช่ให้เข้าห้องเรียน" สอดคล้องกับโครงสร้างแบบใด?',
+    shapeType: 'decision',
     icon: '🩺',
     options: [
       'ก. โครงสร้างแบบทางเลือก / ตัดสินใจ (Selection / If-Else)',
@@ -550,6 +547,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 8,
     question: '8. สัญลักษณ์ "วงกลมเล็ก" (Circle / Connector) มีประโยชน์อย่างไรในผังงาน?',
+    shapeType: 'connector',
     icon: '⭕',
     options: [
       'ก. ใช้หยุดการทำงานทันที',
@@ -563,6 +561,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 9,
     question: '9. ขั้นตอนการคำนวณ "ราคารวม = ราคาขนม × จำนวนชิ้น" ควรเขียนอยู่ในสัญลักษณ์รูปทรงใด?',
+    shapeType: 'process',
     icon: '🍰',
     options: [
       'ก. วงรี (Terminator)',
@@ -576,6 +575,7 @@ const QUIZ_QUESTIONS = [
   {
     id: 10,
     question: '10. ข้อใด "ไม่ใช่" หลักการเขียนผังงานที่ดีและถูกต้อง?',
+    shapeType: 'terminator',
     icon: '⭐',
     options: [
       'ก. มีจุดเริ่มต้น 1 จุด และมีจุดสิ้นสุดชัดเจน',
@@ -639,14 +639,14 @@ export default function App() {
   // --- Game State (5 Missions) ---
   const [currentMissionIdx, setCurrentMissionIdx] = useState(0);
 
-  // Drag & Drop State for Mission 1 (Randomized Symbol Matching)
+  // Drag & Drop State for Mission 1
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragTargets, setDragTargets] = useState([]);
   const [dragAvailablePool, setDragAvailablePool] = useState([]);
   const [dragPlacedAnswers, setDragPlacedAnswers] = useState({});
   const [dragResult, setDragResult] = useState(null);
 
-  // Standard Puzzle Missions State (Missions 2-4)
+  // Puzzle Missions State (Missions 2-4)
   const [placedSlots, setPlacedSlots] = useState([]);
   const [availableBlocks, setAvailableBlocks] = useState([]);
   const [puzzleResult, setPuzzleResult] = useState(null);
@@ -654,9 +654,15 @@ export default function App() {
   const [simStep, setSimStep] = useState(0);
   const [simLogs, setSimLogs] = useState([]);
 
-  // Quiz State (Mission 5)
-  const [quizAnswers, setQuizAnswers] = useState({});
+  // ================= QUIZ MODE STATE (ด่าน 5: 1 ข้อต่อ 1 หน้า + เวลา + ชื่อนักเรียน + ใบสรุปคะแนน) =================
+  const [studentInfo, setStudentInfo] = useState({ name: '', room: 'ป.6/1', number: '' });
+  const [quizStarted, setQuizStarted] = useState(false);
+  const [quizPageIdx, setQuizPageIdx] = useState(0); // 0 to 9 (10 questions)
+  const [quizAnswers, setQuizAnswers] = useState({}); // { [qId]: selectedOptIdx }
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(600); // 10 minutes = 600s
+  const [timeUsedSeconds, setTimeUsedSeconds] = useState(0);
+  const timerRef = useRef(null);
 
   // Completed Missions Record
   const [completedMissions, setCompletedMissions] = useState({});
@@ -685,6 +691,27 @@ export default function App() {
     initLevel(currentMissionIdx);
   }, [currentMissionIdx]);
 
+  // Quiz Countdown Timer Effect
+  useEffect(() => {
+    if (quizStarted && !quizSubmitted) {
+      timerRef.current = setInterval(() => {
+        setTimeLeftSeconds(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            handleSubmitQuiz(true); // Auto-submit when time is up
+            return 0;
+          }
+          return prev - 1;
+        });
+        setTimeUsedSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      clearInterval(timerRef.current);
+    }
+
+    return () => clearInterval(timerRef.current);
+  }, [quizStarted, quizSubmitted]);
+
   const initLevel = (idx) => {
     if (idx === 0) {
       // Mission 1: Randomize 4 symbols from pool
@@ -707,7 +734,6 @@ export default function App() {
       setDragPlacedAnswers({});
       setDragResult(null);
     } else if (idx === 1) {
-      // Mission 2: Milk
       initPuzzleLevel([
         { id: 'm1_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
         { id: 'm1_step1', text: 'เทนมสดรสจืดลงในแก้ว', shape: 'process' },
@@ -717,7 +743,6 @@ export default function App() {
         { id: 'm1_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
       ]);
     } else if (idx === 2) {
-      // Mission 3: Shop Calculator
       initPuzzleLevel([
         { id: 'm2_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
         { id: 'm2_input', text: 'รับค่า ราคาขนม (Price), จำนวนชิ้น (Qty)', shape: 'inputOutput' },
@@ -726,7 +751,6 @@ export default function App() {
         { id: 'm2_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
       ]);
     } else if (idx === 3) {
-      // Mission 4: Temp Decision
       initPuzzleLevel([
         { id: 'm3_start', text: 'เริ่มต้น (Start)', shape: 'terminator' },
         { id: 'm3_input', text: 'สแกนวัดอุณหภูมิร่างกาย (Temp)', shape: 'inputOutput' },
@@ -735,9 +759,13 @@ export default function App() {
         { id: 'm3_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
       ]);
     } else if (idx === 4) {
-      // Mission 5: Quiz
-      setQuizAnswers({});
+      // Quiz mode reset
+      setQuizStarted(false);
       setQuizSubmitted(false);
+      setQuizPageIdx(0);
+      setQuizAnswers({});
+      setTimeLeftSeconds(600);
+      setTimeUsedSeconds(0);
     }
   };
 
@@ -879,19 +907,35 @@ export default function App() {
     }
   };
 
-  // Quiz Handling
+  // ================= QUIZ LOGIC (ด่าน 5: ทีละข้อ + มีเวลา + ชื่อ + ใบประกาศ) =================
+  const handleStartQuiz = (e) => {
+    e.preventDefault();
+    if (!studentInfo.name.trim()) {
+      playSound('error', soundEnabled);
+      alert('กรุณากรอกชื่อ-นามสกุลของนักเรียนก่อนเริ่มทำแบบทดสอบครับ 😊');
+      return;
+    }
+    playSound('success', soundEnabled);
+    setQuizStarted(true);
+    setQuizSubmitted(false);
+    setQuizPageIdx(0);
+    setTimeLeftSeconds(600); // 10 minutes
+    setTimeUsedSeconds(0);
+  };
+
   const handleSelectQuizOption = (qId, optionIdx) => {
     if (quizSubmitted) return;
     playSound('click', soundEnabled);
     setQuizAnswers(prev => ({ ...prev, [qId]: optionIdx }));
   };
 
-  const handleSubmitQuiz = () => {
-    if (Object.keys(quizAnswers).length < QUIZ_QUESTIONS.length) {
-      playSound('error', soundEnabled);
-      alert('กรุณาตอบคำถามให้ครบทั้ง 10 ข้อก่อนส่งคำตอบครับ 😊');
-      return;
+  const handleSubmitQuiz = (isAuto = false) => {
+    if (!isAuto && Object.keys(quizAnswers).length < QUIZ_QUESTIONS.length) {
+      const confirmSubmit = window.confirm(`น้องๆ ตอบไปแล้ว ${Object.keys(quizAnswers).length}/10 ข้อ ยังมีข้อที่ยังไม่ได้ตอบ ต้องการส่งคำตอบเลยหรือไม่?`);
+      if (!confirmSubmit) return;
     }
+
+    clearInterval(timerRef.current);
     playSound('success', soundEnabled);
     setQuizSubmitted(true);
     setCompletedMissions(prev => ({ ...prev, 4: true }));
@@ -903,6 +947,12 @@ export default function App() {
       if (quizAnswers[q.id] === q.correctAnswer) score += 1;
     });
     return score;
+  };
+
+  const formatTimer = (totalSeconds) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   // Sandbox Studio
@@ -970,7 +1020,6 @@ export default function App() {
 
   const activeVideoId = customVideoId || selectedVideo.youtubeId;
 
-  // Filtered symbols for guide
   const filteredSymbols = symbolFilter === 'ทั้งหมด' 
     ? ALL_FLOWCHART_SYMBOLS 
     : ALL_FLOWCHART_SYMBOLS.filter(s => s.category === symbolFilter);
@@ -994,7 +1043,7 @@ export default function App() {
                   วิทยาการคำนวณ
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">รูปทรงสัญลักษณ์มาตรฐาน ANSI/ISO 100% • Drag & Drop • ข้อสอบ 10 ข้อ</p>
+              <p className="text-xs text-slate-500 font-medium">รูปทรงสัญลักษณ์มาตรฐาน ANSI/ISO • ระบบสอบทีละข้อมีเวลา • ใบสรุปคะแนน</p>
             </div>
           </div>
 
@@ -1008,7 +1057,7 @@ export default function App() {
                 }`}
               >
                 <Trophy className="w-4 h-4 text-amber-300" />
-                <span>เกมภารกิจ</span>
+                <span>เกม & ข้อสอบ 10 ข้อ</span>
                 {Object.keys(completedMissions).length > 0 && (
                   <span className="ml-1 text-xs bg-amber-400 text-slate-900 font-black px-1.5 py-0.2 rounded-full">
                     {Object.keys(completedMissions).length}/5 ★
@@ -1023,7 +1072,7 @@ export default function App() {
                 }`}
               >
                 <Code2 className="w-4 h-4 text-sky-300" />
-                <span>ห้องทดลองสร้างผังงาน</span>
+                <span>ห้องทดลองผังงาน</span>
               </button>
 
               <button
@@ -1033,7 +1082,7 @@ export default function App() {
                 }`}
               >
                 <BookOpen className="w-4 h-4" />
-                <span>คู่มือสัญลักษณ์ (ตรงตามมาตรฐาน)</span>
+                <span>คู่มือสัญลักษณ์</span>
               </button>
 
               <button
@@ -1058,10 +1107,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* --- Main Body --- */}
+      {/* --- Main Content --- */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         
-        {/* ================= TAB 1: GAME MISSIONS ================= */}
+        {/* ================= TAB 1: GAME MISSIONS & QUIZ ================= */}
         {activeTab === 'game' && (
           <div className="space-y-6">
             
@@ -1074,15 +1123,15 @@ export default function App() {
                     <span>ภารกิจท้าทายวิทยาการคำนวณ ป.6</span>
                   </div>
                   <h2 className="text-xl font-black text-slate-900 flex items-center space-x-2">
-                    {currentMissionIdx === 0 && 'ด่าน 1: 🧩 แดรกแอนด์ดร็อป (Drag & Drop) สัญลักษณ์ Flowchart (สุ่มโจทย์ใหม่ทุกรอบ)'}
+                    {currentMissionIdx === 0 && 'ด่าน 1: 🧩 แดรกแอนด์ดร็อป (Drag & Drop) สัญลักษณ์ Flowchart'}
                     {currentMissionIdx === 1 && 'ด่าน 2: 🥛 หุ่นยนต์ชงนมสดหวานมัน (โครงสร้างเรียงลำดับ)'}
                     {currentMissionIdx === 2 && 'ด่าน 3: 🍰 คิดเงินร้านขนมสหกรณ์ (การรับค่า & คำนวณ)'}
                     {currentMissionIdx === 3 && 'ด่าน 4: 🩺 เครื่องคัดกรองวัดไข้หน้าโรงเรียน (โครงสร้าง If-Else)'}
-                    {currentMissionIdx === 4 && 'ด่าน 5: 🏆 แบบทดสอบวัดความรู้ผังงาน ป.6 (10 ข้อท้ายบท)'}
+                    {currentMissionIdx === 4 && 'ด่าน 5: 🏆 แบบทดสอบวัดผลสัมฤทธิ์ วิทยาการคำนวณ ป.6 (10 ข้อ)'}
                   </h2>
                 </div>
 
-                {/* Level Tabs (1 to 5) */}
+                {/* Level Tabs */}
                 <div className="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0">
                   {['ด่าน 1 (Drag & Drop)', 'ด่าน 2 (ชงนม)', 'ด่าน 3 (คิดเงิน)', 'ด่าน 4 (วัดไข้)', 'ด่าน 5 (ข้อสอบ 10 ข้อ)'].map((name, idx) => (
                     <button
@@ -1132,7 +1181,7 @@ export default function App() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                   
-                  {/* Left Column: Drop Target Slots (7 cols) */}
+                  {/* Left Column: Drop Target Slots */}
                   <div className="lg:col-span-7 space-y-4">
                     <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
                       <h4 className="font-extrabold text-slate-900 text-base mb-4 flex items-center space-x-2">
@@ -1181,7 +1230,6 @@ export default function App() {
                                 )}
                               </div>
 
-                              {/* Target Drop Content: Render the SVG shape if placed */}
                               <div className="mt-3 pt-2 border-t border-slate-200/70">
                                 {placed ? (
                                   <div className="bg-white p-2 rounded-2xl border border-blue-200 shadow-xs animate-fadeIn flex items-center space-x-3">
@@ -1204,7 +1252,6 @@ export default function App() {
                         })}
                       </div>
 
-                      {/* Verify Button & Result */}
                       <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
                         <button
                           onClick={handleVerifyDragDrop}
@@ -1233,7 +1280,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Right Column: Available Draggable Items with Real SVG Shapes (5 cols) */}
+                  {/* Right Column: Available Draggable Items */}
                   <div className="lg:col-span-5 space-y-4">
                     <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
                       <div className="flex items-center justify-between mb-3">
@@ -1392,85 +1439,378 @@ export default function App() {
               </div>
             )}
 
-            {/* ===== LEVEL 5: 10-QUESTION QUIZ ===== */}
+            {/* ========================================================================= */}
+            {/* ===== LEVEL 5: ข้อสอบ ป.6 (1 ข้อต่อ 1 หน้า + มีเวลา + ชื่อ + สรุปคะแนน) ===== */}
+            {/* ========================================================================= */}
             {currentMissionIdx === 4 && (
               <div className="space-y-6">
-                <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-full border border-amber-300">
-                        🏆 แบบทดสอบท้ายบท 10 ข้อ
-                      </span>
-                      <h3 className="text-2xl font-black text-slate-900 mt-2">แบบทดสอบวัดผลสัมฤทธิ์ วิทยาการคำนวณ ป.6</h3>
+                
+                {/* 1. STAGE 1: REGISTRATION SCREEN (กรอกชื่อนักเรียนก่อนเริ่มทำแบบทดสอบ) */}
+                {!quizStarted && !quizSubmitted && (
+                  <div className="max-w-2xl mx-auto bg-white border border-blue-100 rounded-3xl p-8 sm:p-10 shadow-lg shadow-blue-500/5 text-center">
+                    <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center text-3xl mb-4 border border-blue-200">
+                      🎓
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-slate-500">ตอบไปแล้ว</div>
-                      <div className="text-2xl font-black text-blue-700">{Object.keys(quizAnswers).length} / 10</div>
-                    </div>
-                  </div>
-                </div>
+                    
+                    <span className="text-xs bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full border border-blue-200">
+                      แบบทดสอบวัดผลสัมฤทธิ์ทางการเรียน
+                    </span>
+                    <h3 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
+                      วิชาวิทยาการคำนวณ ชั้นประถมศึกษาปีที่ 6
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-2">
+                      แบบทดสอบปรนัยจำนวน 10 ข้อ • มีการจับเวลา 10:00 นาที • แสดงข้อสอบทีละหน้า
+                    </p>
 
-                <div className="space-y-4">
-                  {QUIZ_QUESTIONS.map((q) => {
-                    const selected = quizAnswers[q.id];
-                    const isCorrect = selected === q.correctAnswer;
-                    return (
-                      <div key={q.id} className={`bg-white border rounded-3xl p-6 shadow-sm ${quizSubmitted ? (isCorrect ? 'border-emerald-300 bg-emerald-50/20' : 'border-rose-300 bg-rose-50/20') : 'border-blue-100'}`}>
-                        <div className="flex items-start justify-between mb-3">
-                          <h4 className="font-extrabold text-base text-slate-900">{q.question}</h4>
-                          {quizSubmitted && (
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-black ${isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                              {isCorrect ? 'ถูกต้อง +1' : 'ผิด 0'}
-                            </span>
-                          )}
+                    {/* Student Registration Form */}
+                    <form onSubmit={handleStartQuiz} className="mt-6 text-left space-y-4 max-w-md mx-auto bg-slate-50 p-6 rounded-3xl border border-slate-200">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          👤 ชื่อ - นามสกุล นักเรียน <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="เช่น เด็กชายกิตติศักดิ์ เรียนดี"
+                          value={studentInfo.name}
+                          onChange={(e) => setStudentInfo({ ...studentInfo, name: e.target.value })}
+                          className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            🏫 ชั้น / ห้อง
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="เช่น ป.6/1"
+                            value={studentInfo.room}
+                            onChange={(e) => setStudentInfo({ ...studentInfo, room: e.target.value })}
+                            className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            🔢 เลขที่
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="เช่น 15"
+                            value={studentInfo.number}
+                            onChange={(e) => setStudentInfo({ ...studentInfo, number: e.target.value })}
+                            className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center space-x-2 transition-all transform active:scale-98 text-base mt-4"
+                      >
+                        <Play className="w-5 h-5 fill-current" />
+                        <span>เริ่มทำแบบทดสอบ (Start Exam)</span>
+                      </button>
+                    </form>
+                  </div>
+                )}
+
+                {/* 2. STAGE 2: ACTIVE EXAM (แสดงข้อสอบทีละหน้า 1 ข้อต่อ 1 หน้า พร้อมตัวจับเวลา) */}
+                {quizStarted && !quizSubmitted && (
+                  <div className="space-y-6">
+                    
+                    {/* Exam Status Bar: Timer + Student Info + Progress */}
+                    <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        
+                        {/* Student Name */}
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base shrink-0">
+                            {studentInfo.name.charAt(0) || '👤'}
+                          </div>
+                          <div>
+                            <div className="text-sm font-extrabold text-slate-900">
+                              {studentInfo.name}
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              ห้อง: <span className="text-blue-700 font-bold">{studentInfo.room || 'ป.6'}</span> • เลขที่: <span className="text-blue-700 font-bold">{studentInfo.number || '-'}</span>
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {q.options.map((opt, optIdx) => (
+                        {/* Countdown Timer */}
+                        <div className="flex items-center space-x-3 self-end sm:self-center">
+                          <div className={`flex items-center space-x-2 px-4 py-2 rounded-2xl border font-mono font-black text-base shadow-xs ${
+                            timeLeftSeconds < 120 
+                              ? 'bg-rose-50 border-rose-300 text-rose-600 animate-pulse' 
+                              : 'bg-blue-50 border-blue-200 text-blue-900'
+                          }`}>
+                            <Clock className="w-4 h-4 text-blue-600" />
+                            <span>{formatTimer(timeLeftSeconds)}</span>
+                          </div>
+
+                          <button
+                            onClick={() => handleSubmitQuiz(false)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-2xl shadow transition flex items-center space-x-1"
+                          >
+                            <CheckCheck className="w-4 h-4" />
+                            <span>ส่งคำตอบ</span>
+                          </button>
+                        </div>
+
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="mt-4 pt-3 border-t border-slate-100">
+                        <div className="flex items-center justify-between text-xs font-bold text-slate-600 mb-1.5">
+                          <span>ข้อที่ {quizPageIdx + 1} จาก {QUIZ_QUESTIONS.length} ข้อ</span>
+                          <span className="text-blue-600">ตอบแล้ว {Object.keys(quizAnswers).length}/10 ข้อ</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-gradient-to-r from-blue-600 to-indigo-600 h-full transition-all duration-300 rounded-full"
+                            style={{ width: `${((quizPageIdx + 1) / QUIZ_QUESTIONS.length) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Single Question Card (1 ข้อต่อ 1 หน้า) */}
+                    {(() => {
+                      const currentQ = QUIZ_QUESTIONS[quizPageIdx];
+                      const selectedOpt = quizAnswers[currentQ.id];
+
+                      return (
+                        <div className="bg-white border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+                          
+                          {/* Question Title & Shape Preview */}
+                          <div className="flex items-start justify-between gap-4 mb-6">
+                            <div>
+                              <span className="text-xs bg-blue-100 text-blue-700 font-black px-3 py-1 rounded-full">
+                                ข้อที่ {quizPageIdx + 1}
+                              </span>
+                              <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-2.5 leading-snug">
+                                {currentQ.question}
+                              </h3>
+                            </div>
+                            <div className="w-24 sm:w-32 shrink-0">
+                              <FlowchartShapeSvg shape={currentQ.shapeType} height="40px" />
+                            </div>
+                          </div>
+
+                          {/* Options List */}
+                          <div className="space-y-3">
+                            {currentQ.options.map((opt, optIdx) => {
+                              const isSelected = selectedOpt === optIdx;
+
+                              return (
+                                <button
+                                  key={optIdx}
+                                  onClick={() => handleSelectQuizOption(currentQ.id, optIdx)}
+                                  className={`w-full p-4 rounded-2xl border-2 text-left text-sm font-semibold transition-all flex items-center justify-between ${
+                                    isSelected
+                                      ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20 transform scale-[1.01]'
+                                      : 'bg-slate-50 hover:bg-blue-50/70 border-slate-200 hover:border-blue-300 text-slate-800'
+                                  }`}
+                                >
+                                  <span>{opt}</span>
+                                  <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ml-3 ${
+                                    isSelected ? 'border-white bg-white text-blue-600' : 'border-slate-300 bg-white'
+                                  }`}>
+                                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Navigation Buttons (Previous, Next, Question Jump) */}
+                          <div className="mt-8 pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <button
-                              key={optIdx}
-                              disabled={quizSubmitted}
-                              onClick={() => handleSelectQuizOption(q.id, optIdx)}
-                              className={`p-3.5 rounded-2xl border text-left text-sm font-semibold transition ${
-                                selected === optIdx ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-50'
+                              disabled={quizPageIdx === 0}
+                              onClick={() => { setQuizPageIdx(prev => prev - 1); playSound('click', soundEnabled); }}
+                              className="w-full sm:w-auto px-5 py-3 rounded-2xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition flex items-center justify-center space-x-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                              <span>ข้อก่อนหน้า</span>
+                            </button>
+
+                            {/* Direct Question Jump Circles */}
+                            <div className="flex items-center space-x-1.5 overflow-x-auto py-1">
+                              {QUIZ_QUESTIONS.map((q, idx) => {
+                                const isAnswered = quizAnswers[q.id] !== undefined;
+                                const isCurrent = quizPageIdx === idx;
+
+                                return (
+                                  <button
+                                    key={q.id}
+                                    onClick={() => { setQuizPageIdx(idx); playSound('click', soundEnabled); }}
+                                    className={`w-8 h-8 rounded-xl font-bold text-xs transition-all flex items-center justify-center ${
+                                      isCurrent
+                                        ? 'bg-blue-600 text-white ring-2 ring-blue-400 ring-offset-2'
+                                        : isAnswered
+                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    {idx + 1}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {quizPageIdx < QUIZ_QUESTIONS.length - 1 ? (
+                              <button
+                                onClick={() => { setQuizPageIdx(prev => prev + 1); playSound('click', soundEnabled); }}
+                                className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow transition flex items-center justify-center space-x-1.5"
+                              >
+                                <span>ข้อถัดไป</span>
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleSubmitQuiz(false)}
+                                className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 text-white font-black text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-1.5"
+                              >
+                                <CheckCheck className="w-4 h-4" />
+                                <span>ส่งคำตอบ (Submit)</span>
+                              </button>
+                            )}
+                          </div>
+
+                        </div>
+                      );
+                    })()}
+
+                  </div>
+                )}
+
+                {/* 3. STAGE 3: RESULT CERTIFICATE & SCORE SUMMARY (สรุปคะแนนและเฉลยละเอียด) */}
+                {quizSubmitted && (
+                  <div className="space-y-8">
+                    
+                    {/* Certificate Card */}
+                    <div className="bg-gradient-to-b from-blue-50/50 via-white to-sky-50 border-4 border-double border-blue-300 rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden text-center max-w-3xl mx-auto">
+                      
+                      {/* Decorative Ribbon Header */}
+                      <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-600 text-white font-bold text-xs uppercase tracking-wider mb-4 shadow-sm">
+                        <Award className="w-4 h-4" />
+                        <span>ใบรายงานผลการทดสอบวัดผลสัมฤทธิ์</span>
+                      </div>
+
+                      <h3 className="text-2xl sm:text-3xl font-black text-blue-900 tracking-tight">
+                        วิชาวิทยาการคำนวณ ชั้นประถมศึกษาปีที่ 6
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1">
+                        โรงเรียนประถมศึกษา • การทดสอบเรื่องผังงาน (Flowchart)
+                      </p>
+
+                      {/* Student Details */}
+                      <div className="my-6 p-4 bg-white/90 rounded-2xl border border-blue-200 inline-block text-slate-800 text-sm font-semibold shadow-xs">
+                        มอบให้แก่: <strong className="text-blue-700 text-base font-black underline">{studentInfo.name || 'นักเรียน ป.6'}</strong>
+                        <div className="text-xs text-slate-500 mt-1">
+                          ชั้น: <strong>{studentInfo.room || 'ป.6'}</strong> • เลขที่: <strong>{studentInfo.number || '-'}</strong> • เวลาที่ใช้ไป: <strong>{formatTimer(timeUsedSeconds)} นาที</strong>
+                        </div>
+                      </div>
+
+                      {/* Score Display Box */}
+                      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white p-6 rounded-3xl shadow-lg shadow-blue-600/25 max-w-md mx-auto mb-6">
+                        <div className="text-xs text-blue-200 font-bold uppercase tracking-wider">คะแนนที่ได้</div>
+                        <div className="text-5xl font-black mt-1">
+                          {calculateQuizScore()} <span className="text-2xl text-blue-200">/ 10</span>
+                        </div>
+                        <div className="text-xs text-amber-300 font-bold mt-2">
+                          {calculateQuizScore() >= 8 ? '🌟 ระดับผลการเรียน: ยอดเยี่ยมมาก (เกรด 4)' : calculateQuizScore() >= 5 ? '👍 ระดับผลการเรียน: ผ่านเกณฑ์ประเมิน (ดี)' : '📖 ระดับผลการเรียน: ควรทบทวนบทเรียนเพิ่มเติม'}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                        <button
+                          onClick={() => { setQuizStarted(false); setQuizSubmitted(false); }}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-6 rounded-2xl border border-slate-300 text-xs transition flex items-center space-x-1.5"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          <span>ทำแบบทดสอบใหม่อีกครั้ง</span>
+                        </button>
+
+                        <button
+                          onClick={() => window.print()}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-2xl shadow text-xs transition flex items-center space-x-1.5"
+                        >
+                          <Printer className="w-4 h-4" />
+                          <span>พิมพ์ใบประกาศคะแนน</span>
+                        </button>
+                      </div>
+
+                    </div>
+
+                    {/* Detailed Question Review & Explanations (เฉลยละเอียดทุกข้อ) */}
+                    <div className="bg-white border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+                      <h4 className="text-lg font-black text-slate-900 mb-4 flex items-center space-x-2">
+                        <BookOpen className="w-5 h-5 text-blue-600" />
+                        <span>ตรวจคำตอบและคำอธิบายเฉลยละเอียดทั้ง 10 ข้อ</span>
+                      </h4>
+
+                      <div className="space-y-4">
+                        {QUIZ_QUESTIONS.map((q, idx) => {
+                          const selected = quizAnswers[q.id];
+                          const isCorrect = selected === q.correctAnswer;
+
+                          return (
+                            <div
+                              key={q.id}
+                              className={`p-5 rounded-3xl border transition-all ${
+                                isCorrect 
+                                  ? 'border-emerald-300 bg-emerald-50/20' 
+                                  : 'border-rose-300 bg-rose-50/20'
                               }`}
                             >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
+                              <div className="flex items-start justify-between gap-3 mb-3">
+                                <h5 className="font-extrabold text-sm text-slate-900">
+                                  {q.question}
+                                </h5>
+                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black shrink-0 ${
+                                  isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                  {isCorrect ? '✅ ถูกต้อง +1' : '❌ ผิด 0'}
+                                </span>
+                              </div>
 
-                        {quizSubmitted && (
-                          <div className="mt-3 text-xs bg-white p-3 rounded-xl border border-slate-200 text-slate-700">
-                            <strong className="text-blue-700">เฉลย: </strong>{q.explanation}
-                          </div>
-                        )}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                {q.options.map((opt, optIdx) => {
+                                  const isUserChosen = selected === optIdx;
+                                  const isTargetCorrect = q.correctAnswer === optIdx;
+
+                                  let optClass = 'bg-slate-50 border-slate-200 text-slate-600';
+                                  if (isTargetCorrect) {
+                                    optClass = 'bg-emerald-100 border-emerald-400 text-emerald-950 font-bold';
+                                  } else if (isUserChosen && !isTargetCorrect) {
+                                    optClass = 'bg-rose-100 border-rose-400 text-rose-950 font-bold line-through';
+                                  }
+
+                                  return (
+                                    <div key={optIdx} className={`p-2.5 rounded-xl border ${optClass}`}>
+                                      {opt}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <div className="mt-3 pt-2 border-t border-slate-200/60 text-xs text-slate-700 bg-white p-3 rounded-xl border border-slate-200">
+                                <strong className="text-blue-700">📖 คำอธิบายเฉลย: </strong>
+                                {q.explanation}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-
-                {/* Submit Quiz Banner */}
-                <div className="bg-white border border-blue-100 rounded-3xl p-6 text-center">
-                  {!quizSubmitted ? (
-                    <button
-                      onClick={handleSubmitQuiz}
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-4 px-8 rounded-2xl shadow-lg shadow-blue-600/30 text-base"
-                    >
-                      ส่งคำตอบและดูผลคะแนน (10 ข้อ)
-                    </button>
-                  ) : (
-                    <div className="space-y-3">
-                      <h4 className="text-2xl font-black text-slate-900">คะแนนของคุณ: {calculateQuizScore()} / 10</h4>
-                      <button
-                        onClick={() => { setQuizAnswers({}); setQuizSubmitted(false); }}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-6 rounded-xl border border-slate-300 text-xs"
-                      >
-                        ทำแบบทดสอบใหม่อีกครั้ง
-                      </button>
                     </div>
-                  )}
-                </div>
+
+                  </div>
+                )}
+
               </div>
             )}
 
@@ -1594,11 +1934,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 3: FLOWCHART HANDBOOK (รูปทรงมาตรฐาน ANSI/ISO แท้ 100%) ================= */}
+        {/* ================= TAB 3: FLOWCHART HANDBOOK ================= */}
         {activeTab === 'guide' && (
           <div className="space-y-8">
-            
-            {/* Guide Header Banner */}
             <div className="bg-white border border-blue-100 rounded-3xl p-8 shadow-sm">
               <div className="max-w-4xl">
                 <span className="text-xs bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full border border-blue-200">
@@ -1631,7 +1969,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Symbol Cards Grid with Real Geometric SVG Vectors */}
+            {/* Symbol Cards Grid */}
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <Layers className="w-5 h-5 text-blue-600" />
@@ -1644,7 +1982,6 @@ export default function App() {
                 {filteredSymbols.map((item) => (
                   <div key={item.id} className="bg-white border border-blue-100 hover:border-blue-300 hover:shadow-lg rounded-3xl p-6 transition-all flex flex-col justify-between">
                     <div>
-                      {/* Real Geometric Vector Shape Preview */}
                       <div className="h-32 bg-gradient-to-br from-blue-50/50 via-slate-50 to-sky-50/30 rounded-2xl border border-blue-100 flex items-center justify-center p-3 mb-4">
                         <FlowchartShapeSvg shape={item.shapeType} label={item.name.split(' ')[0]} height="65px" />
                       </div>
@@ -1749,7 +2086,7 @@ export default function App() {
       {/* --- Footer --- */}
       <footer className="border-t border-blue-100 bg-white/90 py-5 text-center text-xs text-slate-500">
         <p className="font-bold text-slate-700">Flowchart Lab ป.6 • ห้องทดลองผังงานและการแก้ปัญหา วิชาวิทยาการคำนวณ</p>
-        <p className="mt-1 text-[11px]">รูปทรงมาตรฐาน ANSI/ISO แท้ 100% • ด่าน Drag & Drop สุ่มโจทย์ใหม่ • Sandbox • วิดีโอ YouTube • แบบทดสอบ 10 ข้อ</p>
+        <p className="mt-1 text-[11px]">แบบทดสอบ 10 ข้อทีละหน้าพร้อมเวลา • รายงานผลคะแนนและเกียรติบัตร • Drag & Drop • Sandbox</p>
       </footer>
     </div>
   );
