@@ -9,7 +9,8 @@ import {
   FileText, CornerDownRight, RefreshCw, AlertCircle, Heart,
   Smile, Star, Trophy, Rocket, GraduationCap, CheckCircle,
   Clock, CheckSquare, Plus, Trash2, Edit3, Move, User, Printer,
-  Calendar, CheckCheck, Download, Image as ImageIcon
+  Calendar, CheckCheck, Download, Image as ImageIcon, Settings,
+  Lock, Unlock, Key, Save, Eye, Film
 } from 'lucide-react';
 
 // --- Sound Effects using Web Audio API ---
@@ -65,6 +66,20 @@ const playSound = (type, soundEnabled = true) => {
   } catch (e) {
     console.error("Audio error:", e);
   }
+};
+
+// --- YouTube ID Parser Helper ---
+const extractYoutubeId = (urlOrId) => {
+  if (!urlOrId) return '';
+  let str = urlOrId.trim();
+  if (str.includes('v=')) {
+    str = str.split('v=')[1].split('&')[0];
+  } else if (str.includes('youtu.be/')) {
+    str = str.split('youtu.be/')[1].split('?')[0];
+  } else if (str.includes('embed/')) {
+    str = str.split('embed/')[1].split('?')[0];
+  }
+  return str;
 };
 
 // --- Standard Flowchart Geometric SVG Renderer ---
@@ -589,8 +604,8 @@ const QUIZ_QUESTIONS = [
   }
 ];
 
-// --- Educational YouTube Lessons for Grade 6 ---
-const VIDEO_LESSONS = [
+// --- Default Initial YouTube Lessons ---
+const DEFAULT_VIDEO_LESSONS = [
   {
     id: 'p6_lesson1',
     title: 'บทเรียนที่ 1: การเขียนผังงาน (Flowchart) วิทยาการคำนวณ ป.6',
@@ -654,7 +669,7 @@ export default function App() {
   const [simStep, setSimStep] = useState(0);
   const [simLogs, setSimLogs] = useState([]);
 
-  // ================= QUIZ MODE STATE =================
+  // Quiz mode state
   const [studentInfo, setStudentInfo] = useState({ name: '', room: 'ป.6/1', number: '' });
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizPageIdx, setQuizPageIdx] = useState(0);
@@ -683,10 +698,49 @@ export default function App() {
   // Guide Tab Filter
   const [symbolFilter, setSymbolFilter] = useState('ทั้งหมด');
 
-  // Video Tab State
-  const [selectedVideo, setSelectedVideo] = useState(VIDEO_LESSONS[0]);
+  // ================= ADMIN BACKEND FOR VIDEO MEDIA =================
+  // Persistent video lessons stored in localStorage
+  const [videoLessons, setVideoLessons] = useState(() => {
+    try {
+      const saved = localStorage.getItem('flowchart_video_lessons');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_VIDEO_LESSONS;
+  });
+
+  const [selectedVideo, setSelectedVideo] = useState(videoLessons[0] || DEFAULT_VIDEO_LESSONS[0]);
   const [customYoutubeUrl, setCustomYoutubeUrl] = useState('');
   const [customVideoId, setCustomVideoId] = useState(null);
+
+  // Admin Management State
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [adminPinInput, setAdminPinInput] = useState('');
+  const [adminPinError, setAdminPinError] = useState('');
+
+  // Video Add / Edit Form State
+  const [editingVideoId, setEditingVideoId] = useState(null);
+  const [videoForm, setVideoForm] = useState({
+    title: '',
+    creator: 'คุณครูผู้สอน',
+    duration: '10:00 นาที',
+    youtubeUrl: '',
+    description: '',
+    keyPoint1: '',
+    keyPoint2: '',
+    keyPoint3: ''
+  });
+
+  // Save videoLessons to localStorage whenever updated
+  useEffect(() => {
+    try {
+      localStorage.setItem('flowchart_video_lessons', JSON.stringify(videoLessons));
+    } catch (e) {
+      console.error("LocalStorage save error:", e);
+    }
+  }, [videoLessons]);
 
   useEffect(() => {
     initLevel(currentMissionIdx);
@@ -953,14 +1007,13 @@ export default function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // ================= PNG DOWNLOAD & PNG PRINT SYSTEM =================
+  // PNG Download & PNG Print
   const handleDownloadPNG = async () => {
     if (!certificateRef.current) return;
     playSound('click', soundEnabled);
     setIsExporting(true);
 
     try {
-      // Create high-res PNG
       const canvas = await html2canvas(certificateRef.current, {
         scale: 2.5,
         useCORS: true,
@@ -988,7 +1041,6 @@ export default function App() {
     setIsExporting(true);
 
     try {
-      // Capture PNG and print strictly the PNG in high definition
       const canvas = await html2canvas(certificateRef.current, {
         scale: 2.5,
         useCORS: true,
@@ -1034,7 +1086,6 @@ export default function App() {
         `);
         printWin.document.close();
       } else {
-        // Fallback standard print
         window.print();
       }
     } catch (e) {
@@ -1043,6 +1094,142 @@ export default function App() {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  // ================= ADMIN BACKEND VIDEO ACTIONS =================
+  const handleAdminLogin = (e) => {
+    e.preventDefault();
+    if (adminPinInput === 'admin1234' || adminPinInput === '1234' || adminPinInput === 'admin') {
+      playSound('success', soundEnabled);
+      setIsAdminUnlocked(true);
+      setShowAdminModal(false);
+      setAdminPinInput('');
+      setAdminPinError('');
+    } else {
+      playSound('error', soundEnabled);
+      setAdminPinError('รหัสผ่านไม่ถูกต้อง (รหัสมาตรฐาน: admin1234)');
+    }
+  };
+
+  const handleOpenAddVideo = () => {
+    playSound('click', soundEnabled);
+    setEditingVideoId(null);
+    setVideoForm({
+      title: '',
+      creator: 'คุณครูผู้สอน',
+      duration: '10:00 นาที',
+      youtubeUrl: '',
+      description: '',
+      keyPoint1: '',
+      keyPoint2: '',
+      keyPoint3: ''
+    });
+  };
+
+  const handleOpenEditVideo = (video) => {
+    playSound('click', soundEnabled);
+    setEditingVideoId(video.id);
+    setVideoForm({
+      title: video.title,
+      creator: video.creator,
+      duration: video.duration,
+      youtubeUrl: `https://www.youtube.com/watch?v=${video.youtubeId}`,
+      description: video.description,
+      keyPoint1: video.keyPoints?.[0] || '',
+      keyPoint2: video.keyPoints?.[1] || '',
+      keyPoint3: video.keyPoints?.[2] || ''
+    });
+  };
+
+  const handleSaveVideo = (e) => {
+    e.preventDefault();
+    if (!videoForm.title.trim() || !videoForm.youtubeUrl.trim()) {
+      playSound('error', soundEnabled);
+      alert('กรุณากรอกชื่อบทเรียนและลิงก์ YouTube ครับ');
+      return;
+    }
+
+    const yId = extractYoutubeId(videoForm.youtubeUrl);
+    if (!yId) {
+      playSound('error', soundEnabled);
+      alert('รูปแบบลิงก์ YouTube ไม่ถูกต้อง กรุณาตรวจสอบลิงก์อีกครั้งครับ');
+      return;
+    }
+
+    const keyPoints = [videoForm.keyPoint1, videoForm.keyPoint2, videoForm.keyPoint3].filter(p => p && p.trim().length > 0);
+
+    playSound('success', soundEnabled);
+
+    if (editingVideoId) {
+      // Update existing
+      setVideoLessons(prev => prev.map(v => {
+        if (v.id === editingVideoId) {
+          const updated = {
+            ...v,
+            title: videoForm.title,
+            creator: videoForm.creator || 'คุณครูผู้สอน',
+            duration: videoForm.duration || '10:00 นาที',
+            youtubeId: yId,
+            description: videoForm.description,
+            keyPoints: keyPoints.length > 0 ? keyPoints : ['ดูการสอนแบบเรียลไทม์ในห้องเรียน']
+          };
+          if (selectedVideo.id === v.id) setSelectedVideo(updated);
+          return updated;
+        }
+        return v;
+      }));
+      setEditingVideoId(null);
+    } else {
+      // Add new video
+      const newVideo = {
+        id: `custom_vid_${Date.now()}`,
+        title: videoForm.title,
+        creator: videoForm.creator || 'คุณครูผู้สอน',
+        duration: videoForm.duration || '10:00 นาที',
+        youtubeId: yId,
+        description: videoForm.description || 'บทเรียนวิดีโอเสริมการเรียนรู้',
+        keyPoints: keyPoints.length > 0 ? keyPoints : ['ดูการสอนแบบเรียลไทม์ในห้องเรียน']
+      };
+      setVideoLessons(prev => [newVideo, ...prev]);
+      setSelectedVideo(newVideo);
+      setCustomVideoId(null);
+    }
+
+    // Reset Form
+    setVideoForm({
+      title: '',
+      creator: 'คุณครูผู้สอน',
+      duration: '10:00 นาที',
+      youtubeUrl: '',
+      description: '',
+      keyPoint1: '',
+      keyPoint2: '',
+      keyPoint3: ''
+    });
+  };
+
+  const handleDeleteVideo = (id) => {
+    if (videoLessons.length <= 1) {
+      alert('ต้องมีวิดีโออย่างน้อย 1 รายการในระบบครับ');
+      return;
+    }
+    const confirmDel = window.confirm('คุณต้องการลบวิดีโอนี้ออกจากสื่อการสอนใช่หรือไม่?');
+    if (!confirmDel) return;
+
+    playSound('click', soundEnabled);
+    const updated = videoLessons.filter(v => v.id !== id);
+    setVideoLessons(updated);
+    if (selectedVideo.id === id) {
+      setSelectedVideo(updated[0]);
+    }
+  };
+
+  const handleResetDefaultVideos = () => {
+    const confirmReset = window.confirm('ต้องการคืนค่าวิดีโอทั้งหมดเป็นค่าเริ่มต้นใช่หรือไม่?');
+    if (!confirmReset) return;
+    playSound('click', soundEnabled);
+    setVideoLessons(DEFAULT_VIDEO_LESSONS);
+    setSelectedVideo(DEFAULT_VIDEO_LESSONS[0]);
   };
 
   // Sandbox Studio
@@ -1091,24 +1278,25 @@ export default function App() {
   const handleLoadCustomUrl = (e) => {
     e.preventDefault();
     if (!customYoutubeUrl.trim()) return;
-    let id = customYoutubeUrl.trim();
-    if (id.includes('v=')) id = id.split('v=')[1].split('&')[0];
-    else if (id.includes('youtu.be/')) id = id.split('youtu.be/')[1].split('?')[0];
-    else if (id.includes('embed/')) id = id.split('embed/')[1].split('?')[0];
+    const yId = extractYoutubeId(customYoutubeUrl);
+    if (!yId) {
+      alert('ลิงก์ YouTube ไม่ถูกต้องครับ');
+      return;
+    }
 
-    setCustomVideoId(id);
+    setCustomVideoId(yId);
     setSelectedVideo({
-      id: 'custom',
-      title: 'วิดีโอที่คุณครู/นักเรียนระบุ (Custom Stream)',
+      id: 'custom_live',
+      title: 'วิดีโอที่กำลังเล่น (Custom YouTube Stream)',
       creator: 'YouTube Embed',
       duration: 'กำหนดเอง',
-      youtubeId: id,
+      youtubeId: yId,
       description: 'กำลังเล่นวิดีโอการเรียนรู้จากลิงก์ที่คุณระบุในระบบ',
       keyPoints: ['ดูวิดีโอการสอนแบบเรียลไทม์ได้โดยตรงในหน้านี้']
     });
   };
 
-  const activeVideoId = customVideoId || selectedVideo.youtubeId;
+  const activeVideoId = customVideoId || selectedVideo?.youtubeId || 'S20m_Yf8tW0';
 
   const filteredSymbols = symbolFilter === 'ทั้งหมด' 
     ? ALL_FLOWCHART_SYMBOLS 
@@ -1133,11 +1321,11 @@ export default function App() {
                   วิทยาการคำนวณ
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">ดาวน์โหลดใบประกาศเป็น PNG • พิมพ์หน้า PNG • ข้อสอบ 10 ข้อ</p>
+              <p className="text-xs text-slate-500 font-medium">ระบบแอดมินอัปเดตสื่อ YouTube • ดาวน์โหลด PNG • ข้อสอบ 10 ข้อ</p>
             </div>
           </div>
 
-          {/* Navigation Tabs */}
+          {/* Navigation Tabs & Admin Toggle */}
           <div className="flex items-center space-x-2 sm:space-x-3">
             <nav className="flex items-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200">
               <button
@@ -1182,9 +1370,31 @@ export default function App() {
                 }`}
               >
                 <Tv className="w-4 h-4 text-rose-500" />
-                <span>วิดีโอสอน</span>
+                <span>สื่อการสอน (YouTube)</span>
               </button>
             </nav>
+
+            {/* Admin Backend Unlock Button */}
+            <button
+              onClick={() => {
+                if (isAdminUnlocked) {
+                  setIsAdminUnlocked(false);
+                  playSound('click', soundEnabled);
+                } else {
+                  setShowAdminModal(true);
+                  playSound('click', soundEnabled);
+                }
+              }}
+              title={isAdminUnlocked ? 'โหมดคุณครู/แอดมิน (คลิกเพื่อออกจากระบบ)' : 'เข้าสู่ระบบแอดมินจัดการสื่อ'}
+              className={`p-2.5 rounded-2xl border shadow-sm transition flex items-center space-x-1.5 text-xs font-bold ${
+                isAdminUnlocked 
+                  ? 'bg-amber-500 text-white border-amber-600 animate-pulse' 
+                  : 'bg-white border-slate-200 text-slate-600 hover:text-blue-600'
+              }`}
+            >
+              {isAdminUnlocked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+              <span className="hidden md:inline">{isAdminUnlocked ? 'แอดมินออนไลน์' : 'แอดมิน'}</span>
+            </button>
 
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
@@ -1197,6 +1407,51 @@ export default function App() {
         </div>
       </header>
 
+      {/* --- Admin Unlock PIN Modal --- */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative text-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 mx-auto flex items-center justify-center text-2xl mb-3 border border-amber-200">
+              🔑
+            </div>
+            <h3 className="text-xl font-black text-slate-900">เข้าสู่ระบบแอดมินหลังบ้าน</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              สำหรับคุณครูเพื่อเพิ่ม แก้ไข และจัดการสื่อการสอน YouTube
+            </p>
+
+            <form onSubmit={handleAdminLogin} className="mt-5 space-y-3">
+              <input
+                type="password"
+                placeholder="กรอกรหัสผ่าน (admin1234)"
+                value={adminPinInput}
+                onChange={(e) => { setAdminPinInput(e.target.value); setAdminPinError(''); }}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-center text-sm font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500"
+                autoFocus
+              />
+              {adminPinError && (
+                <p className="text-xs text-rose-600 font-bold">{adminPinError}</p>
+              )}
+
+              <div className="flex items-center space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowAdminModal(false); setAdminPinError(''); }}
+                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow transition"
+                >
+                  เข้าสู่ระบบ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* --- Main Content --- */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         
@@ -1204,7 +1459,6 @@ export default function App() {
         {activeTab === 'game' && (
           <div className="space-y-6">
             
-            {/* Level Selector Header */}
             <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm shadow-blue-500/5 no-print">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -1221,7 +1475,6 @@ export default function App() {
                   </h2>
                 </div>
 
-                {/* Level Tabs */}
                 <div className="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0">
                   {['ด่าน 1 (Drag & Drop)', 'ด่าน 2 (ชงนม)', 'ด่าน 3 (คิดเงิน)', 'ด่าน 4 (วัดไข้)', 'ด่าน 5 (ข้อสอบ 10 ข้อ)'].map((name, idx) => (
                     <button
@@ -1243,7 +1496,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* ===== LEVEL 1: DRAG & DROP SYMBOL MATCHING ===== */}
+            {/* LEVEL 1: DRAG & DROP SYMBOL MATCHING */}
             {currentMissionIdx === 0 && (
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white rounded-3xl p-6 shadow-lg shadow-blue-600/20">
@@ -1270,8 +1523,6 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                  
-                  {/* Left Column: Drop Target Slots */}
                   <div className="lg:col-span-7 space-y-4">
                     <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
                       <h4 className="font-extrabold text-slate-900 text-base mb-4 flex items-center space-x-2">
@@ -1370,7 +1621,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Right Column: Available Draggable Items */}
                   <div className="lg:col-span-5 space-y-4">
                     <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
                       <div className="flex items-center justify-between mb-3">
@@ -1421,11 +1671,9 @@ export default function App() {
               </div>
             )}
 
-            {/* ===== LEVEL 2, 3, 4: PUZZLE FLOWCHART MISSIONS ===== */}
+            {/* LEVEL 2, 3, 4: PUZZLE FLOWCHART MISSIONS */}
             {(currentMissionIdx >= 1 && currentMissionIdx <= 3) && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                
-                {/* Left: Canvas */}
                 <div className="lg:col-span-7 space-y-4">
                   <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
                     <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100">
@@ -1500,7 +1748,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Right: Available Blocks */}
                 <div className="lg:col-span-5 space-y-4">
                   <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
                     <h4 className="font-extrabold text-slate-900 text-base mb-3">บล็อกคำสั่งที่พร้อมใช้งาน ({availableBlocks.length})</h4>
@@ -1527,13 +1774,10 @@ export default function App() {
               </div>
             )}
 
-            {/* ========================================================================= */}
-            {/* ===== LEVEL 5: ข้อสอบ ป.6 (1 ข้อต่อ 1 หน้า + มีเวลา + ชื่อ + ดาวน์โหลด PNG + พิมพ์ PNG) ===== */}
-            {/* ========================================================================= */}
+            {/* LEVEL 5: ข้อสอบ ป.6 (1 ข้อต่อ 1 หน้า + มีเวลา + ชื่อ + ดาวน์โหลด PNG + พิมพ์ PNG) */}
             {currentMissionIdx === 4 && (
               <div className="space-y-6">
                 
-                {/* 1. STAGE 1: REGISTRATION SCREEN */}
                 {!quizStarted && !quizSubmitted && (
                   <div className="max-w-2xl mx-auto bg-white border border-blue-100 rounded-3xl p-8 sm:p-10 shadow-lg shadow-blue-500/5 text-center">
                     <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center text-3xl mb-4 border border-blue-200">
@@ -1603,10 +1847,8 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 2. STAGE 2: ACTIVE EXAM (1 ข้อต่อ 1 หน้า + เวลา) */}
                 {quizStarted && !quizSubmitted && (
                   <div className="space-y-6">
-                    
                     <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         
@@ -1765,17 +2007,13 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 3. STAGE 3: RESULT CERTIFICATE & SCORE SUMMARY (ดาวน์โหลด PNG & พิมพ์หน้า PNG) */}
                 {quizSubmitted && (
                   <div className="space-y-8">
-                    
-                    {/* Certificate Card: Target for html2canvas & Print */}
                     <div 
                       ref={certificateRef}
                       id="certificate-card"
                       className="bg-gradient-to-b from-blue-50/60 via-white to-sky-50 border-4 border-double border-blue-300 rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden text-center max-w-3xl mx-auto"
                     >
-                      {/* Top Ribbon */}
                       <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-600 text-white font-bold text-xs uppercase tracking-wider mb-4 shadow-sm">
                         <Award className="w-4 h-4" />
                         <span>ใบรายงานผลการทดสอบวัดผลสัมฤทธิ์</span>
@@ -1788,7 +2026,6 @@ export default function App() {
                         โรงเรียนประถมศึกษา • การทดสอบเรื่องผังงาน (Flowchart)
                       </p>
 
-                      {/* Student Details Box */}
                       <div className="my-6 p-4 bg-white/90 rounded-2xl border border-blue-200 inline-block text-slate-800 text-sm font-semibold shadow-xs">
                         มอบให้แก่: <strong className="text-blue-700 text-base font-black underline">{studentInfo.name || 'นักเรียน ป.6'}</strong>
                         <div className="text-xs text-slate-500 mt-1">
@@ -1796,7 +2033,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Score Badge */}
                       <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white p-6 rounded-3xl shadow-lg shadow-blue-600/25 max-w-md mx-auto mb-6">
                         <div className="text-xs text-blue-200 font-bold uppercase tracking-wider">คะแนนที่ได้</div>
                         <div className="text-5xl font-black mt-1">
@@ -1807,17 +2043,13 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Certificate Footer Stamp */}
                       <div className="text-[11px] text-slate-400 font-medium pt-2">
                         Flowchart Lab ป.6 • ระบบทดสอบและประเมินผลออนไลน์
                       </div>
                     </div>
 
-                    {/* Action Bar (Download PNG, Print PNG, Retake Test) */}
                     <div className="max-w-3xl mx-auto bg-white border border-blue-100 rounded-3xl p-5 shadow-sm no-print">
                       <div className="flex flex-wrap items-center justify-center gap-3">
-                        
-                        {/* Download PNG Button */}
                         <button
                           onClick={handleDownloadPNG}
                           disabled={isExporting}
@@ -1827,7 +2059,6 @@ export default function App() {
                           <span>{isExporting ? 'กำลังสร้างรูปภาพ...' : 'ดาวน์โหลดเป็นรูปภาพ PNG'}</span>
                         </button>
 
-                        {/* Print PNG Button */}
                         <button
                           onClick={handlePrintCertificate}
                           disabled={isExporting}
@@ -1837,7 +2068,6 @@ export default function App() {
                           <span>พิมพ์ใบประกาศคะแนน (Print PNG)</span>
                         </button>
 
-                        {/* Retake Test Button */}
                         <button
                           onClick={() => { setQuizStarted(false); setQuizSubmitted(false); }}
                           className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 px-5 rounded-2xl border border-slate-300 text-xs sm:text-sm transition flex items-center space-x-1.5"
@@ -1845,7 +2075,6 @@ export default function App() {
                           <RotateCcw className="w-4 h-4" />
                           <span>ทำแบบทดสอบใหม่อีกครั้ง</span>
                         </button>
-
                       </div>
                     </div>
 
@@ -1968,7 +2197,6 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              
               <div className="lg:col-span-7 bg-white border border-blue-100 rounded-3xl p-6 shadow-sm min-h-[400px]">
                 <h4 className="font-extrabold text-slate-900 text-base mb-4">ผังงานของคุณ ({sandboxNodes.length} บล็อก)</h4>
                 
@@ -2028,7 +2256,6 @@ export default function App() {
                   )}
                 </div>
               </div>
-
             </div>
           </div>
         )}
@@ -2115,65 +2342,320 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 4: VIDEO LEARNING ================= */}
+        {/* ================= TAB 4: VIDEO LEARNING & ADMIN VIDEO BACKEND ================= */}
         {activeTab === 'video' && (
           <div className="space-y-6">
+            
+            {/* Video Header & Quick Custom URL Player */}
             <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <span className="text-xs bg-rose-50 text-rose-700 font-bold px-3 py-1 rounded-full border border-rose-200">
-                    📺 ห้องเรียนรู้วิดีโอ ป.6 (YouTube Live Stream)
-                  </span>
-                  <h2 className="text-xl font-black text-slate-900 mt-2">ดูคลิปการสอนผังงานแบบเรียลไทม์ในหน้านี้</h2>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs bg-rose-50 text-rose-700 font-bold px-3 py-1 rounded-full border border-rose-200">
+                      📺 ห้องเรียนรู้วิดีโอ ป.6 (YouTube Live Stream)
+                    </span>
+                    {isAdminUnlocked && (
+                      <span className="text-xs bg-amber-100 text-amber-800 font-black px-2.5 py-0.5 rounded-full border border-amber-300 animate-pulse">
+                        ⚙️ แอดมินจัดการสื่อ
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-xl font-black text-slate-900 mt-2">
+                    เรียนรู้การเขียนผังงานด้วยวิดีโอและสื่อการสอนแบบเรียลไทม์
+                  </h2>
                 </div>
 
-                <form onSubmit={handleLoadCustomUrl} className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    placeholder="วางลิงก์ YouTube ที่ต้องการ..."
-                    value={customYoutubeUrl}
-                    onChange={(e) => setCustomYoutubeUrl(e.target.value)}
-                    className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs w-60 sm:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                  />
-                  <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow">
-                    เปิดดูคลิป
-                  </button>
-                </form>
+                <div className="flex items-center space-x-2">
+                  <form onSubmit={handleLoadCustomUrl} className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      placeholder="วางลิงก์ YouTube ที่ต้องการ..."
+                      value={customYoutubeUrl}
+                      onChange={(e) => setCustomYoutubeUrl(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs w-52 sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
+                    <button type="submit" className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow">
+                      เปิดดูคลิป
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
 
+            {/* ================= ADMIN VIDEO MANAGEMENT PANEL (ระบบหลังบ้าน) ================= */}
+            {isAdminUnlocked && (
+              <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-orange-500/10 border-2 border-amber-300 rounded-3xl p-6 shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-amber-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold">
+                      <Settings className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-slate-900">
+                        {editingVideoId ? '✏️ แก้ไขสื่อการสอน YouTube' : '➕ เพิ่มสื่อการสอน YouTube ใหม่'}
+                      </h3>
+                      <p className="text-xs text-slate-600">ข้อมูลจะถูกบันทึกถาวรลงในระบบทันที</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    {editingVideoId && (
+                      <button
+                        onClick={handleOpenAddVideo}
+                        className="text-xs px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition"
+                      >
+                        ยกเลิกการแก้ไข
+                      </button>
+                    )}
+                    <button
+                      onClick={handleResetDefaultVideos}
+                      className="text-xs px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold hover:bg-rose-100 transition"
+                    >
+                      คืนค่าวิดีโอเริ่มต้น
+                    </button>
+                  </div>
+                </div>
+
+                {/* Video Form */}
+                <form onSubmit={handleSaveVideo} className="mt-4 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className="sm:col-span-6">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        🎬 ชื่อบทเรียน / ชื่อคลิปวิดีโอ <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="เช่น บทเรียนที่ 4: การแก้ปัญหาด้วยผังงานวิทยาการคำนวณ"
+                        value={videoForm.title}
+                        onChange={(e) => setVideoForm({ ...videoForm, title: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-6">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        🔗 ลิงก์ YouTube (URL หรือ Video ID) <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="เช่น https://www.youtube.com/watch?v=S20m_Yf8tW0"
+                        value={videoForm.youtubeUrl}
+                        onChange={(e) => setVideoForm({ ...videoForm, youtubeUrl: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-6">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        👤 ผู้จัดทำ / ช่อง YouTube
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="เช่น คุณครูนก / สสวท. ประถมศึกษา"
+                        value={videoForm.creator}
+                        onChange={(e) => setVideoForm({ ...videoForm, creator: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-6">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        ⏱️ ความยาวคลิป
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="เช่น 15:30 นาที"
+                        value={videoForm.duration}
+                        onChange={(e) => setVideoForm({ ...videoForm, duration: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-12">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        📝 คำอธิบายเนื้อหาบทเรียน
+                      </label>
+                      <textarea
+                        rows="2"
+                        placeholder="สรุปย่อเกี่ยวกับเนื้อหาวิทยาการคำนวณที่นักเรียนจะได้รับจากคลิปนี้..."
+                        value={videoForm.description}
+                        onChange={(e) => setVideoForm({ ...videoForm, description: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-4">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        💡 ประเด็นสำคัญข้อที่ 1
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="เช่น สัญลักษณ์เริ่มต้นและสิ้นสุด"
+                        value={videoForm.keyPoint1}
+                        onChange={(e) => setVideoForm({ ...videoForm, keyPoint1: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                    <div className="sm:col-span-4">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        💡 ประเด็นสำคัญข้อที่ 2
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="เช่น การตรวจสอบเงื่อนไขจริง/เท็จ"
+                        value={videoForm.keyPoint2}
+                        onChange={(e) => setVideoForm({ ...videoForm, keyPoint2: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                    <div className="sm:col-span-4">
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        💡 ประเด็นสำคัญข้อที่ 3
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="เช่น ตัวอย่างขั้นตอนในชีวิตประจำวัน"
+                        value={videoForm.keyPoint3}
+                        onChange={(e) => setVideoForm({ ...videoForm, keyPoint3: e.target.value })}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="submit"
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-2xl shadow transition text-xs flex items-center space-x-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{editingVideoId ? 'บันทึกการแก้ไขวิดีโอ' : 'บันทึกและเพิ่มคลิป YouTube'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Video Player & Playlist Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              {/* Main Video Player */}
               <div className="lg:col-span-8 bg-white border border-blue-100 rounded-3xl p-5 shadow-sm">
                 <div className="relative w-full overflow-hidden rounded-2xl bg-black aspect-video shadow-lg">
                   <iframe
                     className="w-full h-full absolute inset-0"
                     src={`https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0`}
-                    title={selectedVideo.title}
+                    title={selectedVideo?.title || 'Flowchart Video'}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
                   />
                 </div>
+                
                 <div className="mt-4 pt-3 border-t border-slate-100">
-                  <h3 className="text-lg font-black text-slate-900">{selectedVideo.title}</h3>
-                  <p className="text-xs text-slate-600 mt-1">{selectedVideo.description}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs bg-rose-100 text-rose-800 font-bold px-2.5 py-0.5 rounded-md">
+                      {selectedVideo?.creator || 'YouTube'} • {selectedVideo?.duration || '10:00 นาที'}
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">ID: {activeVideoId}</span>
+                  </div>
+                  
+                  <h3 className="text-lg font-black text-slate-900 mt-2">{selectedVideo?.title}</h3>
+                  <p className="text-xs text-slate-600 mt-1">{selectedVideo?.description}</p>
+
+                  {/* Key points */}
+                  {selectedVideo?.keyPoints && selectedVideo.keyPoints.length > 0 && (
+                    <div className="mt-4 p-3.5 bg-blue-50/60 rounded-2xl border border-blue-100">
+                      <h5 className="text-xs font-black text-blue-900 mb-1.5 flex items-center space-x-1.5">
+                        <Lightbulb className="w-4 h-4 text-amber-500" />
+                        <span>สาระสำคัญที่นักเรียนจะได้รับ:</span>
+                      </h5>
+                      <ul className="space-y-1 text-xs text-slate-700 list-disc list-inside">
+                        {selectedVideo.keyPoints.map((pt, i) => (
+                          <li key={i}>{pt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
 
+              {/* Video Playlist & Admin Video Actions */}
               <div className="lg:col-span-4 bg-white border border-blue-100 rounded-3xl p-5 shadow-sm">
-                <h4 className="font-extrabold text-slate-900 text-sm mb-3">บทเรียนวิดีโอแนะนำ</h4>
-                <div className="space-y-3">
-                  {VIDEO_LESSONS.map((video) => (
-                    <div
-                      key={video.id}
-                      onClick={() => { setSelectedVideo(video); setCustomVideoId(null); playSound('click', soundEnabled); }}
-                      className="p-3 rounded-2xl border bg-slate-50 hover:bg-blue-50 cursor-pointer transition"
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-extrabold text-slate-900 text-sm flex items-center space-x-1.5">
+                    <Film className="w-4 h-4 text-rose-600" />
+                    <span>รายการบทเรียน ({videoLessons.length} ตอน)</span>
+                  </h4>
+                  {isAdminUnlocked && (
+                    <button
+                      onClick={handleOpenAddVideo}
+                      className="text-[11px] bg-amber-500 hover:bg-amber-600 text-white font-bold px-2.5 py-1 rounded-lg transition flex items-center space-x-1"
                     >
-                      <h5 className="text-xs font-bold text-slate-800 line-clamp-2">{video.title}</h5>
-                      <span className="text-[10px] text-rose-600 font-bold mt-1 block">{video.creator} ({video.duration})</span>
-                    </div>
-                  ))}
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>เพิ่มคลิป</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
+                  {videoLessons.map((video) => {
+                    const isCurrent = (selectedVideo?.id === video.id && !customVideoId);
+
+                    return (
+                      <div
+                        key={video.id}
+                        className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                          isCurrent
+                            ? 'bg-blue-50/80 border-blue-400 shadow-sm ring-1 ring-blue-300'
+                            : 'bg-slate-50 hover:bg-blue-50/40 border-slate-200'
+                        }`}
+                      >
+                        <div 
+                          onClick={() => { setSelectedVideo(video); setCustomVideoId(null); playSound('click', soundEnabled); }}
+                          className="cursor-pointer"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <h5 className="text-xs font-bold text-slate-900 line-clamp-2 hover:text-blue-600">
+                              {video.title}
+                            </h5>
+                            {isCurrent && (
+                              <span className="text-[10px] bg-blue-600 text-white font-black px-1.5 py-0.5 rounded shrink-0">
+                                กำลังเล่น ▶
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 font-medium">
+                            <span className="text-rose-600 font-bold">{video.creator}</span>
+                            <span>{video.duration}</span>
+                          </div>
+                        </div>
+
+                        {/* Admin Action Buttons on Each Item */}
+                        {isAdminUnlocked && (
+                          <div className="flex items-center justify-end space-x-1.5 mt-2.5 pt-2 border-t border-slate-200/70">
+                            <button
+                              onClick={() => handleOpenEditVideo(video)}
+                              className="text-[11px] bg-white border border-slate-200 hover:border-amber-400 text-amber-700 font-bold px-2 py-0.5 rounded-md flex items-center space-x-1"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              <span>แก้ไข</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteVideo(video.id)}
+                              className="text-[11px] bg-white border border-slate-200 hover:border-rose-400 text-rose-600 font-bold px-2 py-0.5 rounded-md flex items-center space-x-1"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>ลบ</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+
             </div>
           </div>
         )}
@@ -2183,7 +2665,7 @@ export default function App() {
       {/* --- Footer --- */}
       <footer className="border-t border-blue-100 bg-white/90 py-5 text-center text-xs text-slate-500 no-print">
         <p className="font-bold text-slate-700">Flowchart Lab ป.6 • ห้องทดลองผังงานและการแก้ปัญหา วิชาวิทยาการคำนวณ</p>
-        <p className="mt-1 text-[11px]">ดาวน์โหลดใบประกาศเป็น PNG • พิมพ์หน้า PNG ชัดเจน • Drag & Drop สุ่มโจทย์ใหม่ • Sandbox</p>
+        <p className="mt-1 text-[11px]">ระบบแอดมินอัปเดตสื่อ YouTube ถาวร • ดาวน์โหลดใบประกาศ PNG • พิมพ์หน้า PNG</p>
       </footer>
     </div>
   );
