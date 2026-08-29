@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import { 
   Play, RotateCcw, CheckCircle2, XCircle, Award, Sparkles, 
   BookOpen, Layers, ArrowRight, ArrowDown, 
@@ -8,7 +9,7 @@ import {
   FileText, CornerDownRight, RefreshCw, AlertCircle, Heart,
   Smile, Star, Trophy, Rocket, GraduationCap, CheckCircle,
   Clock, CheckSquare, Plus, Trash2, Edit3, Move, User, Printer,
-  Calendar, CheckCheck
+  Calendar, CheckCheck, Download, Image as ImageIcon
 } from 'lucide-react';
 
 // --- Sound Effects using Web Audio API ---
@@ -66,7 +67,7 @@ const playSound = (type, soundEnabled = true) => {
   }
 };
 
-// --- Standard Flowchart Geometric SVG Renderer (รูปทรงมาตรฐาน ANSI/ISO 100%) ---
+// --- Standard Flowchart Geometric SVG Renderer ---
 const FlowchartShapeSvg = ({ shape, label = '', height = '65px', className = '' }) => {
   switch (shape) {
     case 'terminator':
@@ -632,21 +633,20 @@ const VIDEO_LESSONS = [
 ];
 
 export default function App() {
-  // Navigation Tabs: 'game' | 'sandbox' | 'guide' | 'video'
   const [activeTab, setActiveTab] = useState('game');
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // --- Game State (5 Missions) ---
+  // Game state
   const [currentMissionIdx, setCurrentMissionIdx] = useState(0);
 
-  // Drag & Drop State for Mission 1
+  // Drag & drop state
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragTargets, setDragTargets] = useState([]);
   const [dragAvailablePool, setDragAvailablePool] = useState([]);
   const [dragPlacedAnswers, setDragPlacedAnswers] = useState({});
   const [dragResult, setDragResult] = useState(null);
 
-  // Puzzle Missions State (Missions 2-4)
+  // Puzzle missions state
   const [placedSlots, setPlacedSlots] = useState([]);
   const [availableBlocks, setAvailableBlocks] = useState([]);
   const [puzzleResult, setPuzzleResult] = useState(null);
@@ -654,20 +654,22 @@ export default function App() {
   const [simStep, setSimStep] = useState(0);
   const [simLogs, setSimLogs] = useState([]);
 
-  // ================= QUIZ MODE STATE (ด่าน 5: 1 ข้อต่อ 1 หน้า + เวลา + ชื่อนักเรียน + ใบสรุปคะแนน) =================
+  // ================= QUIZ MODE STATE =================
   const [studentInfo, setStudentInfo] = useState({ name: '', room: 'ป.6/1', number: '' });
   const [quizStarted, setQuizStarted] = useState(false);
-  const [quizPageIdx, setQuizPageIdx] = useState(0); // 0 to 9 (10 questions)
-  const [quizAnswers, setQuizAnswers] = useState({}); // { [qId]: selectedOptIdx }
+  const [quizPageIdx, setQuizPageIdx] = useState(0);
+  const [quizAnswers, setQuizAnswers] = useState({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState(600); // 10 minutes = 600s
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(600);
   const [timeUsedSeconds, setTimeUsedSeconds] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
   const timerRef = useRef(null);
+  const certificateRef = useRef(null);
 
   // Completed Missions Record
   const [completedMissions, setCompletedMissions] = useState({});
 
-  // --- Sandbox Studio State ---
+  // Sandbox Studio State
   const [sandboxNodes, setSandboxNodes] = useState([
     { id: 'sb_1', shape: 'terminator', text: 'เริ่มต้น (Start)' },
     { id: 'sb_2', shape: 'inputOutput', text: 'รับค่าตัวเลข X' },
@@ -678,15 +680,14 @@ export default function App() {
   const [sandboxRunning, setSandboxRunning] = useState(false);
   const [sandboxLogs, setSandboxLogs] = useState([]);
 
-  // --- Guide Tab Category Filter ---
+  // Guide Tab Filter
   const [symbolFilter, setSymbolFilter] = useState('ทั้งหมด');
 
-  // --- Video Tab State ---
+  // Video Tab State
   const [selectedVideo, setSelectedVideo] = useState(VIDEO_LESSONS[0]);
   const [customYoutubeUrl, setCustomYoutubeUrl] = useState('');
   const [customVideoId, setCustomVideoId] = useState(null);
 
-  // Initialize mission whenever level changes
   useEffect(() => {
     initLevel(currentMissionIdx);
   }, [currentMissionIdx]);
@@ -698,7 +699,7 @@ export default function App() {
         setTimeLeftSeconds(prev => {
           if (prev <= 1) {
             clearInterval(timerRef.current);
-            handleSubmitQuiz(true); // Auto-submit when time is up
+            handleSubmitQuiz(true);
             return 0;
           }
           return prev - 1;
@@ -714,7 +715,6 @@ export default function App() {
 
   const initLevel = (idx) => {
     if (idx === 0) {
-      // Mission 1: Randomize 4 symbols from pool
       const shuffledPool = [...SYMBOL_ITEMS_POOL].sort(() => Math.random() - 0.5);
       const selected = shuffledPool.slice(0, 4);
       
@@ -759,7 +759,6 @@ export default function App() {
         { id: 'm3_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
       ]);
     } else if (idx === 4) {
-      // Quiz mode reset
       setQuizStarted(false);
       setQuizSubmitted(false);
       setQuizPageIdx(0);
@@ -779,7 +778,7 @@ export default function App() {
     setSimLogs([]);
   };
 
-  // --- Drag & Drop Handlers for Mission 1 ---
+  // Drag & drop handlers
   const handleDragStart = (e, item) => {
     setDraggedItem(item);
     e.dataTransfer.setData('text/plain', item.id);
@@ -857,7 +856,6 @@ export default function App() {
     }
   };
 
-  // Puzzle verify (Missions 2-4)
   const handleVerifyPuzzle = () => {
     if (placedSlots.length === 0) {
       playSound('error', soundEnabled);
@@ -907,7 +905,7 @@ export default function App() {
     }
   };
 
-  // ================= QUIZ LOGIC (ด่าน 5: ทีละข้อ + มีเวลา + ชื่อ + ใบประกาศ) =================
+  // Quiz Handlers
   const handleStartQuiz = (e) => {
     e.preventDefault();
     if (!studentInfo.name.trim()) {
@@ -919,7 +917,7 @@ export default function App() {
     setQuizStarted(true);
     setQuizSubmitted(false);
     setQuizPageIdx(0);
-    setTimeLeftSeconds(600); // 10 minutes
+    setTimeLeftSeconds(600);
     setTimeUsedSeconds(0);
   };
 
@@ -953,6 +951,98 @@ export default function App() {
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // ================= PNG DOWNLOAD & PNG PRINT SYSTEM =================
+  const handleDownloadPNG = async () => {
+    if (!certificateRef.current) return;
+    playSound('click', soundEnabled);
+    setIsExporting(true);
+
+    try {
+      // Create high-res PNG
+      const canvas = await html2canvas(certificateRef.current, {
+        scale: 2.5,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+
+      const cleanName = studentInfo.name ? studentInfo.name.trim().replace(/[\s\/\\]+/g, '_') : 'นักเรียน';
+      const link = document.createElement('a');
+      link.download = `ใบประกาศผลการสอบ_วิทยาการคำนวณ_ป6_${cleanName}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      playSound('success', soundEnabled);
+    } catch (err) {
+      console.error("PNG download error:", err);
+      alert('เกิดข้อผิดพลาดในการดาวน์โหลดรูปภาพ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handlePrintCertificate = async () => {
+    if (!certificateRef.current) return;
+    playSound('click', soundEnabled);
+    setIsExporting(true);
+
+    try {
+      // Capture PNG and print strictly the PNG in high definition
+      const canvas = await html2canvas(certificateRef.current, {
+        scale: 2.5,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const printWin = window.open('', '_blank');
+
+      if (printWin) {
+        printWin.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <title>ใบประกาศผลการสอบ ป.6 - ${studentInfo.name || 'นักเรียน'}</title>
+              <style>
+                @page { size: landscape; margin: 10mm; }
+                body {
+                  margin: 0;
+                  padding: 0;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  min-height: 100vh;
+                  background-color: #ffffff;
+                }
+                img {
+                  max-width: 98%;
+                  max-height: 95vh;
+                  height: auto;
+                  object-fit: contain;
+                  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                  border-radius: 8px;
+                }
+              </style>
+            </head>
+            <body>
+              <img src="${imgData}" onload="window.focus(); window.print(); window.close();" />
+            </body>
+          </html>
+        `);
+        printWin.document.close();
+      } else {
+        // Fallback standard print
+        window.print();
+      }
+    } catch (e) {
+      console.error("Print error:", e);
+      window.print();
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Sandbox Studio
@@ -1028,7 +1118,7 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50/80 via-white to-sky-50 text-slate-800 font-['Prompt',sans-serif] antialiased flex flex-col selection:bg-blue-600 selection:text-white">
       
       {/* --- Top Header --- */}
-      <header className="border-b border-blue-100 bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+      <header className="border-b border-blue-100 bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-500 flex items-center justify-center shadow-lg shadow-blue-500/25 animate-bounce-small">
@@ -1043,7 +1133,7 @@ export default function App() {
                   วิทยาการคำนวณ
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">รูปทรงสัญลักษณ์มาตรฐาน ANSI/ISO • ระบบสอบทีละข้อมีเวลา • ใบสรุปคะแนน</p>
+              <p className="text-xs text-slate-500 font-medium">ดาวน์โหลดใบประกาศเป็น PNG • พิมพ์หน้า PNG • ข้อสอบ 10 ข้อ</p>
             </div>
           </div>
 
@@ -1115,7 +1205,7 @@ export default function App() {
           <div className="space-y-6">
             
             {/* Level Selector Header */}
-            <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm shadow-blue-500/5">
+            <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm shadow-blue-500/5 no-print">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <div className="text-xs uppercase tracking-wider text-blue-600 font-bold mb-0.5 flex items-center space-x-1.5">
@@ -1352,7 +1442,6 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* Canvas Slot Container */}
                     <div className="space-y-3 min-h-[380px] bg-gradient-to-b from-blue-50/40 to-slate-50/60 rounded-3xl p-6 border-2 border-dashed border-blue-200/80 flex flex-col items-center justify-start">
                       {placedSlots.length === 0 ? (
                         <div className="my-auto text-center py-12 px-4">
@@ -1391,7 +1480,6 @@ export default function App() {
                       )}
                     </div>
 
-                    {/* Actions */}
                     <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
                       <button
                         onClick={handleVerifyPuzzle}
@@ -1440,12 +1528,12 @@ export default function App() {
             )}
 
             {/* ========================================================================= */}
-            {/* ===== LEVEL 5: ข้อสอบ ป.6 (1 ข้อต่อ 1 หน้า + มีเวลา + ชื่อ + สรุปคะแนน) ===== */}
+            {/* ===== LEVEL 5: ข้อสอบ ป.6 (1 ข้อต่อ 1 หน้า + มีเวลา + ชื่อ + ดาวน์โหลด PNG + พิมพ์ PNG) ===== */}
             {/* ========================================================================= */}
             {currentMissionIdx === 4 && (
               <div className="space-y-6">
                 
-                {/* 1. STAGE 1: REGISTRATION SCREEN (กรอกชื่อนักเรียนก่อนเริ่มทำแบบทดสอบ) */}
+                {/* 1. STAGE 1: REGISTRATION SCREEN */}
                 {!quizStarted && !quizSubmitted && (
                   <div className="max-w-2xl mx-auto bg-white border border-blue-100 rounded-3xl p-8 sm:p-10 shadow-lg shadow-blue-500/5 text-center">
                     <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center text-3xl mb-4 border border-blue-200">
@@ -1462,7 +1550,6 @@ export default function App() {
                       แบบทดสอบปรนัยจำนวน 10 ข้อ • มีการจับเวลา 10:00 นาที • แสดงข้อสอบทีละหน้า
                     </p>
 
-                    {/* Student Registration Form */}
                     <form onSubmit={handleStartQuiz} className="mt-6 text-left space-y-4 max-w-md mx-auto bg-slate-50 p-6 rounded-3xl border border-slate-200">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1516,15 +1603,13 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 2. STAGE 2: ACTIVE EXAM (แสดงข้อสอบทีละหน้า 1 ข้อต่อ 1 หน้า พร้อมตัวจับเวลา) */}
+                {/* 2. STAGE 2: ACTIVE EXAM (1 ข้อต่อ 1 หน้า + เวลา) */}
                 {quizStarted && !quizSubmitted && (
                   <div className="space-y-6">
                     
-                    {/* Exam Status Bar: Timer + Student Info + Progress */}
                     <div className="bg-white border border-blue-100 rounded-3xl p-5 shadow-sm">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         
-                        {/* Student Name */}
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-base shrink-0">
                             {studentInfo.name.charAt(0) || '👤'}
@@ -1539,7 +1624,6 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Countdown Timer */}
                         <div className="flex items-center space-x-3 self-end sm:self-center">
                           <div className={`flex items-center space-x-2 px-4 py-2 rounded-2xl border font-mono font-black text-base shadow-xs ${
                             timeLeftSeconds < 120 
@@ -1561,7 +1645,6 @@ export default function App() {
 
                       </div>
 
-                      {/* Progress Bar */}
                       <div className="mt-4 pt-3 border-t border-slate-100">
                         <div className="flex items-center justify-between text-xs font-bold text-slate-600 mb-1.5">
                           <span>ข้อที่ {quizPageIdx + 1} จาก {QUIZ_QUESTIONS.length} ข้อ</span>
@@ -1576,7 +1659,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Single Question Card (1 ข้อต่อ 1 หน้า) */}
+                    {/* Single Question Card */}
                     {(() => {
                       const currentQ = QUIZ_QUESTIONS[quizPageIdx];
                       const selectedOpt = quizAnswers[currentQ.id];
@@ -1584,7 +1667,6 @@ export default function App() {
                       return (
                         <div className="bg-white border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-sm">
                           
-                          {/* Question Title & Shape Preview */}
                           <div className="flex items-start justify-between gap-4 mb-6">
                             <div>
                               <span className="text-xs bg-blue-100 text-blue-700 font-black px-3 py-1 rounded-full">
@@ -1599,7 +1681,6 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Options List */}
                           <div className="space-y-3">
                             {currentQ.options.map((opt, optIdx) => {
                               const isSelected = selectedOpt === optIdx;
@@ -1625,7 +1706,6 @@ export default function App() {
                             })}
                           </div>
 
-                          {/* Navigation Buttons (Previous, Next, Question Jump) */}
                           <div className="mt-8 pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <button
                               disabled={quizPageIdx === 0}
@@ -1636,7 +1716,6 @@ export default function App() {
                               <span>ข้อก่อนหน้า</span>
                             </button>
 
-                            {/* Direct Question Jump Circles */}
                             <div className="flex items-center space-x-1.5 overflow-x-auto py-1">
                               {QUIZ_QUESTIONS.map((q, idx) => {
                                 const isAnswered = quizAnswers[q.id] !== undefined;
@@ -1686,14 +1765,17 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 3. STAGE 3: RESULT CERTIFICATE & SCORE SUMMARY (สรุปคะแนนและเฉลยละเอียด) */}
+                {/* 3. STAGE 3: RESULT CERTIFICATE & SCORE SUMMARY (ดาวน์โหลด PNG & พิมพ์หน้า PNG) */}
                 {quizSubmitted && (
                   <div className="space-y-8">
                     
-                    {/* Certificate Card */}
-                    <div className="bg-gradient-to-b from-blue-50/50 via-white to-sky-50 border-4 border-double border-blue-300 rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden text-center max-w-3xl mx-auto">
-                      
-                      {/* Decorative Ribbon Header */}
+                    {/* Certificate Card: Target for html2canvas & Print */}
+                    <div 
+                      ref={certificateRef}
+                      id="certificate-card"
+                      className="bg-gradient-to-b from-blue-50/60 via-white to-sky-50 border-4 border-double border-blue-300 rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden text-center max-w-3xl mx-auto"
+                    >
+                      {/* Top Ribbon */}
                       <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-600 text-white font-bold text-xs uppercase tracking-wider mb-4 shadow-sm">
                         <Award className="w-4 h-4" />
                         <span>ใบรายงานผลการทดสอบวัดผลสัมฤทธิ์</span>
@@ -1706,7 +1788,7 @@ export default function App() {
                         โรงเรียนประถมศึกษา • การทดสอบเรื่องผังงาน (Flowchart)
                       </p>
 
-                      {/* Student Details */}
+                      {/* Student Details Box */}
                       <div className="my-6 p-4 bg-white/90 rounded-2xl border border-blue-200 inline-block text-slate-800 text-sm font-semibold shadow-xs">
                         มอบให้แก่: <strong className="text-blue-700 text-base font-black underline">{studentInfo.name || 'นักเรียน ป.6'}</strong>
                         <div className="text-xs text-slate-500 mt-1">
@@ -1714,7 +1796,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Score Display Box */}
+                      {/* Score Badge */}
                       <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white p-6 rounded-3xl shadow-lg shadow-blue-600/25 max-w-md mx-auto mb-6">
                         <div className="text-xs text-blue-200 font-bold uppercase tracking-wider">คะแนนที่ได้</div>
                         <div className="text-5xl font-black mt-1">
@@ -1725,36 +1807,57 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                      {/* Certificate Footer Stamp */}
+                      <div className="text-[11px] text-slate-400 font-medium pt-2">
+                        Flowchart Lab ป.6 • ระบบทดสอบและประเมินผลออนไลน์
+                      </div>
+                    </div>
+
+                    {/* Action Bar (Download PNG, Print PNG, Retake Test) */}
+                    <div className="max-w-3xl mx-auto bg-white border border-blue-100 rounded-3xl p-5 shadow-sm no-print">
+                      <div className="flex flex-wrap items-center justify-center gap-3">
+                        
+                        {/* Download PNG Button */}
+                        <button
+                          onClick={handleDownloadPNG}
+                          disabled={isExporting}
+                          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-2xl shadow-md shadow-emerald-600/20 text-xs sm:text-sm transition flex items-center space-x-2 disabled:opacity-50"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>{isExporting ? 'กำลังสร้างรูปภาพ...' : 'ดาวน์โหลดเป็นรูปภาพ PNG'}</span>
+                        </button>
+
+                        {/* Print PNG Button */}
+                        <button
+                          onClick={handlePrintCertificate}
+                          disabled={isExporting}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-2xl shadow-md shadow-blue-600/20 text-xs sm:text-sm transition flex items-center space-x-2 disabled:opacity-50"
+                        >
+                          <Printer className="w-4 h-4" />
+                          <span>พิมพ์ใบประกาศคะแนน (Print PNG)</span>
+                        </button>
+
+                        {/* Retake Test Button */}
                         <button
                           onClick={() => { setQuizStarted(false); setQuizSubmitted(false); }}
-                          className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2.5 px-6 rounded-2xl border border-slate-300 text-xs transition flex items-center space-x-1.5"
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-3 px-5 rounded-2xl border border-slate-300 text-xs sm:text-sm transition flex items-center space-x-1.5"
                         >
                           <RotateCcw className="w-4 h-4" />
                           <span>ทำแบบทดสอบใหม่อีกครั้ง</span>
                         </button>
 
-                        <button
-                          onClick={() => window.print()}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-2xl shadow text-xs transition flex items-center space-x-1.5"
-                        >
-                          <Printer className="w-4 h-4" />
-                          <span>พิมพ์ใบประกาศคะแนน</span>
-                        </button>
                       </div>
-
                     </div>
 
-                    {/* Detailed Question Review & Explanations (เฉลยละเอียดทุกข้อ) */}
-                    <div className="bg-white border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+                    {/* Detailed Review & Explanations */}
+                    <div className="bg-white border border-blue-100 rounded-3xl p-6 sm:p-8 shadow-sm no-print">
                       <h4 className="text-lg font-black text-slate-900 mb-4 flex items-center space-x-2">
                         <BookOpen className="w-5 h-5 text-blue-600" />
                         <span>ตรวจคำตอบและคำอธิบายเฉลยละเอียดทั้ง 10 ข้อ</span>
                       </h4>
 
                       <div className="space-y-4">
-                        {QUIZ_QUESTIONS.map((q, idx) => {
+                        {QUIZ_QUESTIONS.map((q) => {
                           const selected = quizAnswers[q.id];
                           const isCorrect = selected === q.correctAnswer;
 
@@ -1844,7 +1947,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Add Block Toolbar */}
               <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-slate-100">
                 <span className="text-xs font-bold text-slate-600 mr-2">+ เพิ่มบล็อก:</span>
                 <button onClick={() => handleAddSandboxNode('terminator')} className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs hover:bg-emerald-100">
@@ -1865,10 +1967,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Sandbox Canvas & Console Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
-              {/* Canvas List */}
               <div className="lg:col-span-7 bg-white border border-blue-100 rounded-3xl p-6 shadow-sm min-h-[400px]">
                 <h4 className="font-extrabold text-slate-900 text-base mb-4">ผังงานของคุณ ({sandboxNodes.length} บล็อก)</h4>
                 
@@ -1908,7 +2008,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Console Output */}
               <div className="lg:col-span-5 bg-slate-950 border border-slate-800 rounded-3xl p-5 shadow-xl font-mono text-xs text-slate-200 min-h-[300px]">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
                   <div className="flex items-center space-x-2 text-emerald-400 font-bold">
@@ -1950,7 +2049,6 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Category Filter Tabs */}
               <div className="flex flex-wrap items-center gap-2 mt-6 pt-5 border-t border-slate-100">
                 <span className="text-xs font-bold text-slate-500 mr-2">หมวดหมู่:</span>
                 {['ทั้งหมด', 'พื้นฐานสำคัญ', 'การทำงาน', 'รับและส่งข้อมูล', 'เงื่อนไขตัดสินใจ', 'จุดเชื่อมต่อ'].map((cat) => (
@@ -1969,7 +2067,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Symbol Cards Grid */}
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <Layers className="w-5 h-5 text-blue-600" />
@@ -2084,9 +2181,9 @@ export default function App() {
       </main>
 
       {/* --- Footer --- */}
-      <footer className="border-t border-blue-100 bg-white/90 py-5 text-center text-xs text-slate-500">
+      <footer className="border-t border-blue-100 bg-white/90 py-5 text-center text-xs text-slate-500 no-print">
         <p className="font-bold text-slate-700">Flowchart Lab ป.6 • ห้องทดลองผังงานและการแก้ปัญหา วิชาวิทยาการคำนวณ</p>
-        <p className="mt-1 text-[11px]">แบบทดสอบ 10 ข้อทีละหน้าพร้อมเวลา • รายงานผลคะแนนและเกียรติบัตร • Drag & Drop • Sandbox</p>
+        <p className="mt-1 text-[11px]">ดาวน์โหลดใบประกาศเป็น PNG • พิมพ์หน้า PNG ชัดเจน • Drag & Drop สุ่มโจทย์ใหม่ • Sandbox</p>
       </footer>
     </div>
   );
