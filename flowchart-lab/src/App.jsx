@@ -65,6 +65,328 @@ const playSound = (type, soundEnabled = true) => {
   }
 };
 
+// --- Standard Flowchart Geometric SVG Renderer (รูปทรงมาตรฐาน ANSI/ISO 100% ตรงตามหลักวิชาการ) ---
+const FlowchartShapeSvg = ({ shape, label = '', width = '100%', height = '70px', className = '' }) => {
+  switch (shape) {
+    case 'terminator':
+      // วงรีขอบมน / Stadium Oval
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="termGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#10b981" />
+              <stop offset="100%" stopColor="#0d9488" />
+            </linearGradient>
+          </defs>
+          <rect x="10" y="8" width="180" height="48" rx="24" ry="24" fill="url(#termGrad)" stroke="#059669" strokeWidth="2.5" />
+          <text x="100" y="38" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="13" fontFamily="Prompt, sans-serif">
+            {label || 'Start / End (เริ่มต้น/จบ)'}
+          </text>
+        </svg>
+      );
+
+    case 'process':
+      // สี่เหลี่ยมผืนผ้า / Rectangle
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="procGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#2563eb" />
+              <stop offset="100%" stopColor="#1d4ed8" />
+            </linearGradient>
+          </defs>
+          <rect x="10" y="8" width="180" height="48" rx="4" ry="4" fill="url(#procGrad)" stroke="#1e40af" strokeWidth="2.5" />
+          <text x="100" y="38" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="13" fontFamily="Prompt, sans-serif">
+            {label || 'Process (การคำนวณ / ปฏิบัติงาน)'}
+          </text>
+        </svg>
+      );
+
+    case 'inputOutput':
+      // สี่เหลี่ยมด้านขนาน / Parallelogram
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="ioGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#d97706" />
+            </linearGradient>
+          </defs>
+          <polygon points="35,8 190,8 165,56 10,56" fill="url(#ioGrad)" stroke="#b45309" strokeWidth="2.5" />
+          <text x="100" y="38" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="13" fontFamily="Prompt, sans-serif">
+            {label || 'Data (รับค่า / แสดงผล)'}
+          </text>
+        </svg>
+      );
+
+    case 'decision':
+      // สี่เหลี่ยมข้าวหลามตัด / Diamond
+      return (
+        <svg viewBox="0 0 200 75" className={`w-full max-h-[85px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="decGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#6366f1" />
+              <stop offset="100%" stopColor="#4f46e5" />
+            </linearGradient>
+          </defs>
+          <polygon points="100,6 192,38 100,68 8,38" fill="url(#decGrad)" stroke="#4338ca" strokeWidth="2.5" />
+          <text x="100" y="42" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="12" fontFamily="Prompt, sans-serif">
+            {label || 'Decision (เงื่อนไขตัดสินใจ ?)'}
+          </text>
+        </svg>
+      );
+
+    case 'display':
+      // ทรงจอแสดงผล / Display Shape (หัวโค้งมนซ้าย ตัดตรงขวา)
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="dispGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#06b6d4" />
+              <stop offset="100%" stopColor="#0284c7" />
+            </linearGradient>
+          </defs>
+          <path d="M 40 8 L 175 8 L 192 32 L 175 56 L 40 56 C 12 56 12 8 40 8 Z" fill="url(#dispGrad)" stroke="#0e7490" strokeWidth="2.5" />
+          <text x="105" y="38" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="12" fontFamily="Prompt, sans-serif">
+            {label || 'Display (แสดงผลจอภาพ)'}
+          </text>
+        </svg>
+      );
+
+    case 'manualInput':
+      // สี่เหลี่ยมคางหมูด้านบนเอียง / Manual Input (Keyboard)
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="manGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#0ea5e9" />
+              <stop offset="100%" stopColor="#2563eb" />
+            </linearGradient>
+          </defs>
+          <polygon points="12,22 188,8 188,56 12,56" fill="url(#manGrad)" stroke="#0369a1" strokeWidth="2.5" />
+          <text x="100" y="40" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="12" fontFamily="Prompt, sans-serif">
+            {label || 'Manual Input (คีย์บอร์ด)'}
+          </text>
+        </svg>
+      );
+
+    case 'document':
+      // เอกสารกระดาษขอบล่างเป็นคลื่น / Document
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="docGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#14b8a6" />
+              <stop offset="100%" stopColor="#0f766e" />
+            </linearGradient>
+          </defs>
+          <path d="M 15 8 L 185 8 L 185 45 C 145 32 115 58 70 46 C 45 40 25 50 15 46 Z" fill="url(#docGrad)" stroke="#115e59" strokeWidth="2.5" />
+          <text x="100" y="34" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="12" fontFamily="Prompt, sans-serif">
+            {label || 'Document (พิมพ์เอกสาร)'}
+          </text>
+        </svg>
+      );
+
+    case 'preparation':
+      // หกเหลี่ยม / Preparation (Loop setup)
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="prepGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#8b5cf6" />
+              <stop offset="100%" stopColor="#6d28d9" />
+            </linearGradient>
+          </defs>
+          <polygon points="32,32 52,8 148,8 168,32 148,56 52,56" fill="url(#prepGrad)" stroke="#5b21b6" strokeWidth="2.5" />
+          <text x="100" y="38" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="12" fontFamily="Prompt, sans-serif">
+            {label || 'Preparation (เตรียมค่า / Loop)'}
+          </text>
+        </svg>
+      );
+
+    case 'connector':
+      // วงกลมจุดเชื่อมต่อในหน้า / On-page Connector
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="connGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f43f5e" />
+              <stop offset="100%" stopColor="#e11d48" />
+            </linearGradient>
+          </defs>
+          <circle cx="100" cy="32" r="24" fill="url(#connGrad)" stroke="#be123c" strokeWidth="2.5" />
+          <text x="100" y="38" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="14" fontFamily="Prompt, sans-serif">
+            {label || 'A'}
+          </text>
+        </svg>
+      );
+
+    case 'offpageConnector':
+      // ห้าเหลี่ยมชี้ลง / Off-page Connector
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <defs>
+            <linearGradient id="offGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f97316" />
+              <stop offset="100%" stopColor="#ea580c" />
+            </linearGradient>
+          </defs>
+          <polygon points="75,8 125,8 125,38 100,56 75,38" fill="url(#offGrad)" stroke="#c2410c" strokeWidth="2.5" />
+          <text x="100" y="30" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="12" fontFamily="Prompt, sans-serif">
+            {label || 'หน้า 2'}
+          </text>
+        </svg>
+      );
+
+    case 'flowLine':
+      // ลูกศรทิศทางการทำงาน / Flow Line
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <line x1="25" y1="32" x2="155" y2="32" stroke="#334155" strokeWidth="4" />
+          <polygon points="175,32 150,20 150,44" fill="#334155" />
+          <text x="90" y="22" textAnchor="middle" fill="#475569" fontWeight="bold" fontSize="12" fontFamily="Prompt, sans-serif">
+            ทิศทาง (Flow Line)
+          </text>
+        </svg>
+      );
+
+    default:
+      return (
+        <svg viewBox="0 0 200 65" className={`w-full max-h-[75px] drop-shadow-md ${className}`}>
+          <rect x="10" y="8" width="180" height="48" rx="6" ry="6" fill="#3b82f6" stroke="#1d4ed8" strokeWidth="2" />
+          <text x="100" y="38" textAnchor="middle" fill="#ffffff" fontWeight="bold" fontSize="13" fontFamily="Prompt, sans-serif">
+            {label || 'Process'}
+          </text>
+        </svg>
+      );
+  }
+};
+
+// --- Complete List of 11 Standard Flowchart Symbols ---
+const ALL_FLOWCHART_SYMBOLS = [
+  {
+    id: 'terminator',
+    name: 'จุดเริ่มต้นและจุดสิ้นสุด',
+    shapeName: 'วงรีขอบมน (Stadium / Oval)',
+    shapeType: 'terminator',
+    category: 'พื้นฐานสำคัญ',
+    badge: 'bg-emerald-50 text-emerald-700 border-emerald-300',
+    icon: '🟢',
+    simpleExplain: 'ใช้ระบุจุดเริ่มต้น (Start) และจุดสิ้นสุด (End) ของผังงาน โดยในหนึ่งผังงานต้องมีจุดเริ่มต้น 1 จุดเสมอ',
+    example: 'เริ่มต้น (Start), สิ้นสุด (End), จบการทำงาน'
+  },
+  {
+    id: 'process',
+    name: 'การประมวลผล / คำนวณ / ปฏิบัติงาน',
+    shapeName: 'สี่เหลี่ยมผืนผ้า (Rectangle)',
+    shapeType: 'process',
+    category: 'การทำงาน',
+    badge: 'bg-blue-50 text-blue-700 border-blue-300',
+    icon: '🟦',
+    simpleExplain: 'ใช้สำหรับการคำนวณสูตรเลข กำหนดค่าตัวแปร หรือการสั่งให้ตัวละคร/หุ่นยนต์ลงมือปฏิบัติงาน',
+    example: 'ราคารวม = ราคา × จำนวน, นับรอบ = นับรอบ + 1, เดินหน้า 3 ก้าว'
+  },
+  {
+    id: 'inputOutput',
+    name: 'การรับข้อมูล / แสดงผลทั่วไป (Data)',
+    shapeName: 'สี่เหลี่ยมด้านขนาน (Parallelogram)',
+    shapeType: 'inputOutput',
+    category: 'รับและส่งข้อมูล',
+    badge: 'bg-amber-50 text-amber-800 border-amber-300',
+    icon: '▱',
+    simpleExplain: 'ใช้รับข้อมูลเข้ามาประมวลผล (Input) หรือส่งข้อมูลออกไปแสดงผล (Output) โดยไม่ระบุอุปกรณ์เฉพาะเจาะจง',
+    example: 'รับค่าความกว้างและความยาว, รับคะแนนสอบ, แสดงผลลัพธ์พื้นที่'
+  },
+  {
+    id: 'decision',
+    name: 'การตัดสินใจ / ตรวจสอบเงื่อนไข',
+    shapeName: 'สี่เหลี่ยมข้าวหลามตัด (Diamond)',
+    shapeType: 'decision',
+    category: 'เงื่อนไขตัดสินใจ',
+    badge: 'bg-indigo-50 text-indigo-700 border-indigo-300',
+    icon: '🔶',
+    simpleExplain: 'ใช้ตรวจสอบเงื่อนไขเปรียบเทียบ โดยมีเส้นทางออก 2 ทางเสมอ คือ จริง (True/ใช่) หรือ เท็จ (False/ไม่ใช่)',
+    example: 'คะแนนสอบ >= 50 ?, อุณหภูมิ > 37.5 องศา ?, ฝนตกหรือไม่ ?'
+  },
+  {
+    id: 'display',
+    name: 'แสดงผลออกทางจอภาพ (Display)',
+    shapeName: 'รูปทรงจอแสดงผล (Display Output)',
+    shapeType: 'display',
+    category: 'รับและส่งข้อมูล',
+    badge: 'bg-cyan-50 text-cyan-700 border-cyan-300',
+    icon: '🖥️',
+    simpleExplain: 'ใช้ระบุการแสดงข้อความ รูปภาพ หรือคำตอบออกทางหน้าจอคอมพิวเตอร์ แท็บเล็ต หรือสมาร์ทโฟนโดยเฉพาะ',
+    example: 'แสดงข้อความ "ยินดีด้วยคุณสอบผ่าน!", แสดงยอดเงินคงเหลือบนจอ'
+  },
+  {
+    id: 'manualInput',
+    name: 'การรับข้อมูลผ่านแป้นพิมพ์ (Manual Input)',
+    shapeName: 'สี่เหลี่ยมคางหมูด้านบนเอียง (Manual Input)',
+    shapeType: 'manualInput',
+    category: 'รับและส่งข้อมูล',
+    badge: 'bg-sky-50 text-sky-700 border-sky-300',
+    icon: '⌨️',
+    simpleExplain: 'ใช้ระบุการรับค่าข้อมูลจากการพิมพ์ด้วยมือผ่านแป้นพิมพ์ (Keyboard) ของผู้ใช้งานโดยตรง',
+    example: 'กรอกรหัสผ่าน (Password), พิมพ์ชื่อผู้ใช้งาน (Username)'
+  },
+  {
+    id: 'document',
+    name: 'พิมพ์เอกสารออกเครื่องพิมพ์ (Document)',
+    shapeName: 'เอกสารขอบล่างเป็นคลื่น (Document)',
+    shapeType: 'document',
+    category: 'รับและส่งข้อมูล',
+    badge: 'bg-teal-50 text-teal-700 border-teal-300',
+    icon: '📄',
+    simpleExplain: 'ใช้ระบุการพิมพ์ข้อมูลออกมาเป็นรายงานหรือเอกสารกระดาษผ่านเครื่องพิมพ์ (Printer)',
+    example: 'พิมพ์ใบเสร็จรับเงิน, พิมพ์รายงานเกรดเฉลี่ย'
+  },
+  {
+    id: 'preparation',
+    name: 'การเตรียมค่าเริ่มต้น / ลูป (Preparation)',
+    shapeName: 'หกเหลี่ยม (Hexagon)',
+    shapeType: 'preparation',
+    category: 'การทำงาน',
+    badge: 'bg-purple-50 text-purple-700 border-purple-300',
+    icon: '⬡',
+    simpleExplain: 'ใช้กำหนดค่าเริ่มต้นของตัวแปร หรือตั้งค่ารอบการวนซ้ำของโปรแกรม เช่น การตั้งค่ารอบ For Loop',
+    example: 'รอบที่ = 1 ถึง 10, กำหนดขนาดข้อมูล = 100'
+  },
+  {
+    id: 'connector',
+    name: 'จุดเชื่อมต่อในหน้าเดียวกัน (Connector)',
+    shapeName: 'วงกลมเล็ก (Circle)',
+    shapeType: 'connector',
+    category: 'จุดเชื่อมต่อ',
+    badge: 'bg-rose-50 text-rose-700 border-rose-300',
+    icon: '⭕',
+    simpleExplain: 'ใช้เชื่อมเส้นทางของผังงานในหน้าเดียวกัน เพื่อไม่ให้เส้นลูกศรตัดกันจนดูสับสนและเข้าใจยาก',
+    example: 'จุดเชื่อมต่อ A, B หรือ 1, 2'
+  },
+  {
+    id: 'offpageConnector',
+    name: 'จุดเชื่อมต่อข้ามหน้า (Off-page Connector)',
+    shapeName: 'ห้าเหลี่ยมชี้ลง (Off-page Pentagon)',
+    shapeType: 'offpageConnector',
+    category: 'จุดเชื่อมต่อ',
+    badge: 'bg-orange-50 text-orange-700 border-orange-300',
+    icon: '🏷️',
+    simpleExplain: 'ใช้เชื่อมผังงานที่มีขนาดยาวและต้องต่อขึ้นหน้ากระดาษใหม่ โดยระบุหมายเลขหน้าที่เชื่อมไป',
+    example: 'ไปต่อหน้า 2 (Page 2)'
+  },
+  {
+    id: 'flowLine',
+    name: 'เส้นและลูกศรทิศทาง (Flow Line)',
+    shapeName: 'เส้นลูกศร (Arrow)',
+    shapeType: 'flowLine',
+    category: 'พื้นฐานสำคัญ',
+    badge: 'bg-slate-100 text-slate-700 border-slate-300',
+    icon: '➡️',
+    simpleExplain: 'แสดงลำดับและทิศทางการทำงาน โดยจะไหลจากบนลงล่าง หรือซ้ายไปขวาเสมอ ห้ามลากย้อนโดยไม่มีลูกศร',
+    example: 'ทิศทางการไหลจากขั้นตอนที่ 1 ไปขั้นตอนที่ 2'
+  }
+];
+
 // --- Pool of Flowchart Symbols for Random Drag & Drop Mission 1 ---
 const SYMBOL_ITEMS_POOL = [
   {
@@ -81,7 +403,7 @@ const SYMBOL_ITEMS_POOL = [
     shape: 'process',
     shapeName: 'สี่เหลี่ยมผืนผ้า (Rectangle)',
     symbolText: 'คำนวณเงินรวม = ราคา × จำนวน',
-    category: 'การประมวลผล',
+    category: 'การประมวลผล / คำนวณ',
     icon: '🟦',
     hint: 'ใช้สำหรับการคำนวณตัวเลข หรือการลงมือปฏิบัติงาน'
   },
@@ -90,7 +412,7 @@ const SYMBOL_ITEMS_POOL = [
     shape: 'inputOutput',
     shapeName: 'สี่เหลี่ยมด้านขนาน (Parallelogram)',
     symbolText: 'รับค่าคะแนนสอบ (Input Score)',
-    category: 'รับเข้า / แสดงผล',
+    category: 'รับเข้า / แสดงผลทั่วไป',
     icon: '▱',
     hint: 'ใช้รับข้อมูลหรือแสดงผลลัพธ์ทั่วไป'
   },
@@ -117,7 +439,7 @@ const SYMBOL_ITEMS_POOL = [
     shape: 'connector',
     shapeName: 'วงกลมเล็ก (Circle)',
     symbolText: 'จุดเชื่อมต่อ A',
-    category: 'จุดเชื่อมต่อ',
+    category: 'จุดเชื่อมต่อในหน้า',
     icon: '⭕',
     hint: 'ใช้เชื่อมเส้นทางในหน้าเดียวกัน เพื่อไม่ให้เส้นตัดกัน'
   },
@@ -129,94 +451,6 @@ const SYMBOL_ITEMS_POOL = [
     category: 'เริ่มต้น / สิ้นสุด',
     icon: '🔴',
     hint: 'ใช้ระบุจุดสิ้นสุดเมื่อโปรแกรมทำงานเสร็จสิ้น'
-  }
-];
-
-// --- Standard Symbols for Guide ---
-const PRIMARY_SYMBOLS = [
-  {
-    id: 'terminator',
-    name: 'จุดเริ่มต้นและจุดสิ้นสุด (Start / End)',
-    shapeName: 'วงรีขอบมน (Oval)',
-    category: 'พื้นฐานสำคัญ',
-    badge: 'bg-emerald-50 text-emerald-700 border-emerald-300',
-    colorGradient: 'from-emerald-500 to-teal-600',
-    shapeType: 'oval',
-    icon: '🟢',
-    simpleExplain: 'เป็นจุดเริ่มต้นก้าวแรก และจุดสุดท้ายเมื่อจบการทำงานของโปรแกรม ในหนึ่งผังงานต้องมีเสมอ!',
-    example: 'เริ่มต้น (Start), สิ้นสุด (End), จบการทำงาน'
-  },
-  {
-    id: 'process',
-    name: 'การปฏิบัติงาน / คำนวณ (Process)',
-    shapeName: 'สี่เหลี่ยมผืนผ้า (Rectangle)',
-    category: 'การทำงาน',
-    badge: 'bg-blue-50 text-blue-700 border-blue-300',
-    colorGradient: 'from-blue-600 to-indigo-600',
-    shapeType: 'rectangle',
-    icon: '🟦',
-    simpleExplain: 'ใช้เมื่อมีการลงมือทำสิ่งต่างๆ การคำนวณเลข หรือการสั่งให้หุ่นยนต์/ตัวละครทำตามคำสั่ง',
-    example: 'เดินหน้า 3 ก้าว, ราคารวม = 20 × 5, เติมน้ำตาล 1 ช้อน'
-  },
-  {
-    id: 'inputOutput',
-    name: 'การรับข้อมูล / แสดงผลทั่วไป (Input / Output)',
-    shapeName: 'สี่เหลี่ยมด้านขนาน (Parallelogram)',
-    category: 'รับและส่งข้อมูล',
-    badge: 'bg-amber-50 text-amber-800 border-amber-300',
-    colorGradient: 'from-amber-500 to-amber-600',
-    shapeType: 'parallelogram',
-    icon: '▱',
-    simpleExplain: 'ใช้เมื่อต้องการรับค่าเข้ามา (เช่น ถามชื่อ, รับคะแนน) หรือต้องการส่งค่าออกไปแสดงผล',
-    example: 'รับค่าความกว้างและความยาว, รับคะแนนสอบ, แสดงผลค่าพื้นที่'
-  },
-  {
-    id: 'decision',
-    name: 'การตัดสินใจ / ตรวจสอบเงื่อนไข (Decision)',
-    shapeName: 'สี่เหลี่ยมข้าวหลามตัด (Diamond)',
-    category: 'เงื่อนไขตัดสินใจ',
-    badge: 'bg-indigo-50 text-indigo-700 border-indigo-300',
-    colorGradient: 'from-indigo-600 to-violet-600',
-    shapeType: 'diamond',
-    icon: '🔶',
-    simpleExplain: 'ใช้เปรียบเทียบหรือตั้งคำถาม เช่น "ฝนตกไหม?" ผลลัพธ์จะมี 2 ทางเลือกเสมอ คือ จริง (ใช่) หรือ เท็จ (ไม่ใช่)',
-    example: 'คะแนนสอบ >= 50 ?, อุณหภูมิ > 37.5 องศา ?, ฝนตกหรือไม่ ?'
-  },
-  {
-    id: 'display',
-    name: 'แสดงผลออกทางจอภาพ (Display Output)',
-    shapeName: 'รูปทรงจอแสดงผล (Display)',
-    category: 'รับและส่งข้อมูล',
-    badge: 'bg-cyan-50 text-cyan-700 border-cyan-300',
-    colorGradient: 'from-cyan-500 to-blue-600',
-    shapeType: 'displayShape',
-    icon: '🖥️',
-    simpleExplain: 'ใช้เมื่อต้องการให้หน้าจอคอมพิวเตอร์หรือแท็บเล็ตแสดงข้อความ รูปภาพ หรือคำตอบให้ผู้ใช้เห็น',
-    example: 'แสดงข้อความ "ยินดีด้วยคุณสอบผ่าน!", แสดงยอดเงินคงเหลือ'
-  },
-  {
-    id: 'connector',
-    name: 'จุดเชื่อมต่อในหน้าเดียวกัน (Connector)',
-    shapeName: 'วงกลมเล็ก (Circle)',
-    category: 'จุดเชื่อมต่อ',
-    badge: 'bg-rose-50 text-rose-700 border-rose-300',
-    colorGradient: 'from-rose-500 to-pink-600',
-    shapeType: 'circle',
-    icon: '⭕',
-    simpleExplain: 'ใช้เชื่อมเส้นทางของผังงานให้รวมเป็นจุดเดียวกัน เพื่อไม่ให้เส้นลูกศรตัดกันจนดูสับสน',
-    example: 'จุดเชื่อมรวม A หรือ 1'
-  },
-  {
-    id: 'flowLine',
-    name: 'เส้นและลูกศรทิศทาง (Flow Line)',
-    shapeName: 'เส้นลูกศร (Arrow)',
-    category: 'พื้นฐานสำคัญ',
-    badge: 'bg-slate-100 text-slate-700 border-slate-300',
-    colorGradient: 'from-slate-700 to-slate-800',
-    shapeType: 'arrow',
-    icon: '➡️',
-    simpleExplain: 'แสดงลำดับและทิศทางการทำงาน โดยจะไหลจากบนลงล่าง หรือซ้ายไปขวาเสมอ ห้ามลากย้อนโดยไม่มีลูกศร',
-    example: 'ทิศทางการไหลจากขั้นตอนที่ 1 ไปขั้นตอนที่ 2'
   }
 ];
 
@@ -403,13 +637,13 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   // --- Game State (5 Missions) ---
-  const [currentMissionIdx, setCurrentMissionIdx] = useState(0); // 0=DragDrop Sym, 1=Milk, 2=Shop, 3=Temp, 4=Quiz
+  const [currentMissionIdx, setCurrentMissionIdx] = useState(0);
 
   // Drag & Drop State for Mission 1 (Randomized Symbol Matching)
   const [draggedItem, setDraggedItem] = useState(null);
-  const [dragTargets, setDragTargets] = useState([]); // Slots to fill
-  const [dragAvailablePool, setDragAvailablePool] = useState([]); // Available items to drag
-  const [dragPlacedAnswers, setDragPlacedAnswers] = useState({}); // { [slotId]: item }
+  const [dragTargets, setDragTargets] = useState([]);
+  const [dragAvailablePool, setDragAvailablePool] = useState([]);
+  const [dragPlacedAnswers, setDragPlacedAnswers] = useState({});
   const [dragResult, setDragResult] = useState(null);
 
   // Standard Puzzle Missions State (Missions 2-4)
@@ -419,7 +653,6 @@ export default function App() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [simStep, setSimStep] = useState(0);
   const [simLogs, setSimLogs] = useState([]);
-  const [simVars, setSimVars] = useState({});
 
   // Quiz State (Mission 5)
   const [quizAnswers, setQuizAnswers] = useState({});
@@ -439,6 +672,9 @@ export default function App() {
   const [sandboxRunning, setSandboxRunning] = useState(false);
   const [sandboxLogs, setSandboxLogs] = useState([]);
 
+  // --- Guide Tab Category Filter ---
+  const [symbolFilter, setSymbolFilter] = useState('ทั้งหมด');
+
   // --- Video Tab State ---
   const [selectedVideo, setSelectedVideo] = useState(VIDEO_LESSONS[0]);
   const [customYoutubeUrl, setCustomYoutubeUrl] = useState('');
@@ -455,16 +691,15 @@ export default function App() {
       const shuffledPool = [...SYMBOL_ITEMS_POOL].sort(() => Math.random() - 0.5);
       const selected = shuffledPool.slice(0, 4);
       
-      // Targets are ordered placeholders
       const targets = selected.map((item, i) => ({
         slotId: `slot_${i}`,
         correctItemId: item.id,
         category: item.category,
         shapeName: item.shapeName,
+        shapeType: item.shape,
         hint: item.hint
       }));
 
-      // Available items are shuffled
       const poolShuffled = [...selected].sort(() => Math.random() - 0.5);
 
       setDragTargets(targets);
@@ -480,7 +715,7 @@ export default function App() {
         { id: 'm1_step3', text: 'ใส่น้ำแข็งก้อนลงไปให้เต็มแก้ว', shape: 'process' },
         { id: 'm1_step4', text: 'แสดงผล "นมสดเย็นพร้อมเสิร์ฟ"', shape: 'display' },
         { id: 'm1_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
-      ], ['m1_start', 'm1_step1', 'm1_step2', 'm1_step3', 'm1_step4', 'm1_end']);
+      ]);
     } else if (idx === 2) {
       // Mission 3: Shop Calculator
       initPuzzleLevel([
@@ -489,7 +724,7 @@ export default function App() {
         { id: 'm2_calc', text: 'คำนวณ ราคารวม = Price × Qty', shape: 'process' },
         { id: 'm2_display', text: 'แสดงผลลัพธ์ ยอดเงินที่ต้องจ่าย', shape: 'display' },
         { id: 'm2_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
-      ], ['m2_start', 'm2_input', 'm2_calc', 'm2_display', 'm2_end']);
+      ]);
     } else if (idx === 3) {
       // Mission 4: Temp Decision
       initPuzzleLevel([
@@ -498,7 +733,7 @@ export default function App() {
         { id: 'm3_decision', text: 'ตรวจสอบเงื่อนไข Temp > 37.5 °C ?', shape: 'decision' },
         { id: 'm3_output', text: 'แสดงผล "เข้าห้องเรียนได้" หรือ "พบครูพยาบาล"', shape: 'display' },
         { id: 'm3_end', text: 'สิ้นสุด (End)', shape: 'terminator' }
-      ], ['m3_start', 'm3_input', 'm3_decision', 'm3_output', 'm3_end']);
+      ]);
     } else if (idx === 4) {
       // Mission 5: Quiz
       setQuizAnswers({});
@@ -506,7 +741,7 @@ export default function App() {
     }
   };
 
-  const initPuzzleLevel = (blocks, correctOrder) => {
+  const initPuzzleLevel = (blocks) => {
     const shuffled = [...blocks].sort(() => Math.random() - 0.5);
     setAvailableBlocks(shuffled);
     setPlacedSlots([]);
@@ -514,7 +749,6 @@ export default function App() {
     setIsSimulating(false);
     setSimStep(0);
     setSimLogs([]);
-    setSimVars({});
   };
 
   // --- Drag & Drop Handlers for Mission 1 ---
@@ -528,7 +762,6 @@ export default function App() {
     if (!draggedItem) return;
     playSound('drop', soundEnabled);
 
-    // If slot already had an item, return it to pool
     const existing = dragPlacedAnswers[slotId];
     let newPool = dragAvailablePool.filter(it => it.id !== draggedItem.id);
     if (existing) {
@@ -552,9 +785,7 @@ export default function App() {
     setDragResult(null);
   };
 
-  // Click-to-place fallback for mobile on Mission 1
   const handleQuickPlace = (item) => {
-    // Find first empty target slot
     const emptySlot = dragTargets.find(t => !dragPlacedAnswers[t.slotId]);
     if (!emptySlot) return;
     playSound('drop', soundEnabled);
@@ -593,7 +824,7 @@ export default function App() {
       playSound('error', soundEnabled);
       setDragResult({
         success: false,
-        message: '❌ ยังมีสัญลักษณ์ที่วางสลับที่กันอยู่ ลองอ่านคำใบ้รูปทรงและหน้าที่ แล้วจัดวางใหม่อีกรอบนะครับ'
+        message: '❌ ยังมีสัญลักษณ์ที่วางสลับที่กันอยู่ ลองตรวจดูรูปทรงและหน้าที่ แล้วจัดวางใหม่อีกรอบนะครับ'
       });
     }
   };
@@ -625,14 +856,13 @@ export default function App() {
         message: `🌟 ถูกต้องสมบูรณ์แบบ! เรียงผังงานได้ถูกต้องตามหลักการวิชาวิทยาการคำนวณ ป.6`
       });
       setCompletedMissions(prev => ({ ...prev, [currentMissionIdx]: true }));
-      // Run trace
       setIsSimulating(true);
       setSimStep(0);
       let st = 0;
       const interval = setInterval(() => {
         if (st < placedSlots.length) {
           setSimStep(st);
-          setSimLogs(prev => [...prev, `✅ ทำงานขั้นตอนที่ ${st + 1}: ${placedSlots[st].text}`]);
+          setSimLogs(prev => [...prev, `✅ ขั้นตอนที่ ${st + 1}: ${placedSlots[st].text}`]);
           playSound('step', soundEnabled);
           st++;
         } else {
@@ -675,7 +905,7 @@ export default function App() {
     return score;
   };
 
-  // Sandbox studio runner
+  // Sandbox Studio
   const handleRunSandbox = () => {
     playSound('click', soundEnabled);
     setSandboxRunning(true);
@@ -740,6 +970,11 @@ export default function App() {
 
   const activeVideoId = customVideoId || selectedVideo.youtubeId;
 
+  // Filtered symbols for guide
+  const filteredSymbols = symbolFilter === 'ทั้งหมด' 
+    ? ALL_FLOWCHART_SYMBOLS 
+    : ALL_FLOWCHART_SYMBOLS.filter(s => s.category === symbolFilter);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50/80 via-white to-sky-50 text-slate-800 font-['Prompt',sans-serif] antialiased flex flex-col selection:bg-blue-600 selection:text-white">
       
@@ -759,11 +994,11 @@ export default function App() {
                   วิทยาการคำนวณ
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">เกม Drag & Drop ผังงาน • ห้องทดลองสร้างผังงาน • ข้อสอบ 10 ข้อ</p>
+              <p className="text-xs text-slate-500 font-medium">รูปทรงสัญลักษณ์มาตรฐาน ANSI/ISO 100% • Drag & Drop • ข้อสอบ 10 ข้อ</p>
             </div>
           </div>
 
-          {/* Navigation Controls */}
+          {/* Navigation Tabs */}
           <div className="flex items-center space-x-2 sm:space-x-3">
             <nav className="flex items-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200">
               <button
@@ -798,7 +1033,7 @@ export default function App() {
                 }`}
               >
                 <BookOpen className="w-4 h-4" />
-                <span>คู่มือสัญลักษณ์</span>
+                <span>คู่มือสัญลักษณ์ (ตรงตามมาตรฐาน)</span>
               </button>
 
               <button
@@ -823,7 +1058,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* --- Main Container --- */}
+      {/* --- Main Body --- */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         
         {/* ================= TAB 1: GAME MISSIONS ================= */}
@@ -869,7 +1104,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* ===== LEVEL 1: DRAG & DROP SYMBOL MATCHING (สุ่มโจทย์ทุกครั้งที่เริ่มเกม) ===== */}
+            {/* ===== LEVEL 1: DRAG & DROP SYMBOL MATCHING ===== */}
             {currentMissionIdx === 0 && (
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 text-white rounded-3xl p-6 shadow-lg shadow-blue-600/20">
@@ -879,10 +1114,10 @@ export default function App() {
                         🎲 โหมดสุ่มโจทย์อัตโนมัติ (Random Generator)
                       </span>
                       <h3 className="text-xl font-black mt-2">
-                        ลากวางบล็อกสัญลักษณ์ Flowchart ให้ตรงกับหน้าที่และรูปทรง!
+                        ลากบล็อกสัญลักษณ์ Flowchart รูปทรงที่ถูกต้องมาวางลงในช่องเป้าหมาย!
                       </h3>
                       <p className="text-xs text-blue-100 mt-1">
-                        👉 วิธีเล่น: ลากบล็อกสัญลักษณ์จากฝั่งขวามาปล่อย (Drop) ลงในช่องคำถามฝั่งซ้าย (หรือคลิกเพื่อส่งลงช่องว่างทันที)
+                        👉 วิธีเล่น: ลากบล็อกสัญลักษณ์จากฝั่งขวามาปล่อย (Drop) ลงในช่องคำถามฝั่งซ้าย (หรือคลิกเลือกเพื่อส่งลงช่องว่างอัตโนมัติ)
                       </p>
                     </div>
                     <button
@@ -902,10 +1137,10 @@ export default function App() {
                     <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
                       <h4 className="font-extrabold text-slate-900 text-base mb-4 flex items-center space-x-2">
                         <Move className="w-5 h-5 text-blue-600" />
-                        <span>ช่องเป้าหมายที่ต้องนำสัญลักษณ์มาวาง ({dragTargets.length} ช่อง)</span>
+                        <span>ช่องเป้าหมายที่ต้องนำสัญลักษณ์รูปทรงจริงมาวาง ({dragTargets.length} ช่อง)</span>
                       </h4>
 
-                      <div className="space-y-3.5">
+                      <div className="space-y-4">
                         {dragTargets.map((target, idx) => {
                           const placed = dragPlacedAnswers[target.slotId];
 
@@ -914,24 +1149,24 @@ export default function App() {
                               key={target.slotId}
                               onDragOver={(e) => e.preventDefault()}
                               onDrop={(e) => handleDropOnSlot(e, target.slotId)}
-                              className={`p-4 rounded-2xl border-2 transition-all min-h-[105px] flex flex-col justify-between ${
+                              className={`p-4 rounded-3xl border-2 transition-all min-h-[130px] flex flex-col justify-between ${
                                 placed 
                                   ? 'border-blue-400 bg-blue-50/50 shadow-sm' 
-                                  : 'border-dashed border-blue-200 bg-slate-50/70 hover:bg-blue-50/30'
+                                  : 'border-dashed border-blue-300 bg-slate-50/80 hover:bg-blue-50/40'
                               }`}
                             >
                               <div className="flex items-start justify-between">
                                 <div>
                                   <div className="flex items-center space-x-2">
-                                    <span className="text-xs font-black bg-blue-600 text-white px-2 py-0.5 rounded-lg">
+                                    <span className="text-xs font-black bg-blue-600 text-white px-2.5 py-0.5 rounded-lg">
                                       ช่องที่ {idx + 1}
                                     </span>
-                                    <span className="text-xs font-bold text-slate-800">
+                                    <span className="text-sm font-bold text-slate-900">
                                       หน้าที่: {target.category}
                                     </span>
                                   </div>
                                   <p className="text-xs text-slate-500 mt-1">
-                                    💡 <strong>คำใบ้รูปทรง:</strong> {target.shapeName} ({target.hint})
+                                    💡 <strong>รูปทรงที่ถูกต้อง:</strong> <span className="text-blue-600 font-bold">{target.shapeName}</span> — {target.hint}
                                   </p>
                                 </div>
 
@@ -939,26 +1174,28 @@ export default function App() {
                                   <button
                                     onClick={() => handleRemoveFromSlot(target.slotId)}
                                     title="คลิกเพื่อนำออก"
-                                    className="text-rose-500 hover:text-rose-700 bg-white p-1 rounded-lg border border-rose-200 shadow-xs"
+                                    className="text-rose-500 hover:text-rose-700 bg-white p-1.5 rounded-xl border border-rose-200 shadow-xs"
                                   >
                                     <XCircle className="w-4 h-4" />
                                   </button>
                                 )}
                               </div>
 
-                              {/* Target Drop Content */}
-                              <div className="mt-2 pt-2 border-t border-slate-200/60">
+                              {/* Target Drop Content: Render the SVG shape if placed */}
+                              <div className="mt-3 pt-2 border-t border-slate-200/70">
                                 {placed ? (
-                                  <div className="flex items-center space-x-2.5 text-xs font-bold text-blue-900 bg-white p-2 rounded-xl border border-blue-200 shadow-xs animate-fadeIn">
-                                    <span className="text-lg">{placed.icon}</span>
-                                    <span>{placed.symbolText}</span>
-                                    <span className="ml-auto text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
-                                      {placed.shapeName}
-                                    </span>
+                                  <div className="bg-white p-2 rounded-2xl border border-blue-200 shadow-xs animate-fadeIn flex items-center space-x-3">
+                                    <div className="w-32 sm:w-40 shrink-0">
+                                      <FlowchartShapeSvg shape={placed.shape} label={placed.symbolText} height="48px" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-xs font-bold text-slate-800 truncate">{placed.symbolText}</div>
+                                      <div className="text-[10px] text-blue-600 font-semibold">{placed.shapeName}</div>
+                                    </div>
                                   </div>
                                 ) : (
-                                  <div className="text-center py-2 text-xs text-blue-400 font-semibold italic">
-                                    ⬇️ ลากบล็อกสัญลักษณ์มาวางที่นี่ (Drop Here)
+                                  <div className="text-center py-3 text-xs text-blue-400 font-semibold italic bg-blue-50/50 rounded-xl border border-dashed border-blue-200">
+                                    ⬇️ ลากบล็อกสัญลักษณ์รูปทรงที่ถูกต้องมาวางที่นี่ (Drop Here)
                                   </div>
                                 )}
                               </div>
@@ -974,7 +1211,7 @@ export default function App() {
                           className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-4 px-6 rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center space-x-2 transition-all transform active:scale-98 text-base"
                         >
                           <CheckSquare className="w-5 h-5" />
-                          <span>ตรวจคำตอบการจับคู่ (Verify Matching)</span>
+                          <span>ตรวจคำตอบการจับคู่สัญลักษณ์ (Verify Matching)</span>
                         </button>
 
                         {dragResult && (
@@ -996,13 +1233,13 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Right Column: Available Draggable Items (5 cols) */}
+                  {/* Right Column: Available Draggable Items with Real SVG Shapes (5 cols) */}
                   <div className="lg:col-span-5 space-y-4">
                     <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm shadow-blue-500/5">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="font-extrabold text-slate-900 text-base flex items-center space-x-2">
                           <Layers className="w-5 h-5 text-blue-600" />
-                          <span>บล็อกสัญลักษณ์ที่ต้องนำไปวาง</span>
+                          <span>บล็อกสัญลักษณ์รูปทรงจริง</span>
                         </h4>
                         <span className="text-xs bg-blue-100 text-blue-800 font-bold px-2.5 py-1 rounded-full">
                           เหลือ {dragAvailablePool.length} อัน
@@ -1027,22 +1264,15 @@ export default function App() {
                               onDragStart={(e) => handleDragStart(e, item)}
                               onClick={() => handleQuickPlace(item)}
                               title="ลากไปวางในช่อง หรือคลิกเพื่อเลือก"
-                              className="p-4 rounded-2xl bg-slate-50 hover:bg-blue-50/80 border-2 border-slate-200 hover:border-blue-400 hover:shadow-md cursor-grab active:cursor-grabbing transition-all flex items-center justify-between group"
+                              className="p-3.5 rounded-3xl bg-slate-50 hover:bg-blue-50/80 border-2 border-slate-200 hover:border-blue-400 hover:shadow-md cursor-grab active:cursor-grabbing transition-all flex flex-col justify-between group"
                             >
-                              <div className="flex items-center space-x-3">
-                                <span className="text-2xl">{item.icon}</span>
-                                <div>
-                                  <div className="text-sm font-bold text-slate-800 group-hover:text-blue-700">
-                                    {item.symbolText}
-                                  </div>
-                                  <div className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                    รูปทรง: <span className="text-blue-600 font-bold">{item.shapeName}</span>
-                                  </div>
-                                </div>
+                              <div className="w-full flex items-center justify-center py-1">
+                                <FlowchartShapeSvg shape={item.shape} label={item.symbolText} height="52px" />
                               </div>
-                              <span className="text-xs bg-blue-600 text-white font-bold px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition shadow">
-                                ลากเลย ➡️
-                              </span>
+                              <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-slate-200/60 font-semibold">
+                                <span className="text-slate-600">รูปทรง: <strong className="text-blue-600">{item.shapeName}</strong></span>
+                                <span className="text-blue-600 bg-blue-100 px-2 py-0.5 rounded-lg text-[10px] font-bold">ลากเลย ➡️</span>
+                              </div>
                             </div>
                           ))
                         )}
@@ -1102,17 +1332,9 @@ export default function App() {
                                 setAvailableBlocks(prev => [...prev, blockToRemove]);
                                 setPuzzleResult(null);
                               }}
-                              className="group cursor-pointer relative transition-all transform hover:scale-102"
+                              className="group cursor-pointer relative transition-all transform hover:scale-102 w-full max-w-sm"
                             >
-                              <div className={`px-6 py-3 rounded-2xl shadow-md border-2 text-white font-bold text-sm min-w-[260px] flex items-center justify-between ${
-                                block.shape === 'terminator' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 border-emerald-400 rounded-full' :
-                                block.shape === 'decision' ? 'bg-gradient-to-r from-indigo-600 to-blue-600 border-indigo-400' :
-                                block.shape === 'inputOutput' ? 'bg-gradient-to-r from-amber-500 to-amber-600 border-amber-400 transform -skew-x-6' :
-                                'bg-gradient-to-r from-blue-600 to-blue-700 border-blue-400'
-                              }`}>
-                                <span>{block.text}</span>
-                                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full">{block.shape}</span>
-                              </div>
+                              <FlowchartShapeSvg shape={block.shape} label={block.text} height="52px" />
                               <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition bg-rose-500 text-white rounded-full p-1 shadow">
                                 <XCircle className="w-4 h-4" />
                               </div>
@@ -1135,7 +1357,7 @@ export default function App() {
 
                       {puzzleResult && (
                         <div className={`p-4 rounded-2xl border flex items-start space-x-3 ${puzzleResult.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-rose-50 border-rose-300 text-rose-900'}`}>
-                          {puzzleResult.success ? <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" /> : <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0" />}
+                          {puzzleResult.success ? <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" /> : <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />}
                           <p className="text-sm font-bold">{puzzleResult.message}</p>
                         </div>
                       )}
@@ -1255,7 +1477,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 2: FLOWCHART SANDBOX STUDIO (ห้องทดลองสร้างผังงาน) ================= */}
+        {/* ================= TAB 2: FLOWCHART SANDBOX STUDIO ================= */}
         {activeTab === 'sandbox' && (
           <div className="space-y-6">
             <div className="bg-white border border-blue-100 rounded-3xl p-6 shadow-sm">
@@ -1286,7 +1508,7 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-slate-100">
                 <span className="text-xs font-bold text-slate-600 mr-2">+ เพิ่มบล็อก:</span>
                 <button onClick={() => handleAddSandboxNode('terminator')} className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-300 font-bold text-xs hover:bg-emerald-100">
-                  🟢 เริ่ม/จบ
+                  🟢 เริ่ม/จบ (Terminator)
                 </button>
                 <button onClick={() => handleAddSandboxNode('process')} className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-300 font-bold text-xs hover:bg-blue-100">
                   🟦 ประมวลผล (Process)
@@ -1319,7 +1541,7 @@ export default function App() {
                           <ArrowDown className="w-4 h-4 -mt-1 text-blue-500" />
                         </div>
                       )}
-                      <div className="w-full max-w-md p-3.5 rounded-2xl border-2 border-blue-200 bg-slate-50 flex items-center justify-between shadow-xs">
+                      <div className="w-full max-w-md p-3 rounded-2xl border-2 border-blue-200 bg-slate-50 flex items-center justify-between shadow-xs">
                         <div className="flex items-center space-x-2.5 flex-1 mr-2">
                           <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
                             #{idx + 1}
@@ -1336,7 +1558,7 @@ export default function App() {
                         </div>
                         <button
                           onClick={() => handleRemoveSandboxNode(node.id)}
-                          className="text-rose-500 hover:text-rose-700 p-1 rounded-lg border border-slate-200 bg-white"
+                          className="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg border border-slate-200 bg-white"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1372,41 +1594,90 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 3: FLOWCHART HANDBOOK ================= */}
+        {/* ================= TAB 3: FLOWCHART HANDBOOK (รูปทรงมาตรฐาน ANSI/ISO แท้ 100%) ================= */}
         {activeTab === 'guide' && (
           <div className="space-y-8">
+            
+            {/* Guide Header Banner */}
             <div className="bg-white border border-blue-100 rounded-3xl p-8 shadow-sm">
               <div className="max-w-4xl">
-                <span className="text-xs bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full">
-                  📚 คู่มือสัญลักษณ์มาตรฐาน วิทยาการคำนวณ ป.6
+                <span className="text-xs bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full border border-blue-200">
+                  📚 รูปทรงสัญลักษณ์มาตรฐานสากล (ANSI / ISO Standard)
                 </span>
                 <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
-                  สารานุกรมรูปทรงสัญลักษณ์ผังงาน (Flowchart Handbook)
+                  คู่มือสัญลักษณ์ผังงานฉบับสมบูรณ์ (Flowchart Handbook)
                 </h2>
-                <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-                  สรุปความหมายและวิธีใช้งานสัญลักษณ์ผังงานมาตรฐาน ANSI/ISO ทุกรูปทรงสำหรับนักเรียนชั้น ป.6
+                <p className="text-sm text-slate-600 mt-2 leading-relaxed font-normal">
+                  รวบรวมรูปทรงเรขาคณิตมาตรฐานทางวิศวกรรมและวิทยาการคำนวณที่ถูกต้อง 100% พร้อมคำอธิบายหน้าที่และตัวอย่างการใช้งาน
                 </p>
+              </div>
+
+              {/* Category Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-2 mt-6 pt-5 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-500 mr-2">หมวดหมู่:</span>
+                {['ทั้งหมด', 'พื้นฐานสำคัญ', 'การทำงาน', 'รับและส่งข้อมูล', 'เงื่อนไขตัดสินใจ', 'จุดเชื่อมต่อ'].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => { setSymbolFilter(cat); playSound('click', soundEnabled); }}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                      symbolFilter === cat
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-600/30'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-blue-50 hover:border-blue-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Symbol Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {PRIMARY_SYMBOLS.map((item) => (
-                <div key={item.id} className="bg-white border border-blue-100 hover:border-blue-300 rounded-3xl p-6 transition shadow-sm">
-                  <div className="h-28 bg-gradient-to-br from-blue-50/60 to-slate-50 rounded-2xl border border-blue-100 flex items-center justify-center p-4 mb-4">
-                    <span className={`border-2 text-white font-bold text-xs px-6 py-2 rounded-xl shadow bg-gradient-to-r ${item.colorGradient}`}>
-                      {item.name.split(' ')[0]}
-                    </span>
+            {/* Symbol Cards Grid with Real Geometric SVG Vectors */}
+            <div>
+              <div className="flex items-center space-x-2 mb-4">
+                <Layers className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-black text-slate-900">
+                  สัญลักษณ์มาตรฐาน ({filteredSymbols.length} สัญลักษณ์)
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredSymbols.map((item) => (
+                  <div key={item.id} className="bg-white border border-blue-100 hover:border-blue-300 hover:shadow-lg rounded-3xl p-6 transition-all flex flex-col justify-between">
+                    <div>
+                      {/* Real Geometric Vector Shape Preview */}
+                      <div className="h-32 bg-gradient-to-br from-blue-50/50 via-slate-50 to-sky-50/30 rounded-2xl border border-blue-100 flex items-center justify-center p-3 mb-4">
+                        <FlowchartShapeSvg shape={item.shapeType} label={item.name.split(' ')[0]} height="65px" />
+                      </div>
+
+                      <h4 className="font-extrabold text-slate-900 text-base flex items-center space-x-2">
+                        <span>{item.icon}</span>
+                        <span>{item.name}</span>
+                      </h4>
+                      <p className="text-xs font-bold text-blue-600 mt-0.5">
+                        รูปทรงเรขาคณิต: {item.shapeName}
+                      </p>
+
+                      <p className="text-xs text-slate-600 mt-2.5 leading-relaxed font-normal">
+                        {item.simpleExplain}
+                      </p>
+
+                      <div className="mt-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-xs">
+                        <span className="text-slate-500 font-bold">💡 ตัวอย่าง: </span>
+                        <span className="text-indigo-700 font-bold">{item.example}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold ${item.badge}`}>
+                        {item.category}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium">ANSI/ISO Standard</span>
+                    </div>
                   </div>
-                  <h4 className="font-extrabold text-slate-900 text-base">{item.icon} {item.name}</h4>
-                  <p className="text-xs font-bold text-blue-600 mt-0.5">รูปทรง: {item.shapeName}</p>
-                  <p className="text-xs text-slate-600 mt-2">{item.simpleExplain}</p>
-                  <div className="mt-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs">
-                    <strong>ตัวอย่าง: </strong>{item.example}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+
           </div>
         )}
 
@@ -1457,7 +1728,7 @@ export default function App() {
               <div className="lg:col-span-4 bg-white border border-blue-100 rounded-3xl p-5 shadow-sm">
                 <h4 className="font-extrabold text-slate-900 text-sm mb-3">บทเรียนวิดีโอแนะนำ</h4>
                 <div className="space-y-3">
-                  {VIDEO_LESSONS.map((video, idx) => (
+                  {VIDEO_LESSONS.map((video) => (
                     <div
                       key={video.id}
                       onClick={() => { setSelectedVideo(video); setCustomVideoId(null); playSound('click', soundEnabled); }}
@@ -1478,7 +1749,7 @@ export default function App() {
       {/* --- Footer --- */}
       <footer className="border-t border-blue-100 bg-white/90 py-5 text-center text-xs text-slate-500">
         <p className="font-bold text-slate-700">Flowchart Lab ป.6 • ห้องทดลองผังงานและการแก้ปัญหา วิชาวิทยาการคำนวณ</p>
-        <p className="mt-1 text-[11px]">ด่าน 1 Drag & Drop สุ่มโจทย์ใหม่ • ห้องทดลองสร้างผังงาน Sandbox • วิดีโอสด YouTube • แบบทดสอบ 10 ข้อ</p>
+        <p className="mt-1 text-[11px]">รูปทรงมาตรฐาน ANSI/ISO แท้ 100% • ด่าน Drag & Drop สุ่มโจทย์ใหม่ • Sandbox • วิดีโอ YouTube • แบบทดสอบ 10 ข้อ</p>
       </footer>
     </div>
   );
