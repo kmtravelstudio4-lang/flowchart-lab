@@ -176,8 +176,18 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const valid = parsed.filter(c => c && typeof c === 'object' && c.id);
-          if (valid.length > 0) return valid;
+          return LEARNING_CHAPTERS.map(base => {
+            const match = parsed.find(c => c && c.id === base.id);
+            if (match) {
+              return {
+                ...base,
+                ...match,
+                symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
+                keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
+              };
+            }
+            return base;
+          });
         }
       }
     } catch {
@@ -2058,22 +2068,22 @@ export default function App() {
                         )}
 
                         {/* Chapter Key Points */}
-                        {ch.keyPoints && (
+                        {Array.isArray(ch.keyPoints) && ch.keyPoints.length > 0 && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {ch.keyPoints.map((pt, i) => (
                               <div key={i} className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-xs hover:border-blue-300 transition duration-200 card-hover-effect">
                                 <h5 className="font-extrabold text-sm text-blue-900 mb-2 flex items-center space-x-2">
                                   <Sparkles className="w-4 h-4 text-amber-500" />
-                                  <span>{pt.heading}</span>
+                                  <span>{pt?.heading || ''}</span>
                                 </h5>
-                                <p className="text-xs text-slate-600 leading-relaxed font-medium">{pt.content}</p>
+                                <p className="text-xs text-slate-600 leading-relaxed font-medium">{pt?.content || ''}</p>
                               </div>
                             ))}
                           </div>
                         )}
 
                         {/* Symbols Special Gallery for Chapter 2 */}
-                        {ch.symbols && (
+                        {Array.isArray(ch.symbols) && ch.symbols.length > 0 && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {ch.symbols.map((sym, i) => (
                               <div key={i} className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-xs flex flex-col justify-between hover:border-blue-400 transition duration-200 card-hover-effect">
@@ -3172,22 +3182,22 @@ export default function App() {
                           </div>
 
                           {/* Key Points */}
-                          {ch.keyPoints && (
+                          {Array.isArray(ch.keyPoints) && ch.keyPoints.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               {ch.keyPoints.map((pt, i) => (
                                 <div key={i} className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-xs hover:border-blue-300 transition">
                                   <h5 className="font-extrabold text-sm text-blue-900 mb-2 flex items-center space-x-2">
                                     <Sparkles className="w-4 h-4 text-amber-500" />
-                                    <span>{pt.heading}</span>
+                                    <span>{pt?.heading || ''}</span>
                                   </h5>
-                                  <p className="text-xs text-slate-600 leading-relaxed font-medium">{pt.content}</p>
+                                  <p className="text-xs text-slate-600 leading-relaxed font-medium">{pt?.content || ''}</p>
                                 </div>
                               ))}
                             </div>
                           )}
 
                           {/* Symbols special section if ch2 */}
-                          {ch.symbols && (
+                          {Array.isArray(ch.symbols) && ch.symbols.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                               {ch.symbols.map((sym, i) => (
                                 <div key={i} className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-xs flex flex-col justify-between">
