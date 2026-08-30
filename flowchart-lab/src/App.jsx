@@ -191,6 +191,28 @@ export default function App() {
     } catch { /* ignore */ }
   }, [learningChapters]);
 
+  // Real-time Cloud Sync: โหลดบทเรียนและลิงก์ PDF ล่าสุดจาก Google Sheets แบบ Real-time
+  useEffect(() => {
+    if (!cloudWebhookUrl) return;
+    const fetchCloudChapters = async () => {
+      try {
+        const res = await fetch(`${cloudWebhookUrl}?configKey=learning_chapters`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setLearningChapters(data);
+            try {
+              localStorage.setItem('flowchart_learning_chapters', JSON.stringify(data));
+            } catch { /* ignore */ }
+          }
+        }
+      } catch (err) {
+        console.log('Using local chapter cache:', err);
+      }
+    };
+    fetchCloudChapters();
+  }, [cloudWebhookUrl]);
+
   // Editing Chapter Modal State in Admin
   const [editingChapter, setEditingChapter] = useState(null); // null | chapter object
   const [isCreatingNewChapter, setIsCreatingNewChapter] = useState(false);
@@ -198,16 +220,36 @@ export default function App() {
   const [chapterViewMode, setChapterViewMode] = useState('dual'); // 'dual' | 'pdf' | 'notes'
   const [selectedReadingChapterIdx, setSelectedReadingChapterIdx] = useState(null); // null (grid) | number (in-page reader)
 
-  // Direct 1-Click Save Google Drive PDF Link Handler
-  const handleSaveChapterPdfUrl = (chapterId, url) => {
+  // Direct 1-Click Save Google Drive PDF Link Handler with Real-time Cloud Sync
+  const handleSaveChapterPdfUrl = async (chapterId, url) => {
     const base = (Array.isArray(learningChapters) && learningChapters.length > 0) ? learningChapters : LEARNING_CHAPTERS;
     const updated = base.map(c => c.id === chapterId ? { ...c, pdfUrl: (url || '').trim() } : c);
     setLearningChapters(updated);
     try {
       localStorage.setItem('flowchart_learning_chapters', JSON.stringify(updated));
     } catch { /* ignore */ }
+
+    // Real-time Cloud Sync to Google Sheets
+    if (cloudWebhookUrl) {
+      try {
+        await fetch(cloudWebhookUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'saveConfig',
+            configKey: 'learning_chapters',
+            configData: updated,
+            updatedAt: new Date().toISOString()
+          })
+        });
+      } catch (err) {
+        console.warn('Cloud chapter sync error:', err);
+      }
+    }
+
     playSound('success', soundEnabled);
-    alert('✅ บันทึกลิงก์ Google Drive PDF ของบทเรียนเรียบร้อยแล้ว!');
+    alert('✅ บันทึกและซิงก์ลิงก์ Google Drive PDF ขึ้นคลาวด์แบบ Real-Time เรียบร้อยแล้ว!');
   };
 
   // Learning Chapter Active Tab & Custom Illustrations

@@ -23,9 +23,40 @@ function doPost(e) {
     var masterSheet = ss.getActiveSheet();
     var data = JSON.parse(e.postData.contents);
     
-    // Check if test ping
+    // 1. Check if test ping
     if (data.action === "ping") {
       return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Connected successfully!" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 2. Real-time Lesson & PDF Link Config Storage
+    if (data.action === "saveConfig") {
+      var configSheet = ss.getSheetByName("SystemConfig");
+      if (!configSheet) {
+        configSheet = ss.insertSheet("SystemConfig");
+        configSheet.appendRow(["ConfigKey", "ConfigJSON", "UpdatedAt"]);
+        configSheet.getRange(1, 1, 1, 3).setFontWeight("bold").setBackground("#e0f2fe");
+      }
+      var configKey = data.configKey || "default_config";
+      var configDataStr = JSON.stringify(data.configData || {});
+      var nowStr = Utilities.formatDate(new Date(), "Asia/Bangkok", "dd/MM/yyyy HH:mm:ss");
+      
+      var found = false;
+      var lastRow = configSheet.getLastRow();
+      if (lastRow > 1) {
+        var keys = configSheet.getRange(1, 1, lastRow, 1).getValues();
+        for (var k = 1; k < keys.length; k++) {
+          if (keys[k][0] === configKey) {
+            configSheet.getRange(k + 1, 2, 1, 2).setValues([[configDataStr, nowStr]]);
+            found = true;
+            break;
+          }
+        }
+      }
+      if (!found) {
+        configSheet.appendRow([configKey, configDataStr, nowStr]);
+      }
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Config synced to Cloud!" }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     
@@ -136,6 +167,22 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configKey = e && e.parameter && e.parameter.configKey;
+  if (configKey) {
+    var configSheet = ss.getSheetByName("SystemConfig");
+    if (configSheet && configSheet.getLastRow() > 1) {
+      var data = configSheet.getRange(2, 1, configSheet.getLastRow() - 1, 2).getValues();
+      for (var i = 0; i < data.length; i++) {
+        if (data[i][0] === configKey) {
+          return ContentService.createTextOutput(data[i][1])
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify([]))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   return ContentService.createTextOutput("Flowchart Quest Enterprise Database Webhook is active and running!");
 }
 `;
