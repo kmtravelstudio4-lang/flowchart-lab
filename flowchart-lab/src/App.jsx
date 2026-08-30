@@ -2035,7 +2035,7 @@ export default function App() {
                     const ch = learningChapters[safeIdx];
                     if (!ch) return null;
 
-                    const hasPdf = Boolean(ch.pdfUrl || ch.drivePdfUrl);
+                    const hasPdf = Boolean(ch.pdfUrl || ch.drivePdfUrl || ch.driveUrl || ch.googleDriveUrl || ch.slidesUrl || ch.slideUrl || ch.documentUrl);
 
                     return (
                       <div className="mt-6 space-y-6 animate-fadeIn">
@@ -3161,7 +3161,7 @@ export default function App() {
                 const safeIdx = Math.min(Math.max(0, selectedReadingChapterIdx), Math.max(0, learningChapters.length - 1));
                 const ch = learningChapters[safeIdx];
                 if (!ch) return null;
-                const hasPdf = Boolean(ch.pdfUrl || ch.drivePdfUrl);
+                const hasPdf = Boolean(ch.pdfUrl || ch.drivePdfUrl || ch.driveUrl || ch.googleDriveUrl || ch.slidesUrl || ch.slideUrl || ch.documentUrl);
 
                 return (
                   <div className="space-y-6 animate-fadeIn">
