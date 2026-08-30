@@ -6,15 +6,13 @@ const DEFAULT_REPO_NAME = 'flowchart-lab';
 const DEFAULT_BRANCH = 'main';
 
 /**
- * Get active GitHub Token
+ * Get active GitHub Token (User-provided in Admin UI only)
  */
 export function getGitHubToken() {
   try {
     const custom = localStorage.getItem('flowchart_github_token');
     if (custom && custom.trim()) return custom.trim();
-    // Reconstruct default workspace token dynamically
-    const k = [103,104,112,95,68,112,53,83,66,110,117,104,75,97,116,89,105,117,121,80,53,121,121,51,108,49,66,116,55,69,85,67,97,57,50,56,76,48,71,51];
-    return k.map(c => String.fromCharCode(c)).join('');
+    return '';
   } catch {
     return '';
   }
