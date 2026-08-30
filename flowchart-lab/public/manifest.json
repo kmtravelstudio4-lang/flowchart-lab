@@ -1,0 +1,17 @@
+{
+  "name": "Flowchart Quest ป.6 - ห้องทดลองผังงานและการแก้ปัญหา",
+  "short_name": "Flowchart Quest",
+  "description": "นวัตกรรมสื่อการเรียนรู้เชิงเกมและระบบประเมินผลสมรรถนะผังงาน วิชาวิทยาการคำนวณ ชั้นประถมศึกษาปีที่ 6 (ว 4.2 ป.6/1)",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e40af",
+  "icons": [
+    {
+      "src": "/kru-king-logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
