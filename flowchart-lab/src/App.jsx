@@ -11,14 +11,6 @@ import {
   ExternalLink, Key, Hash
 } from 'lucide-react';
 
-// Default 4 Pre-Configured Classrooms with PIN codes
-export const DEFAULT_CLASSROOMS = [
-  { id: 'room_601', code: '601', name: 'ห้อง ป.6/1', sheetTab: 'ป.6_1', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/1' },
-  { id: 'room_602', code: '602', name: 'ห้อง ป.6/2', sheetTab: 'ป.6_2', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/2' },
-  { id: 'room_603', code: '603', name: 'ห้อง ป.6/3', sheetTab: 'ป.6_3', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/3' },
-  { id: 'room_604', code: '604', name: 'ห้อง ป.6/4', sheetTab: 'ป.6_4', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/4' }
-];
-
 // Imports from modular data & utilities
 import { 
   LEARNING_CHAPTERS, 
@@ -60,6 +52,14 @@ import HorizontalPdfViewer from './components/HorizontalPdfViewer';
 import { formatEmbedPdfUrl } from './utils/pdfHelper';
 import kruKingLogo from './assets/kru-king-logo.png';
 import { syncSystemStateToGitHub, getGitHubToken, setGitHubToken } from './utils/githubSync';
+
+// Default 4 Pre-Configured Classrooms with PIN codes
+export const DEFAULT_CLASSROOMS = [
+  { id: 'room_601', code: '601', name: 'ห้อง ป.6/1', sheetTab: 'ป.6_1', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/1' },
+  { id: 'room_602', code: '602', name: 'ห้อง ป.6/2', sheetTab: 'ป.6_2', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/2' },
+  { id: 'room_603', code: '603', name: 'ห้อง ป.6/3', sheetTab: 'ป.6_3', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/3' },
+  { id: 'room_604', code: '604', name: 'ห้อง ป.6/4', sheetTab: 'ป.6_4', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/4' }
+];
 
 // YouTube ID Parser Helper
 const extractYoutubeId = (urlOrId) => {
