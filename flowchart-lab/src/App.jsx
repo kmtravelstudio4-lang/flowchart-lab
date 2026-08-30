@@ -80,6 +80,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('game');
   const [soundEnabled, setSoundEnabled] = useState(true);
 
+  // Google Sheets Cloud Database Webhook State
+  const [cloudWebhookUrl, setCloudWebhookUrl] = useState(() => {
+    try {
+      return localStorage.getItem('flowchart_cloud_webhook_url') || 'https://script.google.com/macros/s/AKfycbxGzkBnArT6V7nqR8mqtRn6CWFGU0Lffxc3U6XZlZSB2DttJaxSxtRQBfR4N9QAq6En/exec';
+    } catch {
+      return 'https://script.google.com/macros/s/AKfycbxGzkBnArT6V7nqR8mqtRn6CWFGU0Lffxc3U6XZlZSB2DttJaxSxtRQBfR4N9QAq6En/exec';
+    }
+  });
+  const [cloudSyncToast, setCloudSyncToast] = useState({ show: false, message: '', mode: 'cloud' });
+
   // Classrooms State (จัดการห้องเรียน & รหัส PIN ประจำห้อง)
   const [classrooms, setClassrooms] = useState(() => {
     try {
@@ -449,18 +459,9 @@ export default function App() {
   const [adminPinInput, setAdminPinInput] = useState('');
   const [adminPinError, setAdminPinError] = useState('');
 
-  // Google Sheets Cloud Database Webhook State
-  const [cloudWebhookUrl, setCloudWebhookUrl] = useState(() => {
-    try {
-      return localStorage.getItem('flowchart_cloud_webhook_url') || 'https://script.google.com/macros/s/AKfycbxGzkBnArT6V7nqR8mqtRn6CWFGU0Lffxc3U6XZlZSB2DttJaxSxtRQBfR4N9QAq6En/exec';
-    } catch {
-      return 'https://script.google.com/macros/s/AKfycbxGzkBnArT6V7nqR8mqtRn6CWFGU0Lffxc3U6XZlZSB2DttJaxSxtRQBfR4N9QAq6En/exec';
-    }
-  });
   const [cloudTestState, setCloudTestState] = useState({ loading: false, success: null, message: '' });
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
-  const [cloudSyncToast, setCloudSyncToast] = useState({ show: false, message: '', mode: 'cloud' });
 
   // Platform & Learning Management State
   const [selectedStudentForProfile, setSelectedStudentForProfile] = useState(null);
