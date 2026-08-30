@@ -197,18 +197,25 @@ export default function App() {
     if (!cloudWebhookUrl) return;
     const fetchCloudChapters = async () => {
       try {
-        const res = await fetch(`${cloudWebhookUrl}?configKey=learning_chapters`);
+        const res = await fetch(`${cloudWebhookUrl}?configKey=learning_chapters`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
-            setLearningChapters(data);
+            const merged = LEARNING_CHAPTERS.map(base => {
+              const match = data.find(d => d && d.id === base.id);
+              return match ? { ...base, ...match } : base;
+            });
+            setLearningChapters(merged);
             try {
-              localStorage.setItem('flowchart_learning_chapters', JSON.stringify(data));
+              localStorage.setItem('flowchart_learning_chapters', JSON.stringify(merged));
             } catch { /* ignore */ }
           }
         }
       } catch (err) {
-        console.log('Using local chapter cache:', err);
+        console.log('Using local chapter cache (fallback):', err);
       }
     };
     fetchCloudChapters();

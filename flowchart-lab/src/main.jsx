@@ -47,25 +47,65 @@ class GlobalErrorBoundary extends Component {
             <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px', lineHeight: '1.5' }}>
               ตรวจพบข้อผิดพลาดชั่วคราว ข้อมูลของคุณถูกบันทึกไว้อย่างปลอดภัยแล้ว
             </p>
-            <button
-              onClick={() => {
-                this.setState({ hasError: false, error: null });
-                window.location.reload();
-              }}
-              style={{
-                background: '#2563eb',
-                color: '#ffffff',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '16px',
-                fontWeight: '800',
-                fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.3)'
-              }}
-            >
-              🔄 รีโหลดหน้าเว็บใหม่
-            </button>
+            {this.state.error && (
+              <div style={{
+                textAlign: 'left',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '12px',
+                padding: '12px',
+                margin: '16px 0',
+                fontSize: '12px',
+                color: '#b91c1c',
+                maxHeight: '140px',
+                overflowY: 'auto',
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap'
+              }}>
+                <strong>ข้อผิดพลาด:</strong> {this.state.error?.message || String(this.state.error)}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.location.reload();
+                }}
+                style={{
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '16px',
+                  fontWeight: '800',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.3)'
+                }}
+              >
+                🔄 รีโหลดหน้าเว็บใหม่
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('flowchart_learning_chapters');
+                  localStorage.removeItem('flowchart_classrooms');
+                  this.setState({ hasError: false, error: null });
+                  window.location.reload();
+                }}
+                style={{
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  padding: '12px 20px',
+                  borderRadius: '16px',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                🧹 ล้างแคชชั่วคราว & เริ่มใหม่
+              </button>
+            </div>
           </div>
         </div>
       );
