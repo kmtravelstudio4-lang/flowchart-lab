@@ -63,7 +63,7 @@
       ],
       "targetMissionIdx": 0,
       "targetMissionName": "ด่าน 1: รู้จักสัญลักษณ์ (Symbol Hunter)",
-      "pdfUrl": "",
+      "pdfUrl": "https://drive.google.com/file/d/1o1yiGrO_Kv5Re782rDkev7o4XYbcx2CD/view?usp=sharing",
       "symbols": []
     },
     {
@@ -113,7 +113,7 @@
       ],
       "targetMissionIdx": 0,
       "targetMissionName": "ด่าน 1: รู้จักสัญลักษณ์ (Symbol Hunter)",
-      "pdfUrl": "",
+      "pdfUrl": "https://drive.google.com/file/d/1_ObmghOM2pd0yczYzvoGmMBngt_W_WRk/view?usp=sharing",
       "keyPoints": []
     },
     {
@@ -140,7 +140,7 @@
       ],
       "targetMissionIdx": 1,
       "targetMissionName": "ด่าน 2: เรียงขั้นตอน (Step Master)",
-      "pdfUrl": "",
+      "pdfUrl": "https://drive.google.com/file/d/1Jrpliew22l4-OqHKZAYrFIQaXbFzfus8/view?usp=sharing",
       "symbols": []
     },
     {
@@ -198,6 +198,6 @@
       "symbols": []
     }
   ],
-  "updatedAt": "2026-08-30T17:01:31.348Z",
+  "updatedAt": "2026-08-30T17:02:38.459Z",
   "version": "2.0.0"
 }
