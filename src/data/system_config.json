@@ -63,8 +63,8 @@
       ],
       "targetMissionIdx": 0,
       "targetMissionName": "ด่าน 1: รู้จักสัญลักษณ์ (Symbol Hunter)",
-      "symbols": [],
-      "pdfUrl": ""
+      "pdfUrl": "https://drive.google.com/file/d/1o1yiGrO_Kv5Re782rDkev7o4XYbcx2CD/view?usp=sharing",
+      "symbols": []
     },
     {
       "id": "ch2",
@@ -113,8 +113,8 @@
       ],
       "targetMissionIdx": 0,
       "targetMissionName": "ด่าน 1: รู้จักสัญลักษณ์ (Symbol Hunter)",
-      "keyPoints": [],
-      "pdfUrl": ""
+      "pdfUrl": "https://drive.google.com/file/d/1_ObmghOM2pd0yczYzvoGmMBngt_W_WRk/view?usp=sharing",
+      "keyPoints": []
     },
     {
       "id": "ch3",
@@ -140,8 +140,8 @@
       ],
       "targetMissionIdx": 1,
       "targetMissionName": "ด่าน 2: เรียงขั้นตอน (Step Master)",
-      "symbols": [],
-      "pdfUrl": ""
+      "pdfUrl": "https://drive.google.com/file/d/1Jrpliew22l4-OqHKZAYrFIQaXbFzfus8/view?usp=sharing",
+      "symbols": []
     },
     {
       "id": "ch4",
@@ -167,8 +167,8 @@
       ],
       "targetMissionIdx": 2,
       "targetMissionName": "ด่าน 3: อ่านผังงาน (Flow Reader)",
-      "symbols": [],
-      "pdfUrl": ""
+      "pdfUrl": "",
+      "symbols": []
     },
     {
       "id": "ch5",
@@ -194,10 +194,10 @@
       ],
       "targetMissionIdx": 3,
       "targetMissionName": "ด่าน 4: นักสืบ Bug (Bug Detective)",
-      "symbols": [],
-      "pdfUrl": ""
+      "pdfUrl": "https://drive.google.com/file/d/1o1yiGrO_Kv5Re782rDkev7o4XYbcx2CD/view?usp=sharing",
+      "symbols": []
     }
   ],
-  "updatedAt": "2026-08-30T17:13:04.469Z",
+  "updatedAt": "2026-08-30T17:22:18.206Z",
   "version": "2.0.0"
 }
