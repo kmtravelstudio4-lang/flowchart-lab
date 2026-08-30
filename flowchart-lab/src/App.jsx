@@ -186,18 +186,21 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return LEARNING_CHAPTERS.map(base => {
+          const merged = LEARNING_CHAPTERS.map(base => {
             const match = parsed.find(c => c && c.id === base.id);
             if (match) {
               return {
                 ...base,
                 ...match,
+                pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || match.slidesUrl || match.slideUrl || match.documentUrl || base.pdfUrl || '').trim(),
                 symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
                 keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
               };
             }
             return base;
           });
+          const customExtras = parsed.filter(p => p && p.id && !LEARNING_CHAPTERS.some(b => b.id === p.id));
+          return [...merged, ...customExtras];
         }
       }
     } catch {
@@ -217,20 +220,32 @@ export default function App() {
     if (!cloudWebhookUrl) return;
     const fetchCloudChapters = async () => {
       try {
-        const res = await fetch(`${cloudWebhookUrl}?configKey=learning_chapters`, {
+        const res = await fetch(`${cloudWebhookUrl}?configKey=system_master_config`, {
           method: 'GET',
           headers: { 'Accept': 'application/json' }
         });
         if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
+          const raw = await res.json();
+          const data = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.chapters) ? raw.chapters : null);
+          if (data && data.length > 0) {
             const merged = LEARNING_CHAPTERS.map(base => {
               const match = data.find(d => d && d.id === base.id);
-              return match ? { ...base, ...match } : base;
+              if (match) {
+                return {
+                  ...base,
+                  ...match,
+                  pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || match.slidesUrl || match.slideUrl || match.documentUrl || base.pdfUrl || '').trim(),
+                  symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
+                  keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
+                };
+              }
+              return base;
             });
-            setLearningChapters(merged);
+            const customExtras = data.filter(d => d && d.id && !LEARNING_CHAPTERS.some(b => b.id === d.id));
+            const fullList = [...merged, ...customExtras];
+            setLearningChapters(fullList);
             try {
-              localStorage.setItem('flowchart_learning_chapters', JSON.stringify(merged));
+              localStorage.setItem('flowchart_learning_chapters', JSON.stringify(fullList));
             } catch { /* ignore */ }
           }
         }

@@ -27,8 +27,13 @@ export function extractGoogleFileId(url) {
  */
 export function formatEmbedPdfUrl(url, strategyIndex = 0) {
   if (!url || typeof url !== 'string') return '';
-  const trimmed = url.trim();
+  let trimmed = url.trim();
   if (!trimmed) return '';
+
+  // Auto-prefix https:// if user pasted domain without protocol
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    trimmed = 'https://' + trimmed;
+  }
 
   try {
     // 1. Google Slides (/presentation/d/ID/...)
@@ -47,13 +52,21 @@ export function formatEmbedPdfUrl(url, strategyIndex = 0) {
       }
     }
 
-    // 3. Canva Embed Link
+    // 3. Google Drive Folders (/folders/ID)
+    if (trimmed.includes('drive.google.com/drive/folders/')) {
+      const folderMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+      if (folderMatch && folderMatch[1]) {
+        return `https://drive.google.com/embeddedfolderview?id=${folderMatch[1]}#grid`;
+      }
+    }
+
+    // 4. Canva Embed Link
     if (trimmed.includes('canva.com/design')) {
       const canvaClean = trimmed.split('?')[0];
       return `${canvaClean}/view?embed`;
     }
 
-    // 4. Google Drive File (PDF/Doc/Slide)
+    // 5. Google Drive File (PDF/Doc/Slide)
     const fileId = extractGoogleFileId(trimmed);
     if (fileId && (trimmed.includes('drive.google.com') || trimmed.includes('docs.google.com'))) {
       if (strategyIndex === 1) {
@@ -67,8 +80,8 @@ export function formatEmbedPdfUrl(url, strategyIndex = 0) {
       return `https://drive.google.com/file/d/${fileId}/preview`;
     }
 
-    // 5. Standard PDF or External Web URL
-    if (trimmed.endsWith('.pdf')) {
+    // 6. Standard PDF or External Web URL
+    if (trimmed.toLowerCase().includes('.pdf')) {
       if (strategyIndex === 1) {
         return `https://docs.google.com/viewer?url=${encodeURIComponent(trimmed)}&embedded=true`;
       }
