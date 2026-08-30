@@ -52,6 +52,16 @@ import HorizontalPdfViewer from './components/HorizontalPdfViewer';
 import { formatEmbedPdfUrl } from './utils/pdfHelper';
 import kruKingLogo from './assets/kru-king-logo.png';
 import masterSystemConfig from './data/system_config.json';
+import { 
+  subscribeLessons, 
+  saveLesson, 
+  seedLessonsToFirestore, 
+  saveStudent as saveStudentFirestore, 
+  saveScore as saveScoreFirestore, 
+  saveEvidence as saveEvidenceFirestore,
+  subscribeScores as subscribeScoresFirestore 
+} from './services/firestoreService';
+import { getStoredFirebaseConfig, saveFirebaseConfig } from './lib/firebase';
 
 // Default 4 Pre-Configured Classrooms with PIN codes (Merged with system_config)
 export const DEFAULT_CLASSROOMS = (masterSystemConfig && Array.isArray(masterSystemConfig.classrooms) && masterSystemConfig.classrooms.length > 0)
@@ -229,10 +239,38 @@ export default function App() {
     } catch { /* ignore */ }
   }, [learningChapters]);
 
-  // Real-time Cloud Sync: โหลดบทเรียนและลิงก์ PDF ล่าสุดจาก GitHub CDN และ Google Sheets แบบ Real-time
+  // Real-time Cloud Sync: โหลดบทเรียนและลิงก์ PDF ล่าสุดจาก Firebase Firestore (Real-Time Listener) + GitHub CDN
   useEffect(() => {
+    // 1. Real-Time Firestore onSnapshot Listener (Single Source of Truth)
+    const unsubscribeFirestore = subscribeLessons((cloudLessons) => {
+      if (Array.isArray(cloudLessons) && cloudLessons.length > 0) {
+        setLearningChapters(prev => {
+          const baseList = (prev && prev.length > 0) ? prev : INITIAL_CHAPTERS;
+          const merged = baseList.map(base => {
+            const match = cloudLessons.find(d => d && d.id === base.id);
+            if (match) {
+              return {
+                ...base,
+                ...match,
+                pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || match.slidesUrl || match.slideUrl || match.documentUrl || base.pdfUrl || '').trim(),
+                symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
+                keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
+              };
+            }
+            return base;
+          });
+          const customExtras = cloudLessons.filter(d => d && d.id && !baseList.some(b => b.id === d.id));
+          const fullList = [...merged, ...customExtras];
+          try {
+            localStorage.setItem('flowchart_learning_chapters', JSON.stringify(fullList));
+          } catch {}
+          return fullList;
+        });
+      }
+    });
+
+    // 2. Static CDN Fast-Load from public/system_config.json
     const fetchCloudChapters = async () => {
-      // 1. First fetch from public/system_config.json (GitHub CDN)
       try {
         const staticRes = await fetch(`./system_config.json?v=${Date.now()}`, {
           headers: { 'Accept': 'application/json' }
@@ -268,7 +306,7 @@ export default function App() {
         console.log('Static config fetch fallback:', err);
       }
 
-      // 2. Then attempt Google Sheets if configured
+      // 3. Fallback to Google Sheets if configured
       if (cloudWebhookUrl) {
         try {
           const res = await fetch(`${cloudWebhookUrl}?configKey=system_master_config`, {
@@ -310,6 +348,12 @@ export default function App() {
       }
     };
     fetchCloudChapters();
+
+    return () => {
+      if (typeof unsubscribeFirestore === 'function') {
+        unsubscribeFirestore();
+      }
+    };
   }, [cloudWebhookUrl]);
 
   // Editing Chapter Modal State in Admin
@@ -374,18 +418,33 @@ export default function App() {
     playSound('success', soundEnabled);
   };
 
-  // Direct 1-Click Save Google Drive PDF Link Handler with Real-time Cloud & GitHub Sync
+  // Direct 1-Click Save Google Drive PDF Link Handler with Real-time Firestore & GitHub Sync
   const handleSaveChapterPdfUrl = async (chapterId, url) => {
-    const base = (Array.isArray(learningChapters) && learningChapters.length > 0) ? learningChapters : LEARNING_CHAPTERS;
-    const updated = base.map(c => c.id === chapterId ? { ...c, pdfUrl: (url || '').trim() } : c);
+    const base = (Array.isArray(learningChapters) && learningChapters.length > 0) ? learningChapters : INITIAL_CHAPTERS;
+    const targetChapter = base.find(c => c.id === chapterId) || {};
+    const updatedChapter = { ...targetChapter, pdfUrl: (url || '').trim() };
+    const updated = base.map(c => c.id === chapterId ? updatedChapter : c);
     setLearningChapters(updated);
     try {
       localStorage.setItem('flowchart_learning_chapters', JSON.stringify(updated));
     } catch { /* ignore */ }
 
-    // Execute Unified Real-time Sync to Cloud & GitHub
+    // 1. Write to Firebase Firestore (Single Source of Truth) with Read-back Verification
+    let firestoreOk = false;
+    try {
+      const fsRes = await saveLesson(chapterId, updatedChapter);
+      if (fsRes && fsRes.success) {
+        firestoreOk = true;
+      }
+    } catch (fsErr) {
+      console.warn('Firestore lesson save notice:', fsErr);
+    }
+
+    // 2. Execute Unified Real-time Sync to GitHub CDN & Google Sheets
     await syncAllToCloudAndGitHub(updated, classrooms);
-    alert('✅ บันทึกและซิงก์ข้อมูลบทเรียนขึ้น Google Sheets & GitHub เรียบร้อยแล้ว!');
+    alert(firestoreOk 
+      ? '✅ บันทึกและกระจายข้อมูลสู่ Firebase Firestore (Real-time) & GitHub CDN เรียบร้อยแล้ว!' 
+      : '✅ บันทึกและซิงก์ข้อมูลบทเรียนขึ้นระบบ Cloud & GitHub CDN เรียบร้อยแล้ว!');
   };
 
   // Learning Chapter Active Tab & Custom Illustrations
