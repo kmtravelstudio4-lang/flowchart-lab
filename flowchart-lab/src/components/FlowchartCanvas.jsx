@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Play, Trash2, ArrowDown,
-  Sparkles, Lightbulb, Award, Check, Plus, ArrowUp, RotateCcw
+  Sparkles, Lightbulb, Award, Check, Plus, ArrowUp, RotateCcw,
+  ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import FlowchartShapeSvg from './FlowchartShapeSvg';
 import { playSound } from '../utils/audio';
@@ -23,8 +24,9 @@ export const FlowchartCanvas = ({
   const [simBranchChoice, setSimBranchChoice] = useState('YES'); // 'YES' or 'NO'
   const [simLogs, setSimLogs] = useState([]);
 
-  // Reflection Questions State (Multiple Choice selections)
+  // Reflection Questions State (Single Question Step-by-Step)
   const [reflectionAnswers, setReflectionAnswers] = useState({});
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
 
   // Evaluation Rubric & Submission Result
   const [rubricResult, setRubricResult] = useState(null);
@@ -36,6 +38,7 @@ export const FlowchartCanvas = ({
       setAvailableBlocks(shuffled);
       setPlacedNodes([]);
       setReflectionAnswers({});
+      setCurrentQuestionIdx(0);
       setRubricResult(null);
       setSimLogs([]);
     }
@@ -450,74 +453,167 @@ export const FlowchartCanvas = ({
 
       </div>
 
-      {/* Multiple-Choice Reflection Questions Section (Ultra-Clean Glass Cards) */}
-      <div className="bg-white/90 backdrop-blur-xl border border-blue-100/80 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-        <div className="flex items-center space-x-3 pb-4 border-b border-slate-100">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md shadow-blue-500/20">
-            📝
-          </div>
-          <div>
-            <h4 className="font-extrabold text-base sm:text-lg text-slate-900">
-              ตอบคำถามสะท้อนคิดเชิงตรรกะ (4 ข้อ เพื่อรับคะแนนรูบริกเต็ม 35 คะแนน)
-            </h4>
-            <p className="text-xs text-slate-500 font-medium">
-              คลิกเลือกคำตอบที่ถูกต้องและสมเหตุสมผลที่สุดในแต่ละข้อ
-            </p>
-          </div>
-        </div>
+      {/* Multiple-Choice Reflection Questions Section (1 Question Per Step) */}
+      {scenario?.reflectionQuestions && scenario.reflectionQuestions.length > 0 && (() => {
+        const questions = scenario.reflectionQuestions;
+        const safeQIdx = Math.min(Math.max(0, currentQuestionIdx), questions.length - 1);
+        const currentQ = questions[safeQIdx];
+        const answeredCount = questions.filter(q => reflectionAnswers[q.id] !== undefined).length;
+        const isAllAnswered = answeredCount === questions.length;
+        const selectedOpt = currentQ ? reflectionAnswers[currentQ.id] : undefined;
+        const thaiOptionLabels = ['ก.', 'ข.', 'ค.', 'ง.', 'จ.'];
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(scenario?.reflectionQuestions || []).map((rq) => {
-            const selectedOpt = reflectionAnswers[rq.id];
-            return (
-              <div key={rq.id} className="p-5 rounded-3xl bg-slate-50/70 border border-slate-200/80 space-y-3 hover:border-blue-300 transition duration-200">
-                <div className="flex items-center space-x-2.5">
-                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-2xs">
-                    {rq.id.replace('rq', '')}
-                  </span>
-                  <h5 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">{rq.question}</h5>
+        return (
+          <div className="bg-white/90 backdrop-blur-xl border border-blue-100/80 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 animate-fadeIn">
+            {/* Header & Stepper Navigator */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xl shadow-md shadow-blue-500/20">
+                  📝
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-base sm:text-lg text-slate-900">
+                    ตอบคำถามสะท้อนคิดเชิงตรรกะ (ข้อที่ {safeQIdx + 1} จาก {questions.length} ข้อ)
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium">
+                    คลิกเลือกคำตอบที่ถูกต้องและสมเหตุสมผลที่สุดในแต่ละข้อ (รูบริกเต็ม 35 คะแนน)
+                  </p>
+                </div>
+              </div>
+
+              {/* Question Stepper Pills */}
+              <div className="flex items-center space-x-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 self-start sm:self-center">
+                {questions.map((q, qIdx) => {
+                  const isAnswered = reflectionAnswers[q.id] !== undefined;
+                  const isCurrent = safeQIdx === qIdx;
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => {
+                        setCurrentQuestionIdx(qIdx);
+                        playSound('click', soundEnabled);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1 ${
+                        isCurrent
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20 scale-105'
+                          : isAnswered
+                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300'
+                          : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
+                      }`}
+                      title={`ข้อที่ ${qIdx + 1}`}
+                    >
+                      {isAnswered && !isCurrent ? (
+                        <Check className="w-3 h-3 text-emerald-600" />
+                      ) : null}
+                      <span>ข้อ {qIdx + 1}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Active Question Box (Single View) */}
+            {currentQ && (
+              <div className="space-y-4 animate-fadeIn" key={currentQ.id}>
+                <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-50/80 to-indigo-50/40 border border-blue-200/80">
+                  <div className="flex items-start space-x-3">
+                    <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                      {safeQIdx + 1}
+                    </span>
+                    <h5 className="text-sm sm:text-base font-bold text-slate-900 leading-relaxed">
+                      {currentQ.question}
+                    </h5>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  {rq.options.map((opt, optIdx) => {
+                {/* Options List */}
+                <div className="space-y-2.5">
+                  {currentQ.options.map((opt, optIdx) => {
                     const isSelected = selectedOpt === optIdx;
                     return (
                       <button
                         key={optIdx}
-                        onClick={() => handleSelectReflection(rq.id, optIdx)}
-                        className={`w-full text-left p-3 rounded-2xl text-xs transition-all duration-200 flex items-center justify-between border ${
+                        type="button"
+                        onClick={() => {
+                          handleSelectReflection(currentQ.id, optIdx);
+                          playSound('click', soundEnabled);
+                        }}
+                        className={`w-full text-left p-4 rounded-2xl text-xs sm:text-sm transition-all duration-200 flex items-center justify-between border ${
                           isSelected
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-600 shadow-md shadow-blue-600/20 font-bold scale-[1.01]'
-                            : 'bg-white text-slate-700 hover:bg-blue-50/80 border-slate-200/80 font-medium'
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-600 shadow-md shadow-blue-600/25 font-bold scale-[1.01]'
+                            : 'bg-white hover:bg-blue-50/70 text-slate-700 border-slate-200 hover:border-blue-300 font-medium'
                         }`}
                       >
-                        <span className="leading-snug">{opt}</span>
-                        {isSelected && <Check className="w-4 h-4 shrink-0 text-white ml-2" />}
+                        <div className="flex items-center space-x-3">
+                          <span className={`w-6 h-6 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {thaiOptionLabels[optIdx] || `${optIdx + 1}.`}
+                          </span>
+                          <span className="leading-snug">{opt}</span>
+                        </div>
+                        {isSelected && <Check className="w-5 h-5 shrink-0 text-white ml-2" />}
                       </button>
                     );
                   })}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            )}
 
-        {/* Submit & Rubric Button Bar */}
-        <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100">
-          <div className="text-xs text-slate-500 font-medium flex items-center space-x-1.5">
-            <Award className="w-4 h-4 text-blue-600" />
-            <span>ประเมินผลอัตโนมัติตาม <strong>เกณฑ์รูบริก 5 ด้าน</strong> (คะแนนเต็ม 35 คะแนน)</span>
+            {/* Bottom Stepper Navigation & Action Controls */}
+            <div className="pt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100">
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  disabled={safeQIdx === 0}
+                  onClick={() => {
+                    setCurrentQuestionIdx(prev => Math.max(0, prev - 1));
+                    playSound('click', soundEnabled);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 font-extrabold text-xs transition flex items-center space-x-1.5"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>ข้อก่อนหน้า</span>
+                </button>
+
+                {safeQIdx < questions.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentQuestionIdx(prev => Math.min(questions.length - 1, prev + 1));
+                      playSound('click', soundEnabled);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs transition flex items-center space-x-1.5 shadow-xs action-btn-hover"
+                  >
+                    <span>ข้อถัดไป</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Answered Counter Badge */}
+              <div className="text-xs font-bold text-slate-500">
+                ตอบแล้ว <span className={`font-black ${isAllAnswered ? 'text-emerald-600' : 'text-blue-600'}`}>{answeredCount}</span> / {questions.length} ข้อ
+              </div>
+
+              {/* Submit & Rubric Button */}
+              <button
+                type="button"
+                onClick={handleEvaluateAndSubmit}
+                className={`w-full sm:w-auto font-black px-7 py-3 rounded-2xl shadow-md transition-all duration-200 text-xs sm:text-sm flex items-center justify-center space-x-2 action-btn-hover ${
+                  isAllAnswered
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-600/25'
+                    : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-blue-600/25'
+                }`}
+              >
+                <Award className="w-4 h-4 text-amber-300" />
+                <span>ตรวจคำตอบ & ส่งประเมินผลรูบริก (Rubric)</span>
+              </button>
+            </div>
           </div>
-
-          <button
-            onClick={handleEvaluateAndSubmit}
-            className="w-full sm:w-auto bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white font-black px-8 py-3.5 rounded-2xl shadow-lg shadow-blue-600/25 transition-all duration-200 text-xs sm:text-sm flex items-center justify-center space-x-2 action-btn-hover"
-          >
-            <Award className="w-4 h-4 text-amber-300" />
-            <span>ตรวจคำตอบ & ส่งประเมินผลรูบริก (Rubric)</span>
-          </button>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Rubric Evaluation Modal / Result Banner */}
       {rubricResult && (
