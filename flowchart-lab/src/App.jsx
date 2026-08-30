@@ -59,6 +59,7 @@ import LearningEvidenceModal from './components/LearningEvidenceModal';
 import HorizontalPdfViewer from './components/HorizontalPdfViewer';
 import { formatEmbedPdfUrl } from './utils/pdfHelper';
 import kruKingLogo from './assets/kru-king-logo.png';
+import { syncSystemStateToGitHub, getGitHubToken, setGitHubToken } from './utils/githubSync';
 
 // YouTube ID Parser Helper
 const extractYoutubeId = (urlOrId) => {
@@ -220,16 +221,23 @@ export default function App() {
   const [chapterViewMode, setChapterViewMode] = useState('dual'); // 'dual' | 'pdf' | 'notes'
   const [selectedReadingChapterIdx, setSelectedReadingChapterIdx] = useState(null); // null (grid) | number (in-page reader)
 
-  // Direct 1-Click Save Google Drive PDF Link Handler with Real-time Cloud Sync
-  const handleSaveChapterPdfUrl = async (chapterId, url) => {
-    const base = (Array.isArray(learningChapters) && learningChapters.length > 0) ? learningChapters : LEARNING_CHAPTERS;
-    const updated = base.map(c => c.id === chapterId ? { ...c, pdfUrl: (url || '').trim() } : c);
-    setLearningChapters(updated);
-    try {
-      localStorage.setItem('flowchart_learning_chapters', JSON.stringify(updated));
-    } catch { /* ignore */ }
+  // Unified Real-Time System Synchronizer (Google Sheets Cloud + GitHub API)
+  const syncAllToCloudAndGitHub = async (customChapters = null, customRooms = null) => {
+    const activeChs = customChapters || learningChapters;
+    const activeRms = customRooms || classrooms;
 
-    // Real-time Cloud Sync to Google Sheets
+    const syncPayload = {
+      appName: 'Flowchart Quest ป.6',
+      classrooms: activeRms,
+      chapters: activeChs,
+      updatedAt: new Date().toISOString(),
+      version: '2.0.0'
+    };
+
+    let sheetsOk = false;
+    let githubOk = false;
+
+    // 1. Sync to Google Sheets Cloud
     if (cloudWebhookUrl) {
       try {
         await fetch(cloudWebhookUrl, {
@@ -238,18 +246,48 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'saveConfig',
-            configKey: 'learning_chapters',
-            configData: updated,
+            configKey: 'system_master_config',
+            configData: syncPayload,
             updatedAt: new Date().toISOString()
           })
         });
+        sheetsOk = true;
       } catch (err) {
-        console.warn('Cloud chapter sync error:', err);
+        console.warn('Google Sheets sync error:', err);
       }
     }
 
+    // 2. Sync to GitHub Repository via REST API
+    try {
+      const ghRes = await syncSystemStateToGitHub(syncPayload);
+      if (ghRes && ghRes.success) {
+        githubOk = true;
+      }
+    } catch (err) {
+      console.warn('GitHub API sync error:', err);
+    }
+
+    setCloudSyncToast({
+      show: true,
+      message: `⚡ ซิงก์ข้อมูลทั้งระบบเรียบร้อย (Google Sheets: ${sheetsOk ? '✅' : '💾'}, GitHub: ${githubOk ? '✅' : '⚠️'})`,
+      mode: 'cloud'
+    });
+    setTimeout(() => setCloudSyncToast({ show: false, message: '', mode: 'cloud' }), 4000);
     playSound('success', soundEnabled);
-    alert('✅ บันทึกและซิงก์ลิงก์ Google Drive PDF ขึ้นคลาวด์แบบ Real-Time เรียบร้อยแล้ว!');
+  };
+
+  // Direct 1-Click Save Google Drive PDF Link Handler with Real-time Cloud & GitHub Sync
+  const handleSaveChapterPdfUrl = async (chapterId, url) => {
+    const base = (Array.isArray(learningChapters) && learningChapters.length > 0) ? learningChapters : LEARNING_CHAPTERS;
+    const updated = base.map(c => c.id === chapterId ? { ...c, pdfUrl: (url || '').trim() } : c);
+    setLearningChapters(updated);
+    try {
+      localStorage.setItem('flowchart_learning_chapters', JSON.stringify(updated));
+    } catch { /* ignore */ }
+
+    // Execute Unified Real-time Sync to Cloud & GitHub
+    await syncAllToCloudAndGitHub(updated, classrooms);
+    alert('✅ บันทึกและซิงก์ข้อมูลบทเรียนขึ้น Google Sheets & GitHub เรียบร้อยแล้ว!');
   };
 
   // Learning Chapter Active Tab & Custom Illustrations
@@ -4412,12 +4450,23 @@ export default function App() {
                         <p className="text-xs text-amber-100 mt-0.5 font-medium">ศูนย์กลางบริหารจัดการข้อมูลนักเรียน การประเมินผล วิเคราะห์สถิติ สื่อการสอน และสำรองข้อมูล</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setIsAdminUnlocked(false)}
-                      className="bg-white/95 hover:bg-white text-slate-800 font-bold px-4 py-2.5 rounded-2xl text-xs shadow transition action-btn-hover self-start sm:self-auto"
-                    >
-                      ล็อกระบบ (Lock)
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => syncAllToCloudAndGitHub()}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-2xl text-xs shadow-md transition action-btn-hover flex items-center space-x-1.5 cursor-pointer"
+                        title="ซิงก์ข้อมูลทั้งระบบขึ้น Google Sheets & GitHub ทันที"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>⚡ ซิงก์ขึ้น Cloud & GitHub</span>
+                      </button>
+                      <button
+                        onClick={() => setIsAdminUnlocked(false)}
+                        className="bg-white/95 hover:bg-white text-slate-800 font-bold px-4 py-2.5 rounded-2xl text-xs shadow transition action-btn-hover self-start sm:self-auto cursor-pointer"
+                      >
+                        ล็อกระบบ (Lock)
+                      </button>
+                    </div>
                   </div>
 
                   {/* 9 Clean Sub-Tabs Navigation */}
@@ -4610,11 +4659,15 @@ export default function App() {
                                   {activeRooms.length > 1 && (
                                     <button
                                       type="button"
-                                      onClick={() => {
+                                      onClick={async () => {
                                         if (window.confirm(`ต้องการลบห้อง "${room.name}" (รหัส ${room.code}) ใช่หรือไม่?`)) {
                                           const updated = activeRooms.filter(r => r.code !== room.code);
                                           setClassrooms(updated);
+                                          try {
+                                            localStorage.setItem('flowchart_classrooms', JSON.stringify(updated));
+                                          } catch { /* ignore */ }
                                           playSound('click', soundEnabled);
+                                          await syncAllToCloudAndGitHub(learningChapters, updated);
                                         }
                                       }}
                                       className="p-1.5 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-slate-200"
@@ -5867,7 +5920,7 @@ export default function App() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             if (!editingChapter.title || !editingChapter.title.trim()) {
                               alert('กรุณากรอกชื่อบทเรียน');
                               return;
@@ -5899,7 +5952,8 @@ export default function App() {
                             setEditingChapter(null);
                             setIsCreatingNewChapter(false);
                             playSound('success', soundEnabled);
-                            alert(isCreatingNewChapter ? '✅ เพิ่มบทเรียนใหม่สำเร็จแล้ว!' : '✅ บันทึกการแก้ไขบทเรียนเรียบร้อยแล้ว!');
+                            await syncAllToCloudAndGitHub(nextChapters, classrooms);
+                            alert(isCreatingNewChapter ? '✅ เพิ่มบทเรียนและซิงก์ขึ้น Google Sheets & GitHub สำเร็จแล้ว!' : '✅ บันทึกบทเรียนและซิงก์ขึ้น Google Sheets & GitHub เรียบร้อยแล้ว!');
                           }}
                           className="px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition shadow-md flex items-center space-x-1.5 action-btn-hover"
                         >
@@ -6007,7 +6061,7 @@ export default function App() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             if (!editingClassroom.code || !editingClassroom.code.trim()) {
                               alert('กรุณากรอกรหัส PIN ห้องเรียน');
                               return;
@@ -6047,7 +6101,8 @@ export default function App() {
                             setEditingClassroom(null);
                             setIsCreatingClassroom(false);
                             playSound('success', soundEnabled);
-                            alert(isCreatingClassroom ? '✅ สร้างห้องเรียนและกำหนดรหัส PIN สำเร็จแล้ว!' : '✅ บันทึกการแก้ไขห้องเรียนเรียบร้อยแล้ว!');
+                            await syncAllToCloudAndGitHub(learningChapters, nextRooms);
+                            alert(isCreatingClassroom ? '✅ สร้างห้องเรียนและซิงก์ขึ้น Google Sheets & GitHub สำเร็จแล้ว!' : '✅ บันทึกห้องเรียนและซิงก์ขึ้น Google Sheets & GitHub เรียบร้อยแล้ว!');
                           }}
                           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md flex items-center space-x-1.5 action-btn-hover"
                         >
