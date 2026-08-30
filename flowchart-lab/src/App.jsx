@@ -3251,18 +3251,53 @@ export default function App() {
         {/* ================= TAB 3: TEACHER DASHBOARD & REPORT ================= */}
         {activeTab === 'teacher' && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Top Return Button */}
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => { setActiveTab('game'); playSound('click', soundEnabled); }}
-                className="px-4 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 hover:text-indigo-700 font-extrabold text-xs shadow-xs border border-slate-200/80 flex items-center space-x-2 transition-all action-btn-hover"
-              >
-                <ArrowLeft className="w-4 h-4 text-indigo-600" />
-                <span>ย้อนกลับหน้าหลักภารกิจ</span>
-              </button>
+            {!isAdminUnlocked ? (
+              <div className="max-w-md mx-auto glass-panel rounded-3xl p-8 shadow-xl text-center my-8 border border-indigo-200 animate-fadeIn">
+                <div className="w-16 h-16 rounded-3xl bg-indigo-50 text-indigo-600 mx-auto flex items-center justify-center text-3xl mb-4 border border-indigo-200 shadow-sm">
+                  🔐
+                </div>
+                <h3 className="text-2xl font-black text-slate-900">แดชบอร์ดคุณครู (Teacher Only)</h3>
+                <p className="text-xs text-slate-500 mt-1 font-medium">กรุณากรอกรหัสผ่านเพื่อเข้าถึงรายงานผลสัมฤทธิ์และสถิติห้องเรียน</p>
 
-              <button
-                onClick={() => { setActiveTab('admin'); setAdminSubTab('pilot'); playSound('click', soundEnabled); }}
+                <form onSubmit={handleAdminLogin} className="mt-6 space-y-4">
+                  <input
+                    type="password"
+                    required
+                    placeholder="กรุณากรอกรหัสผ่านคุณครู..."
+                    value={adminPinInput}
+                    onChange={(e) => { setAdminPinInput(e.target.value); setAdminPinError(''); }}
+                    className="w-full bg-white border border-slate-300 rounded-2xl px-4 py-3.5 text-center text-base font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
+                    autoFocus
+                  />
+                  {adminPinError && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-bold animate-fadeIn flex items-center justify-center space-x-1.5 shadow-2xs">
+                      <span>⚠️</span>
+                      <span>{adminPinError}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 px-6 rounded-2xl shadow-md transition text-sm action-btn-hover cursor-pointer"
+                  >
+                    เข้าสู่ระบบแดชบอร์ด (Unlock)
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div className="space-y-6 animate-fadeIn">
+                {/* Top Return Button */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => { setActiveTab('game'); playSound('click', soundEnabled); }}
+                    className="px-4 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 hover:text-indigo-700 font-extrabold text-xs shadow-xs border border-slate-200/80 flex items-center space-x-2 transition-all action-btn-hover"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-indigo-600" />
+                    <span>ย้อนกลับหน้าหลักภารกิจ</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('admin'); setAdminSubTab('pilot'); playSound('click', soundEnabled); }}
                 className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold px-4 py-2.5 rounded-2xl border border-indigo-200 text-xs flex items-center space-x-1.5 transition shadow-2xs"
               >
                 <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />
@@ -3613,9 +3648,11 @@ export default function App() {
               )}
 
             </div>
-
           </div>
         )}
+
+      </div>
+    )}
 
         {/* ================= TAB 4: SANDBOX STUDIO ================= */}
         {activeTab === 'sandbox' && (
