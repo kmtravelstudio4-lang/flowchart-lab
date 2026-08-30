@@ -58,6 +58,7 @@ import StudentManagementModal from './components/StudentManagementModal';
 import LearningEvidenceModal from './components/LearningEvidenceModal';
 import HorizontalPdfViewer from './components/HorizontalPdfViewer';
 import { formatEmbedPdfUrl } from './utils/pdfHelper';
+import kruKingLogo from './assets/kru-king-logo.png';
 
 // YouTube ID Parser Helper
 const extractYoutubeId = (urlOrId) => {
@@ -1124,7 +1125,7 @@ export default function App() {
             <div className="flex items-center justify-between w-full lg:w-auto">
               <div className="flex items-center space-x-3">
                 <img 
-                  src="/kru-king-logo.png" 
+                  src={kruKingLogo} 
                   alt="ห้องสื่อครูคิง" 
                   className="w-12 h-12 object-contain drop-shadow-md rounded-2xl bg-white p-0.5 border border-blue-200/80 shrink-0" 
                 />
@@ -1451,7 +1452,7 @@ export default function App() {
               <div className="max-w-2xl mx-auto glass-panel rounded-3xl p-8 sm:p-12 shadow-xl shadow-blue-600/10 text-center space-y-7 border border-white/80 animate-fadeIn">
                 <div className="relative inline-block">
                   <img 
-                    src="/kru-king-logo.png" 
+                    src={kruKingLogo} 
                     alt="ห้องสื่อครูคิง" 
                     className="w-28 h-28 object-contain mx-auto drop-shadow-2xl rounded-full bg-white p-1 border-4 border-amber-300 shadow-lg shadow-amber-400/20" 
                   />
@@ -2861,7 +2862,7 @@ export default function App() {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
                       <img 
-                        src="/kru-king-logo.png" 
+                        src={kruKingLogo} 
                         alt="ห้องสื่อครูคิง" 
                         className="w-12 h-12 object-contain rounded-2xl bg-white p-0.5 border border-blue-200 shadow-2xs" 
                       />
@@ -4318,7 +4319,7 @@ export default function App() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-white/20">
                     <div className="flex items-center space-x-3.5">
                       <img 
-                        src="/kru-king-logo.png" 
+                        src={kruKingLogo} 
                         alt="ห้องสื่อครูคิง" 
                         className="w-14 h-14 object-contain rounded-2xl bg-white p-1 shadow-md border border-amber-200" 
                       />
@@ -6101,7 +6102,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto glass-panel rounded-3xl p-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left text-xs text-slate-500 shadow-sm border border-white/80">
           <div className="flex items-center space-x-3">
             <img 
-              src="/kru-king-logo.png" 
+              src={kruKingLogo} 
               alt="ห้องสื่อครูคิง" 
               className="w-10 h-10 object-contain rounded-xl bg-white p-0.5 border border-blue-100 shadow-2xs shrink-0" 
             />
