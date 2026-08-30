@@ -119,14 +119,39 @@ export async function commitFileToGitHub(path, content, commitMessage, branch = 
 
 /**
  * Push entire System State (Classrooms + Chapters + Settings) to GitHub as JSON configuration
+ * Commits to both 'main' branch and directly to 'gh-pages' branch for instant global CDN availability
  * @param {Object} systemData
  * @returns {Promise<{success: boolean, message: string}>}
  */
 export async function syncSystemStateToGitHub(systemData) {
   const jsonContent = JSON.stringify(systemData, null, 2);
-  return await commitFileToGitHub(
+  const timeStr = new Date().toLocaleString('th-TH');
+
+  // 1. Commit to main branch (repository source)
+  const resMain = await commitFileToGitHub(
     'src/data/system_config.json',
     jsonContent,
-    `feat(config): real-time system state sync from admin [${new Date().toLocaleString('th-TH')}]`
+    `feat(config): real-time system state sync from admin [${timeStr}]`,
+    'main'
   );
+
+  // 2. Commit directly to gh-pages branch (live CDN root)
+  const resGhPages = await commitFileToGitHub(
+    'system_config.json',
+    jsonContent,
+    `feat(cdn): live system_config.json update [${timeStr}]`,
+    'gh-pages'
+  );
+
+  if (resGhPages.success || resMain.success) {
+    return {
+      success: true,
+      message: '✅ ซิงก์ข้อมูลขึ้น GitHub (Main & GitHub Pages CDN) เรียบร้อย!'
+    };
+  } else {
+    return {
+      success: false,
+      message: resGhPages.message || resMain.message || 'ซิงก์ GitHub ไม่สำเร็จ'
+    };
+  }
 }
