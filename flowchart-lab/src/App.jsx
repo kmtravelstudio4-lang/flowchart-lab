@@ -51,15 +51,29 @@ import LearningEvidenceModal from './components/LearningEvidenceModal';
 import HorizontalPdfViewer from './components/HorizontalPdfViewer';
 import { formatEmbedPdfUrl } from './utils/pdfHelper';
 import kruKingLogo from './assets/kru-king-logo.png';
-import { syncSystemStateToGitHub, getGitHubToken, setGitHubToken } from './utils/githubSync';
+import masterSystemConfig from './data/system_config.json';
 
-// Default 4 Pre-Configured Classrooms with PIN codes
-export const DEFAULT_CLASSROOMS = [
-  { id: 'room_601', code: '601', name: 'ห้อง ป.6/1', sheetTab: 'ป.6_1', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/1' },
-  { id: 'room_602', code: '602', name: 'ห้อง ป.6/2', sheetTab: 'ป.6_2', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/2' },
-  { id: 'room_603', code: '603', name: 'ห้อง ป.6/3', sheetTab: 'ป.6_3', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/3' },
-  { id: 'room_604', code: '604', name: 'ห้อง ป.6/4', sheetTab: 'ป.6_4', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/4' }
-];
+// Default 4 Pre-Configured Classrooms with PIN codes (Merged with system_config)
+export const DEFAULT_CLASSROOMS = (masterSystemConfig && Array.isArray(masterSystemConfig.classrooms) && masterSystemConfig.classrooms.length > 0)
+  ? masterSystemConfig.classrooms
+  : [
+      { id: 'room_601', code: '601', name: 'ห้อง ป.6/1', sheetTab: 'ป.6_1', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/1' },
+      { id: 'room_602', code: '602', name: 'ห้อง ป.6/2', sheetTab: 'ป.6_2', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/2' },
+      { id: 'room_603', code: '603', name: 'ห้อง ป.6/3', sheetTab: 'ป.6_3', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/3' },
+      { id: 'room_604', code: '604', name: 'ห้อง ป.6/4', sheetTab: 'ป.6_4', active: true, desc: 'ชั้นประถมศึกษาปีที่ 6/4' }
+    ];
+
+// Initial Base Chapters with embedded Google Drive PDF link for Chapter 1
+export const INITIAL_CHAPTERS = (masterSystemConfig && Array.isArray(masterSystemConfig.chapters) && masterSystemConfig.chapters.length > 0)
+  ? LEARNING_CHAPTERS.map(base => {
+      const match = masterSystemConfig.chapters.find(c => c && c.id === base.id);
+      return match ? {
+        ...base,
+        ...match,
+        pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || base.pdfUrl || '').trim()
+      } : base;
+    })
+  : LEARNING_CHAPTERS;
 
 // YouTube ID Parser Helper
 const extractYoutubeId = (urlOrId) => {
@@ -179,14 +193,14 @@ export default function App() {
   const [postScore, setPostScore] = useState(0);
   const [postPageIdx, setPostPageIdx] = useState(0);
 
-  // Dynamic Learning Chapters State (เพิ่ม/ลด/แก้ไขเนื้อหาบทเรียน)
+  // Dynamic Learning Chapters State (เพิ่ม/ลด/แก้ไขเนื้อหาบทเรียน - Sync with INITIAL_CHAPTERS)
   const [learningChapters, setLearningChapters] = useState(() => {
     try {
       const saved = localStorage.getItem('flowchart_learning_chapters');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const merged = LEARNING_CHAPTERS.map(base => {
+          const merged = INITIAL_CHAPTERS.map(base => {
             const match = parsed.find(c => c && c.id === base.id);
             if (match) {
               return {
@@ -199,14 +213,14 @@ export default function App() {
             }
             return base;
           });
-          const customExtras = parsed.filter(p => p && p.id && !LEARNING_CHAPTERS.some(b => b.id === p.id));
+          const customExtras = parsed.filter(p => p && p.id && !INITIAL_CHAPTERS.some(b => b.id === p.id));
           return [...merged, ...customExtras];
         }
       }
     } catch {
       // ignore
     }
-    return LEARNING_CHAPTERS;
+    return INITIAL_CHAPTERS;
   });
 
   useEffect(() => {
@@ -215,42 +229,84 @@ export default function App() {
     } catch { /* ignore */ }
   }, [learningChapters]);
 
-  // Real-time Cloud Sync: โหลดบทเรียนและลิงก์ PDF ล่าสุดจาก Google Sheets แบบ Real-time
+  // Real-time Cloud Sync: โหลดบทเรียนและลิงก์ PDF ล่าสุดจาก GitHub CDN และ Google Sheets แบบ Real-time
   useEffect(() => {
-    if (!cloudWebhookUrl) return;
     const fetchCloudChapters = async () => {
+      // 1. First fetch from public/system_config.json (GitHub CDN)
       try {
-        const res = await fetch(`${cloudWebhookUrl}?configKey=system_master_config`, {
-          method: 'GET',
+        const staticRes = await fetch(`./system_config.json?v=${Date.now()}`, {
           headers: { 'Accept': 'application/json' }
         });
-        if (res.ok) {
-          const raw = await res.json();
-          const data = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.chapters) ? raw.chapters : null);
-          if (data && data.length > 0) {
-            const merged = LEARNING_CHAPTERS.map(base => {
-              const match = data.find(d => d && d.id === base.id);
-              if (match) {
-                return {
-                  ...base,
-                  ...match,
-                  pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || match.slidesUrl || match.slideUrl || match.documentUrl || base.pdfUrl || '').trim(),
-                  symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
-                  keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
-                };
-              }
-              return base;
+        if (staticRes.ok) {
+          const staticData = await staticRes.json();
+          if (staticData && Array.isArray(staticData.chapters) && staticData.chapters.length > 0) {
+            setLearningChapters(prev => {
+              const baseList = (prev && prev.length > 0) ? prev : INITIAL_CHAPTERS;
+              const merged = baseList.map(base => {
+                const match = staticData.chapters.find(d => d && d.id === base.id);
+                if (match) {
+                  return {
+                    ...base,
+                    ...match,
+                    pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || match.slidesUrl || match.slideUrl || match.documentUrl || base.pdfUrl || '').trim(),
+                    symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
+                    keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
+                  };
+                }
+                return base;
+              });
+              const customExtras = staticData.chapters.filter(d => d && d.id && !baseList.some(b => b.id === d.id));
+              const fullList = [...merged, ...customExtras];
+              try {
+                localStorage.setItem('flowchart_learning_chapters', JSON.stringify(fullList));
+              } catch {}
+              return fullList;
             });
-            const customExtras = data.filter(d => d && d.id && !LEARNING_CHAPTERS.some(b => b.id === d.id));
-            const fullList = [...merged, ...customExtras];
-            setLearningChapters(fullList);
-            try {
-              localStorage.setItem('flowchart_learning_chapters', JSON.stringify(fullList));
-            } catch { /* ignore */ }
           }
         }
       } catch (err) {
-        console.log('Using local chapter cache (fallback):', err);
+        console.log('Static config fetch fallback:', err);
+      }
+
+      // 2. Then attempt Google Sheets if configured
+      if (cloudWebhookUrl) {
+        try {
+          const res = await fetch(`${cloudWebhookUrl}?configKey=system_master_config`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+          });
+          const contentType = res.headers.get('content-type') || '';
+          if (res.ok && contentType.includes('json')) {
+            const raw = await res.json();
+            const data = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.chapters) ? raw.chapters : null);
+            if (data && data.length > 0) {
+              setLearningChapters(prev => {
+                const baseList = (prev && prev.length > 0) ? prev : INITIAL_CHAPTERS;
+                const merged = baseList.map(base => {
+                  const match = data.find(d => d && d.id === base.id);
+                  if (match) {
+                    return {
+                      ...base,
+                      ...match,
+                      pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || match.slidesUrl || match.slideUrl || match.documentUrl || base.pdfUrl || '').trim(),
+                      symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
+                      keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
+                    };
+                  }
+                  return base;
+                });
+                const customExtras = data.filter(d => d && d.id && !baseList.some(b => b.id === d.id));
+                const fullList = [...merged, ...customExtras];
+                try {
+                  localStorage.setItem('flowchart_learning_chapters', JSON.stringify(fullList));
+                } catch {}
+                return fullList;
+              });
+            }
+          }
+        } catch (err) {
+          console.log('Google Sheets config fetch fallback:', err);
+        }
       }
     };
     fetchCloudChapters();
