@@ -1,4 +1,10 @@
 {
+  "name": "flowchart-quest-root",
+  "private": true,
+  "scripts": {
+    "build": "cd flowchart-lab && npm install && npm run build",
+    "dev": "cd flowchart-lab && npm run dev"
+  },
   "dependencies": {
     "lucide-react": "^1.35.0"
   },
