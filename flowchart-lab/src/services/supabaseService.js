@@ -220,12 +220,22 @@ export const fetchStudentProgress = async (studentId) => {
 export const recordActivityAttempt = async ({
   studentId,
   activityId,
+  stageId = 'game',
   answer = null,
   isCorrect = false,
-  attemptNumber = 1
+  attemptNumber = 1,
+  elapsedSeconds = 0
 }) => {
   if (!studentId || !activityId) return { success: false };
   if (!isSupabaseConfigured) return { success: true, localOnly: true };
+
+  const answerPayload = typeof answer === 'object' && answer !== null ? answer : { value: answer };
+  if (elapsedSeconds > 0) {
+    answerPayload.elapsed_seconds = elapsedSeconds;
+  }
+  if (stageId) {
+    answerPayload.stage_id = stageId;
+  }
 
   try {
     const { data, error } = await supabase
@@ -233,7 +243,7 @@ export const recordActivityAttempt = async ({
       .insert({
         student_id: studentId,
         activity_id: activityId,
-        answer: typeof answer === 'object' ? answer : { value: answer },
+        answer: answerPayload,
         is_correct: isCorrect,
         attempt_number: attemptNumber,
         created_at: new Date().toISOString()
@@ -243,11 +253,18 @@ export const recordActivityAttempt = async ({
 
     if (error) throw error;
 
-    // Log activity event
-    await logEvent(studentId, isCorrect ? 'activity_passed' : 'activity_attempted', `กิจกรรม: ${activityId} (ครั้งที่ ${attemptNumber})`, {
+    // Log granular game telemetry events
+    const eventType = isCorrect ? 'activity_correct' : 'activity_wrong';
+    const eventTitle = isCorrect
+      ? `✅ ตอบกิจกรรมถูกต้อง: ${activityId} (ด่าน ${stageId})`
+      : `💡 ตอบกิจกรรม: ${activityId} (ด่าน ${stageId}, ครั้งที่ ${attemptNumber})`;
+
+    await logEvent(studentId, eventType, eventTitle, {
       activity_id: activityId,
+      stage_id: stageId,
       is_correct: isCorrect,
-      attempt_number: attemptNumber
+      attempt_number: attemptNumber,
+      elapsed_seconds: elapsedSeconds
     });
 
     return { success: true, attempt: data };
@@ -256,6 +273,7 @@ export const recordActivityAttempt = async ({
     return { success: false, error: err.message };
   }
 };
+
 
 export const logEvent = async (param1, eventType, eventName, metadata = {}) => {
   if (!isSupabaseConfigured) return;

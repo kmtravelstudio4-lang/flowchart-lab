@@ -71,6 +71,18 @@ import {
   computeOnlineStatus 
 } from './services/supabaseService';
 
+import GameHeader from './components/game/GameHeader';
+import GameFeedbackModal from './components/game/GameFeedbackModal';
+import GameResultModal from './components/game/GameResultModal';
+import { 
+  STAGES_CONFIG, 
+  TIMER_STATES, 
+  formatTimeMMSS, 
+  getStageConfig, 
+  getContextualFeedback 
+} from './engine/gameEngine';
+
+
 
 
 
@@ -698,6 +710,74 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isProfileEntered, activeTab, gameStage]);
 
+  // Standardized Stage Countdown Timer State Machine
+  const [stageTimerState, setStageTimerState] = useState(TIMER_STATES.RUNNING);
+  const [stageTimeRemaining, setStageTimeRemaining] = useState(180);
+  const [isTimeUpModalOpen, setIsTimeUpModalOpen] = useState(false);
+  const stageEndTimeRef = useRef(null);
+  const stageTimerIntervalRef = useRef(null);
+
+  // Helper for sequential stage progression
+  const getNextStageId = useCallback((currentStage) => {
+    const sequence = ['intro', 'learning', 'pretest', 'mission1', 'mission2', 'mission3', 'mission4', 'final', 'posttest', 'summary'];
+    const idx = sequence.indexOf(currentStage);
+    if (idx !== -1 && idx < sequence.length - 1) {
+      return sequence[idx + 1];
+    }
+    return 'summary';
+  }, []);
+
+  // Update Countdown Timer on gameStage change
+  useEffect(() => {
+    if (!isProfileEntered || activeTab !== 'game' || gameStage === 'intro' || gameStage === 'summary') {
+      setStageTimerState(TIMER_STATES.NOT_STARTED);
+      return;
+    }
+
+    const stageCfg = getStageConfig(gameStage);
+    const limit = stageCfg.timeLimit || 180;
+    setStageTimeRemaining(limit);
+    setStageTimerState(TIMER_STATES.RUNNING);
+    setIsTimeUpModalOpen(false);
+    stageEndTimeRef.current = Date.now() + limit * 1000;
+
+    if (studentInfo.studentId) {
+      logEvent(studentInfo.studentId, 'stage_started', `เริ่มด่าน: ${stageCfg.title}`, {
+        stage_id: gameStage,
+        time_limit: limit
+      });
+      updateStudentProgress({
+        studentId: studentInfo.studentId,
+        lessonId: 'ch1',
+        currentStage: gameStage,
+        status: 'in_progress'
+      });
+    }
+
+    if (stageTimerIntervalRef.current) clearInterval(stageTimerIntervalRef.current);
+    stageTimerIntervalRef.current = setInterval(() => {
+      if (!stageEndTimeRef.current) return;
+      const remaining = Math.max(0, Math.ceil((stageEndTimeRef.current - Date.now()) / 1000));
+      setStageTimeRemaining(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(stageTimerIntervalRef.current);
+        setStageTimerState(TIMER_STATES.TIME_UP);
+        setIsTimeUpModalOpen(true);
+        if (studentInfo.studentId) {
+          logEvent(studentInfo.studentId, 'stage_time_up', `⏰ หมดเวลาด่าน: ${stageCfg.title}`, {
+            stage_id: gameStage
+          });
+        }
+      }
+    }, 250);
+
+    return () => {
+      if (stageTimerIntervalRef.current) clearInterval(stageTimerIntervalRef.current);
+    };
+  }, [gameStage, isProfileEntered, activeTab, studentInfo.studentId]);
+
+
   // Network Online/Offline Listener
   useEffect(() => {
     const handleOnline = () => {
@@ -1119,13 +1199,14 @@ export default function App() {
     setM1Result(null);
   };
 
-  const handleVerifyMission1 = () => {
+  const handleVerifyMission1 = async () => {
     const filledCount = Object.keys(m1PlacedAnswers).length;
     if (filledCount < m1Targets.length) {
       playSound('error', soundEnabled);
       setM1Result({
         success: false,
-        message: `คุณยังวางไม่ครบทุกช่องนะครับ (วางไปแล้ว ${filledCount}/${m1Targets.length} ช่อง) ลากวางให้ครบก่อนนะ!`
+        canContinue: false,
+        message: `คุณยังวางไม่ครบทุกช่องนะครับ (วางไปแล้ว ${filledCount}/${m1Targets.length} ช่อง) เลือกวางให้ครบก่อนตรวจคำตอบนะ!`
       });
       return;
     }
@@ -1136,33 +1217,48 @@ export default function App() {
       if (!placed || placed.id !== t.correctItemId) allCorrect = false;
     });
 
+    if (studentInfo.studentId) {
+      await recordActivityAttempt({
+        studentId: studentInfo.studentId,
+        activityId: 'mission1_symbol_hunter',
+        stageId: 'mission1',
+        answer: m1PlacedAnswers,
+        isCorrect: allCorrect,
+        attemptNumber: 1
+      });
+    }
+
+    setCompletedStages(prev => ({ ...prev, mission1: true }));
+
     if (allCorrect) {
       playSound('success', soundEnabled);
       setComboCount(prev => prev + 1);
       setUserXP(prev => prev + 150);
       setMissionScores(prev => ({ ...prev, m1: 15 }));
-      setCompletedStages(prev => ({ ...prev, mission1: true }));
       setM1Result({
         success: true,
-        message: '🎉 ยอดเยี่ยมมากครับ! จับคู่สัญลักษณ์ Flowchart กับหน้าที่ได้ถูกต้อง 100% (+15 คะแนนเต็ม, ปลดล็อกด่าน 2)'
+        canContinue: true,
+        message: '🎉 ยอดเยี่ยมมากครับ! จับคู่สัญลักษณ์ Flowchart กับหน้าที่ได้ถูกต้องครบถ้วน'
       });
     } else {
       playSound('error', soundEnabled);
       setComboCount(0);
       setM1Result({
         success: false,
-        message: '❌ ยังมีสัญลักษณ์ที่วางสลับที่กันอยู่ ลองตรวจดูรูปทรงและหน้าที่ แล้วจัดวางใหม่อีกรอบนะครับ'
+        canContinue: true,
+        message: '💡 มีบางสัญลักษณ์ที่วางสลับที่กัน: สี่เหลี่ยมผืนผ้า = Process (ประมวลผล), สี่เหลี่ยมข้าวหลามตัด = Decision (ตัดสินใจ), วงรี = Terminal (เริ่มต้น/สิ้นสุด) คุณสามารถไปต่อได้ทันที หรือลองจัดวางใหม่อีกครั้งได้ครับ'
       });
     }
   };
 
   // --- Mission 2 Handlers (Step Master) ---
-  const handleVerifyMission2 = () => {
+  const handleVerifyMission2 = async () => {
     const currentLvl = STEP_MASTER_LEVELS[m2LevelIdx];
     if (m2PlacedSlots.length !== currentLvl.blocks.length) {
       playSound('error', soundEnabled);
       setM2Result({
         success: false,
+        canContinue: false,
         message: `กรุณาเลือกวางบล็อกคำสั่งให้ครบทั้ง ${currentLvl.blocks.length} ขั้นตอนก่อนตรวจคำตอบครับ`
       });
       return;
@@ -1171,31 +1267,44 @@ export default function App() {
     const currentIds = m2PlacedSlots.map(b => b.id);
     const isMatch = currentIds.every((id, idx) => id === currentLvl.correctOrder[idx]);
 
+    if (studentInfo.studentId) {
+      await recordActivityAttempt({
+        studentId: studentInfo.studentId,
+        activityId: `mission2_level_${m2LevelIdx + 1}`,
+        stageId: 'mission2',
+        answer: currentIds,
+        isCorrect: isMatch,
+        attemptNumber: 1
+      });
+    }
+
+    setCompletedStages(prev => ({ ...prev, mission2: true }));
+
     if (isMatch) {
       playSound('success', soundEnabled);
       setM2IsSimulating(true);
       setM2Result({
         success: true,
+        canContinue: true,
         message: `🌟 ถูกต้องสมบูรณ์แบบ! ${currentLvl.feedbackExplanation}`
       });
 
-      // If finished all 3 levels
       if (m2LevelIdx >= STEP_MASTER_LEVELS.length - 1) {
         setMissionScores(prev => ({ ...prev, m2: 15 }));
-        setCompletedStages(prev => ({ ...prev, mission2: true }));
         setUserXP(prev => prev + 150);
       }
     } else {
       playSound('error', soundEnabled);
       setM2Result({
         success: false,
-        message: '❌ ลำดับขั้นตอนยังไม่ถูกต้อง ลองพิจารณากิจวัตรและขั้นตอนการทำงานตามลำดับเหตุผลใหม่อีกครั้งครับ'
+        canContinue: true,
+        message: `💡 ลำดับขั้นตอนยังไม่ตรงกับหลักเหตุผล: ${currentLvl.feedbackExplanation || 'ลำดับผังงานแบบ Sequence ต้องทำงานจากบนลงล่างตามลำดับเวลา'} คุณสามารถไปต่อได้ทันที หรือลองจัดใหม่อีกรอบได้ครับ`
       });
     }
   };
 
   // --- Mission 3 Handlers (Flow Reader) ---
-  const handleVerifyMission3 = () => {
+  const handleVerifyMission3 = async () => {
     const currentLvl = FLOW_READER_LEVELS[m3LevelIdx];
     const answeredCount = Object.keys(m3Answers).filter(k => k.startsWith(`m3_l${m3LevelIdx + 1}`)).length;
 
@@ -1203,6 +1312,7 @@ export default function App() {
       playSound('error', soundEnabled);
       setM3Result({
         success: false,
+        canContinue: false,
         message: `กรุณาตอบคำถามให้ครบทั้ง ${currentLvl.questions.length} ข้อก่อนตรวจคำตอบครับ`
       });
       return;
@@ -1213,34 +1323,51 @@ export default function App() {
       if (m3Answers[q.qId] === q.correctAnswer) correctCount++;
     });
 
-    if (correctCount === currentLvl.questions.length) {
+    const isAllCorrect = correctCount === currentLvl.questions.length;
+
+    if (studentInfo.studentId) {
+      await recordActivityAttempt({
+        studentId: studentInfo.studentId,
+        activityId: `mission3_level_${m3LevelIdx + 1}`,
+        stageId: 'mission3',
+        answer: m3Answers,
+        isCorrect: isAllCorrect,
+        attemptNumber: 1
+      });
+    }
+
+    setCompletedStages(prev => ({ ...prev, mission3: true }));
+
+    if (isAllCorrect) {
       playSound('success', soundEnabled);
       setM3Result({
         success: true,
+        canContinue: true,
         message: `🎉 ถูกต้องครบทุกข้อ! คุณอ่านและวิเคราะห์ผังงานระดับ ${m3LevelIdx + 1} ได้อย่างแม่นยำ`
       });
 
       if (m3LevelIdx >= FLOW_READER_LEVELS.length - 1) {
         setMissionScores(prev => ({ ...prev, m3: 15 }));
-        setCompletedStages(prev => ({ ...prev, mission3: true }));
         setUserXP(prev => prev + 150);
       }
     } else {
       playSound('error', soundEnabled);
       setM3Result({
         success: false,
-        message: `❌ คุณตอบถูก ${correctCount}/${currentLvl.questions.length} ข้อ ลองอ่านเส้นทางลูกศรและเงื่อนไขใหม่อีกครั้งครับ`
+        canContinue: true,
+        message: `💡 คุณตอบถูก ${correctCount}/${currentLvl.questions.length} ข้อ: ข้อสังเกตคือ สี่เหลี่ยมข้าวหลามตัดจะแยกออกเป็น 2 ทาง (จริง/เท็จ) คุณสามารถไปต่อได้เลย หรือลองทบทวนใหม่อีกครั้งได้ครับ`
       });
     }
   };
 
   // --- Mission 4 Handlers (Bug Detective) ---
-  const handleVerifyMission4 = () => {
+  const handleVerifyMission4 = async () => {
     const sc = BUG_DETECTIVE_SCENARIOS[m4ScenarioIdx];
     if (m4Answers.step1 === null || m4Answers.step2 === null || m4Answers.step3 === null) {
       playSound('error', soundEnabled);
       setM4Result({
         success: false,
+        canContinue: false,
         message: 'กรุณาตอบคำถามให้ครบทั้ง 3 ขั้นตอน (จุดไหนผิด, ผิดเพราะอะไร, ควรแก้อย่างไร) ครับ'
       });
       return;
@@ -1249,24 +1376,40 @@ export default function App() {
     const s1Ok = m4Answers.step1 === sc.step1_whereBug.correctAnswer;
     const s2Ok = m4Answers.step2 === sc.step2_whyBug.correctAnswer;
     const s3Ok = m4Answers.step3 === sc.step3_howToFix.correctAnswer;
+    const isAllOk = s1Ok && s2Ok && s3Ok;
 
-    if (s1Ok && s2Ok && s3Ok) {
+    if (studentInfo.studentId) {
+      await recordActivityAttempt({
+        studentId: studentInfo.studentId,
+        activityId: `mission4_scenario_${m4ScenarioIdx + 1}`,
+        stageId: 'mission4',
+        answer: m4Answers,
+        isCorrect: isAllOk,
+        attemptNumber: 1
+      });
+    }
+
+    setCompletedStages(prev => ({ ...prev, mission4: true }));
+
+    if (isAllOk) {
       playSound('success', soundEnabled);
       setM4Result({
         success: true,
-        message: `🕵️‍♂️ ยอดเยี่ยมมาก นักสืบ Bug! คุณค้นพบจุดผิด อธิบายสาเหตุ และเสนอวิธีแก้ไขได้อย่างสมบูรณ์แบบ (+20 คะแนนเต็ม)`
+        canContinue: true,
+        message: `🕵️‍♂️ ยอดเยี่ยมมาก นักสืบ Bug! คุณค้นพบจุดผิด อธิบายสาเหตุ และเสนอวิธีแก้ไขได้อย่างสมบูรณ์แบบ`
       });
       setMissionScores(prev => ({ ...prev, m4: 20 }));
-      setCompletedStages(prev => ({ ...prev, mission4: true }));
       setUserXP(prev => prev + 200);
     } else {
       playSound('error', soundEnabled);
       setM4Result({
         success: false,
-        message: `❌ ยังมีคำตอบบางข้อไม่ถูกต้อง ลองสังเกตสัญลักษณ์และทิศทางของลูกศรใหม่อีกครั้งครับ`
+        canContinue: true,
+        message: `💡 ข้อคิดจากนักสืบ Bug: จุดผิดของผังงานมักเกิดจาก "ใช้สัญลักษณ์ผิดประเภท" หรือ "เส้นทางลูกศรวนลูปไม่สิ้นสุด" คุณสามารถไปต่อสู่ Final Mission ได้ทันที หรือลองสืบหาใหม่อีกครั้งครับ`
       });
     }
   };
+
 
   // --- Final Mission Completion Handler ---
   const handleFinalMissionComplete = (finalScore, rubricDetails, data) => {
@@ -1751,15 +1894,15 @@ export default function App() {
                 {/* Tier 2: 9-Stage Progress Timeline Stepper */}
                 <div className="flex items-center space-x-2 overflow-x-auto py-1 text-xs font-bold scrollbar-none">
                   {[
-                    { id: 'learning', label: '1. บทเรียน', score: null, isUnlocked: true },
-                    { id: 'pretest', label: '2. Pre-Test', score: missionScores.preScore !== null ? `${missionScores.preScore}/10` : null, isUnlocked: true },
-                    { id: 'mission1', label: '3. M1: สัญลักษณ์', score: `${missionScores.m1}/15`, isUnlocked: Boolean(completedStages.pretest || missionScores.preScore !== null || completedStages.learning) },
-                    { id: 'mission2', label: '4. M2: ลำดับ', score: `${missionScores.m2}/15`, isUnlocked: Boolean(completedStages.mission1 || (missionScores.m1 && missionScores.m1 >= 10)) },
-                    { id: 'mission3', label: '5. M3: อ่านผัง', score: `${missionScores.m3}/15`, isUnlocked: Boolean(completedStages.mission2 || (missionScores.m2 && missionScores.m2 >= 10)) },
-                    { id: 'mission4', label: '6. M4: แก้บั๊ก', score: `${missionScores.m4}/20`, isUnlocked: Boolean(completedStages.mission3 || (missionScores.m3 && missionScores.m3 >= 10)) },
-                    { id: 'final', label: '7. Final: ออกแบบ', score: `${missionScores.m5}/35`, isUnlocked: Boolean(completedStages.mission4 || (missionScores.m4 && missionScores.m4 >= 15)) },
-                    { id: 'posttest', label: '8. Post-Test', score: missionScores.postScore !== null ? `${missionScores.postScore}/10` : null, isUnlocked: Boolean(completedStages.final || (missionScores.m5 && missionScores.m5 >= 15)) },
-                    { id: 'summary', label: '9. สรุปผล & เกียรติบัตร', score: '★', isUnlocked: Boolean(completedStages.posttest || missionScores.postScore !== null) }
+                    { id: 'learning', label: '1. บทเรียน', isUnlocked: true },
+                    { id: 'pretest', label: '2. Pre-Test', isUnlocked: true },
+                    { id: 'mission1', label: '3. M1: สัญลักษณ์', isUnlocked: true },
+                    { id: 'mission2', label: '4. M2: ลำดับ', isUnlocked: true },
+                    { id: 'mission3', label: '5. M3: อ่านผัง', isUnlocked: true },
+                    { id: 'mission4', label: '6. M4: แก้บั๊ก', isUnlocked: true },
+                    { id: 'final', label: '7. Final: ออกแบบ', isUnlocked: true },
+                    { id: 'posttest', label: '8. Post-Test', isUnlocked: true },
+                    { id: 'summary', label: '9. สรุปผล & เกียรติบัตร', isUnlocked: Boolean(completedStages.posttest || missionScores.postScore !== null) }
                   ].map((stage) => {
                     const isCurrent = gameStage === stage.id;
                     const isDone = completedStages[stage.id];
@@ -1769,11 +1912,6 @@ export default function App() {
                       <button
                         key={stage.id}
                         onClick={() => { 
-                          if (!isUnlocked) {
-                            playSound('error', soundEnabled);
-                            alert('🔒 ด่านนี้ยังถูกล็อกอยู่ครับ กรุณาทำภารกิจด่านก่อนหน้าให้ผ่านก่อนนะครับ 😊');
-                            return;
-                          }
                           setGameStage(stage.id); 
                           playSound('click', soundEnabled); 
                         }}
@@ -1782,25 +1920,16 @@ export default function App() {
                             ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-600 text-white shadow-md shadow-blue-600/25 scale-[1.02]'
                             : isDone
                             ? 'bg-emerald-50/90 border-emerald-300 text-emerald-800 hover:bg-emerald-100 shadow-2xs'
-                            : isUnlocked
-                            ? 'bg-white/90 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 shadow-2xs'
-                            : 'bg-slate-100/60 border-slate-200 text-slate-400 cursor-not-allowed opacity-75'
+                            : 'bg-white/90 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 shadow-2xs'
                         }`}
                       >
-                        {!isUnlocked && <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
                         <span>{stage.label}</span>
-                        {stage.score && (
-                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                            isCurrent ? 'bg-white/20 text-white' : isDone ? 'bg-emerald-200/80 text-emerald-900' : isUnlocked ? 'bg-slate-100 text-slate-700' : 'bg-slate-200/50 text-slate-400'
-                          }`}>
-                            {stage.score}
-                          </span>
-                        )}
                         {isDone && <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
                       </button>
                     );
                   })}
                 </div>
+
 
               </div>
             )}
@@ -1996,8 +2125,46 @@ export default function App() {
               </div>
             )}
 
+            {/* Standardized Game Header with Live Timer across all gameplay stages */}
+            {isProfileEntered && activeTab === 'game' && gameStage !== 'intro' && gameStage !== 'summary' && (
+              <GameHeader
+                stageNumber={getStageConfig(gameStage).stageNumber}
+                totalStages={8}
+                title={getStageConfig(gameStage).title}
+                subtitle={getStageConfig(gameStage).subtitle}
+                timeRemaining={stageTimeRemaining}
+                timerState={stageTimerState}
+                onTogglePause={() => {
+                  if (stageTimerState === TIMER_STATES.RUNNING) {
+                    setStageTimerState(TIMER_STATES.PAUSED);
+                  } else if (stageTimerState === TIMER_STATES.PAUSED) {
+                    setStageTimerState(TIMER_STATES.RUNNING);
+                  }
+                }}
+              />
+            )}
+
+            {/* Time Up Result Modal — allows continuing directly without being locked */}
+            <GameResultModal
+              isOpen={isTimeUpModalOpen}
+              stageTitle={getStageConfig(gameStage).title}
+              stageNumber={getStageConfig(gameStage).stageNumber}
+              elapsedSeconds={getStageConfig(gameStage).timeLimit - stageTimeRemaining}
+              attemptCount={1}
+              correctCount={1}
+              status="time_up"
+              onNextStage={() => {
+                setIsTimeUpModalOpen(false);
+                const nextStg = getNextStageId(gameStage);
+                setGameStage(nextStg);
+                playSound('click', soundEnabled);
+              }}
+              isLastStage={gameStage === 'posttest'}
+            />
+
             {/* --- STAGE 1: PRE-TEST (แบบทดสอบก่อนเรียน 10 ข้อ) --- */}
             {isProfileEntered && gameStage === 'pretest' && (
+
               <div className="space-y-6 animate-fadeIn">
                 <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-sm">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
@@ -2507,23 +2674,35 @@ export default function App() {
 
                         {m1Result && (
                           <div className={`p-4 rounded-2xl border flex items-start space-x-3 animate-fadeIn ${
-                            m1Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-rose-50 border-rose-300 text-rose-900'
+                            m1Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
                           }`}>
-                            {m1Result.success ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" /> : <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />}
+                            {m1Result.success ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" /> : <Sparkles className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />}
                             <div className="flex-1">
-                              <p className="text-xs sm:text-sm font-bold">{m1Result.message}</p>
-                              {m1Result.success && (
+                              <p className="text-xs sm:text-sm font-bold leading-relaxed">{m1Result.message}</p>
+                              <div className="mt-3 flex flex-wrap items-center gap-2">
                                 <button
+                                  type="button"
                                   onClick={() => { setGameStage('mission2'); playSound('click', soundEnabled); }}
-                                  className="mt-2.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-extrabold shadow-md transition inline-flex items-center space-x-1.5"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow-md transition inline-flex items-center space-x-1.5 cursor-pointer"
                                 >
-                                  <span>ไปทำ Mission 2 (Step Master)</span>
+                                  <span>ไปต่อ Mission 2 (Step Master)</span>
                                   <ArrowRight className="w-3.5 h-3.5" />
                                 </button>
-                              )}
+                                {!m1Result.success && (
+                                  <button
+                                    type="button"
+                                    onClick={initMission1}
+                                    className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>ลองสลับตำแหน่งอีกครั้ง</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}
+
                       </div>
 
                     </div>
@@ -2651,28 +2830,42 @@ export default function App() {
 
                           {m2Result && (
                             <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold animate-fadeIn ${
-                              m2Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-rose-50 border-rose-300 text-rose-900'
+                              m2Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
                             }`}>
-                              <p>{m2Result.message}</p>
-                              {m2Result.success && m2LevelIdx < STEP_MASTER_LEVELS.length - 1 && (
-                                <button
-                                  onClick={() => setM2LevelIdx(prev => prev + 1)}
-                                  className="mt-2.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition"
-                                >
-                                  ไปต่อระดับถัดไป ➔
-                                </button>
-                              )}
-                              {m2Result.success && m2LevelIdx >= STEP_MASTER_LEVELS.length - 1 && (
-                                <button
-                                  onClick={() => { setGameStage('mission3'); playSound('click', soundEnabled); }}
-                                  className="mt-2.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow inline-flex items-center space-x-1.5 transition"
-                                >
-                                  <span>ผ่านด่าน 2! ไป Mission 3 (Flow Reader)</span>
-                                  <ArrowRight className="w-3.5 h-3.5" />
-                                </button>
-                              )}
+                              <p className="leading-relaxed">{m2Result.message}</p>
+                              <div className="mt-3 flex flex-wrap items-center gap-2">
+                                {m2LevelIdx < STEP_MASTER_LEVELS.length - 1 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setM2LevelIdx(prev => prev + 1)}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow transition cursor-pointer"
+                                  >
+                                    ไปต่อระดับ {m2LevelIdx + 2} ➔
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setGameStage('mission3'); playSound('click', soundEnabled); }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
+                                  >
+                                    <span>ไป Mission 3 (Flow Reader)</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                {!m2Result.success && (
+                                  <button
+                                    type="button"
+                                    onClick={() => initMission2(m2LevelIdx)}
+                                    className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>ลองจัดลำดับใหม่</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           )}
+
                         </div>
                       </div>
                     </div>
@@ -2790,28 +2983,42 @@ export default function App() {
 
                       {m3Result && (
                         <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold animate-fadeIn ${
-                          m3Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-rose-50 border-rose-300 text-rose-900'
+                          m3Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
                         }`}>
-                          <p>{m3Result.message}</p>
-                          {m3Result.success && m3LevelIdx < FLOW_READER_LEVELS.length - 1 && (
-                            <button
-                              onClick={() => setM3LevelIdx(prev => prev + 1)}
-                              className="mt-2.5 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition"
-                            >
-                              ไปอ่านผังงานระดับถัดไป ➔
-                            </button>
-                          )}
-                          {m3Result.success && m3LevelIdx >= FLOW_READER_LEVELS.length - 1 && (
-                            <button
-                              onClick={() => { setGameStage('mission4'); playSound('click', soundEnabled); }}
-                              className="mt-2.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow inline-flex items-center space-x-1.5 transition"
-                            >
-                              <span>ผ่านด่าน 3! ไป Mission 4 (Bug Detective)</span>
-                              <ArrowRight className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <p className="leading-relaxed">{m3Result.message}</p>
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            {m3LevelIdx < FLOW_READER_LEVELS.length - 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => setM3LevelIdx(prev => prev + 1)}
+                                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow transition cursor-pointer"
+                              >
+                                ไปอ่านผังงานระดับ {m3LevelIdx + 2} ➔
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => { setGameStage('mission4'); playSound('click', soundEnabled); }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
+                              >
+                                <span>ไป Mission 4 (Bug Detective)</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {!m3Result.success && (
+                              <button
+                                type="button"
+                                onClick={() => setM3Answers({})}
+                                className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                                <span>ลองตอบใหม่อีกครั้ง</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
+
 
                     </div>
                   </div>
@@ -2967,20 +3174,32 @@ export default function App() {
 
                             {m4Result && (
                               <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold animate-fadeIn ${
-                                m4Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-rose-50 border-rose-300 text-rose-900'
+                                m4Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
                               }`}>
-                                <p>{m4Result.message}</p>
-                                {m4Result.success && (
+                                <p className="leading-relaxed">{m4Result.message}</p>
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
                                   <button
+                                    type="button"
                                     onClick={() => { setGameStage('final'); playSound('click', soundEnabled); }}
-                                    className="mt-2.5 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow inline-flex items-center space-x-1.5 transition"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
                                   >
-                                    <span>ไปสู่ FINAL MISSION (Flowchart Designer)</span>
+                                    <span>ไปสู่ FINAL MISSION (Algorithm Forge)</span>
                                     <ArrowRight className="w-3.5 h-3.5" />
                                   </button>
-                                )}
+                                  {!m4Result.success && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setM4Answers({ step1: null, step2: null, step3: null })}
+                                      className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer"
+                                    >
+                                      <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                                      <span>ลองสืบหาใหม่อีกรอบ</span>
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             )}
+
 
                           </>
                         );
