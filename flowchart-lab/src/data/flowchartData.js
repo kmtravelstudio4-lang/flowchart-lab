@@ -29,7 +29,8 @@ export const LEARNING_CHAPTERS = [
       }
     ],
     targetMissionIdx: 0,
-    targetMissionName: 'ด่าน 1: รู้จักสัญลักษณ์ (Symbol Hunter)'
+    targetMissionName: 'ด่าน 1: รู้จักสัญลักษณ์ (Symbol Hunter)',
+    pdfUrl: 'https://drive.google.com/file/d/1o1yiGrO_Kv5Re782rDkev7o4XYbcx2CD/view?usp=sharing'
   },
   {
     id: 'ch2',
@@ -77,8 +78,10 @@ export const LEARNING_CHAPTERS = [
       }
     ],
     targetMissionIdx: 0,
-    targetMissionName: 'ด่าน 1: รู้จักสัญลักษณ์ (Symbol Hunter)'
+    targetMissionName: 'ด่าน 1: รู้จักสัญลักษณ์ (Symbol Hunter)',
+    pdfUrl: 'https://drive.google.com/file/d/1_ObmghOM2pd0yczYzvoGmMBngt_W_WRk/view?usp=sharing'
   },
+
   {
     id: 'ch3',
     chapterNum: 3,
