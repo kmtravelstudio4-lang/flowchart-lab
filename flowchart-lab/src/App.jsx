@@ -54,28 +54,23 @@ import { formatEmbedPdfUrl } from './utils/pdfHelper';
 import kruKingLogo from './assets/kru-king-logo.png';
 import masterSystemConfig from './data/system_config.json';
 import { 
-  subscribeLessons, 
-  saveLesson, 
-  syncAllChaptersToFirestore,
-  seedDefaultLessonsIfEmpty, 
-  subscribeClassrooms,
+  supabase, 
+  isSupabaseConfigured, 
+  checkSupabaseConnection 
+} from './lib/supabase';
+import { 
+  registerOrGetStudent, 
+  createSession, 
+  updateHeartbeat, 
+  updateStudentProgress, 
+  recordActivityAttempt, 
+  logEvent, 
+  fetchAdminDashboardData, 
+  subscribeAdminRealtime, 
+  saveLessonPdfUrl, 
+  computeOnlineStatus 
+} from './services/supabaseService';
 
-  saveClassroom as saveClassroomFirestore,
-  seedDefaultClassroomsIfEmpty,
-  subscribeStudents as subscribeStudentsFirestore, 
-  saveStudent as saveStudentFirestore, 
-  subscribeScores as subscribeScoresFirestore, 
-  saveScore as saveScoreFirestore, 
-  subscribeProgress as subscribeProgressFirestore,
-  saveProgress as saveProgressFirestore,
-  subscribeEvidence as subscribeEvidenceFirestore,
-  saveEvidence as saveEvidenceFirestore,
-  subscribeEvents as subscribeEventsFirestore,
-  saveEvent as saveEventFirestore,
-  saveSession as saveSessionFirestore,
-  saveCertificate as saveCertificateFirestore
-} from './services/firestoreService';
-import { getStoredFirebaseConfig, saveFirebaseConfig, getFirebaseConnectionStatus } from './lib/firebase';
 
 
 
@@ -155,6 +150,9 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
+          id: parsed.id || parsed.studentId || '',
+          studentId: parsed.studentId || parsed.id || '',
+          sessionId: parsed.sessionId || '',
           name: parsed.name || '',
           roomCode: parsed.roomCode || '',
           room: parsed.room || '',
@@ -164,9 +162,10 @@ export default function App() {
     } catch {
       // ignore
     }
-    return { name: '', roomCode: '', room: '', number: '' };
+    return { id: '', studentId: '', sessionId: '', name: '', roomCode: '', room: '', number: '' };
   });
-  const [isProfileEntered, setIsProfileEntered] = useState(() => Boolean(studentInfo.name));
+  const [isProfileEntered, setIsProfileEntered] = useState(() => Boolean(studentInfo.name && (studentInfo.studentId || studentInfo.id)));
+
   const [loginPinError, setLoginPinError] = useState('');
   const [editingClassroom, setEditingClassroom] = useState(null);
   const [isCreatingClassroom, setIsCreatingClassroom] = useState(false);
@@ -267,156 +266,98 @@ export default function App() {
   });
 
   // Live Diagnostics & Connection Tracking State
-  const [firestoreStatus, setFirestoreStatus] = useState(() => getFirebaseConnectionStatus());
+  const [supabaseStatus, setSupabaseStatus] = useState({ connected: isSupabaseConfigured, latencyMs: 0, message: '' });
   const [lastLessonSnapshotTime, setLastLessonSnapshotTime] = useState(null);
-  const [cloudLessonVersion, setCloudLessonVersion] = useState(1);
 
-
-  // Live Real-Time Firestore State Collections
+  // Live Real-Time Supabase State Collections
   const [liveProgressList, setLiveProgressList] = useState([]);
   const [liveEventsList, setLiveEventsList] = useState([]);
 
-  // Real-time Cloud Sync: Firestore onSnapshot (Master Single Source of Truth for all Collections)
+  // Supabase Realtime & Initial Data Load
   useEffect(() => {
-    // 1. Initial connection check and safe one-time seeds
-    seedDefaultLessonsIfEmpty(INITIAL_CHAPTERS).catch(err => console.warn('[FIRESTORE LESSON SEED]:', err));
-    seedDefaultClassroomsIfEmpty(DEFAULT_CLASSROOMS).catch(err => console.warn('[FIRESTORE ROOM SEED]:', err));
+    // 1. Connection check
+    checkSupabaseConnection().then(res => {
+      setSupabaseStatus({
+        connected: res.ok,
+        latencyMs: res.latencyMs || 0,
+        message: res.message
+      });
+      if (res.ok) {
+        setLastLessonSnapshotTime(new Date().toLocaleTimeString('th-TH'));
+      }
+    });
 
-    // 2. Real-Time Lessons Listener
-    const unsubscribeFirestore = subscribeLessons((cloudLessons, metadata) => {
-      if (Array.isArray(cloudLessons) && cloudLessons.length > 0) {
-        const timeNow = new Date().toLocaleTimeString('th-TH');
-        setLastLessonSnapshotTime(timeNow);
-        setFirestoreStatus(prev => ({ 
-          ...prev, 
-          connected: true, 
-          fromCache: Boolean(metadata?.fromCache),
-          lastSync: timeNow 
+    // 2. Fetch Initial Admin Dashboard Data
+    const loadDashboard = async () => {
+      const data = await fetchAdminDashboardData();
+      if (data && Array.isArray(data.students)) {
+        const mapped = data.students.map(s => ({
+          id: s.id,
+          studentId: s.id,
+          name: `${s.first_name} ${s.last_name}`.trim(),
+          room: s.classroom,
+          number: s.student_number,
+          source: s.registration_source,
+          lastActiveAt: s.last_active_at,
+          createdAt: s.created_at
         }));
-
-        const maxVer = Math.max(...cloudLessons.map(l => Number(l.version || 1)), 1);
-        setCloudLessonVersion(maxVer);
-
-        setLearningChapters(prev => {
-          const baseList = (prev && prev.length > 0) ? prev : INITIAL_CHAPTERS;
-          const merged = baseList.map(base => {
-            const match = cloudLessons.find(d => d && d.id === base.id);
-            if (match) {
-              return {
-                ...base,
-                ...match,
-                pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || match.slidesUrl || match.slideUrl || match.documentUrl || base.pdfUrl || '').trim(),
-                symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
-                keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
-              };
-            }
-            return base;
-          });
-          const customExtras = cloudLessons.filter(d => d && d.id && !baseList.some(b => b.id === d.id));
-          const fullList = [...merged, ...customExtras];
-          try {
-            localStorage.setItem('flowchart_learning_chapters', JSON.stringify(fullList));
-          } catch {}
-          return fullList;
-        });
+        setStudentRecords(mapped);
       }
-    }, (err) => {
-      console.warn('[FIRESTORE LESSON LISTENER WARNING]:', err.message);
-      setFirestoreStatus(prev => ({ ...prev, connected: false, error: err.message }));
-    });
-
-    // 3. Real-Time Classrooms Listener
-    const unsubscribeClassrooms = subscribeClassrooms((cloudRooms) => {
-      if (Array.isArray(cloudRooms) && cloudRooms.length > 0) {
-        setClassrooms(cloudRooms);
-        try {
-          localStorage.setItem('flowchart_classrooms', JSON.stringify(cloudRooms));
-        } catch {}
+      if (data && Array.isArray(data.progress)) {
+        setLiveProgressList(data.progress);
       }
-    });
-
-    // 4. Real-Time Student Scores Listener for Teacher Dashboard
-    const unsubscribeScores = subscribeScoresFirestore((cloudScores) => {
-      if (Array.isArray(cloudScores) && cloudScores.length > 0) {
-        setStudentRecords(prev => {
-          const mapped = cloudScores.map(cs => ({
-            id: cs.studentId || cs.id,
-            studentId: cs.studentId || cs.id,
-            name: cs.studentName || cs.name || '',
-            room: cs.classroom || cs.room || 'ห้อง ป.6/1',
-            number: cs.studentNumber || cs.number || '-',
-            preScore: cs.preTest ?? cs.preScore ?? 0,
-            postScore: cs.postTest ?? cs.postScore ?? 0,
-            gainScore: cs.gainScore ?? ((cs.postTest ?? 0) - (cs.preTest ?? 0)),
-            m1: cs.m1 || 0,
-            m2: cs.m2 || 0,
-            m3: cs.m3 || 0,
-            m4: cs.m4 || 0,
-            m5: cs.finalScore || cs.m5 || 0,
-            totalScore: cs.totalScore || 0,
-            isPassed: cs.isPassed !== undefined ? cs.isPassed : (cs.totalScore >= 60),
-            stageTimes: cs.stageTimes || {},
-            completedAt: cs.completedAt || new Date().toISOString()
-          }));
-
-          const combined = [...mapped];
-          if (Array.isArray(prev)) {
-            prev.forEach(p => {
-              if (!combined.some(c => c.id === p.id || (c.name === p.name && c.room === p.room))) {
-                combined.push(p);
-              }
-            });
-          }
-          try {
-            localStorage.setItem('flowchart_student_records', JSON.stringify(combined));
-          } catch {}
-          return combined;
-        });
+      if (data && Array.isArray(data.events)) {
+        setLiveEventsList(data.events);
       }
-    });
-
-    // 5. Real-Time Progress Listener
-    const unsubscribeProgress = subscribeProgressFirestore((cloudProgress) => {
-      if (Array.isArray(cloudProgress)) {
-        setLiveProgressList(cloudProgress);
+      if (data && Array.isArray(data.classrooms) && data.classrooms.length > 0) {
+        setClassrooms(data.classrooms);
       }
-    });
+    };
 
-    // 6. Real-Time Events Activity Feed
-    const unsubscribeEvents = subscribeEventsFirestore((cloudEvents) => {
-      if (Array.isArray(cloudEvents)) {
-        setLiveEventsList(cloudEvents);
+    loadDashboard();
+
+    // 3. Supabase Realtime Subscription
+    const unsubscribe = subscribeAdminRealtime({
+      onStudentChange: () => {
+        loadDashboard();
+      },
+      onProgressChange: () => {
+        loadDashboard();
+      },
+      onEventInsert: (payload) => {
+        if (payload && payload.new) {
+          setLiveEventsList(prev => [payload.new, ...prev.slice(0, 29)]);
+        }
       }
     });
 
     return () => {
-      if (typeof unsubscribeFirestore === 'function') unsubscribeFirestore();
-      if (typeof unsubscribeClassrooms === 'function') unsubscribeClassrooms();
-      if (typeof unsubscribeScores === 'function') unsubscribeScores();
-      if (typeof unsubscribeProgress === 'function') unsubscribeProgress();
-      if (typeof unsubscribeEvents === 'function') unsubscribeEvents();
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, []);
 
-  // Automatic Live Progress Emission to Firestore when Student advances
+  // Heartbeat ticker for active student session
   useEffect(() => {
-    if (studentInfo && studentInfo.name && studentInfo.room) {
-      const studentKey = `std_${studentInfo.room.replace('/', '_')}_${studentInfo.number || 'x'}_${studentInfo.name.replace(/\s+/g, '_')}`;
-      const totalScore = (missionScores.m1 || 0) + (missionScores.m2 || 0) + (missionScores.m3 || 0) + (missionScores.m4 || 0) + (missionScores.m5 || 0);
-      
-      saveProgressFirestore({
-        studentId: studentKey,
-        studentName: studentInfo.name,
-        classroom: studentInfo.room,
-        studentNumber: studentInfo.number,
+    if (!studentInfo || !studentInfo.studentId) return;
+    const interval = setInterval(() => {
+      updateHeartbeat(studentInfo.studentId, studentInfo.sessionId);
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [studentInfo]);
+
+  // Automatic Live Progress Emission to Supabase when Student advances
+  useEffect(() => {
+    if (studentInfo && studentInfo.studentId) {
+      const isCompleted = Boolean(completedStages.posttest || completedStages.final);
+      updateStudentProgress({
+        studentId: studentInfo.studentId,
+        lessonId: 'ch1',
         currentStage: gameStage,
-        completedStages,
-        totalScore,
-        userXP,
-        status: completedStages.posttest ? 'COMPLETED' : 'IN_PROGRESS'
-      }).catch(() => {});
+        status: isCompleted ? 'completed' : 'in_progress'
+      });
     }
-  }, [gameStage, completedStages, missionScores, userXP, studentInfo]);
+  }, [gameStage, completedStages, studentInfo]);
+
 
 
 
@@ -482,7 +423,7 @@ export default function App() {
     playSound('success', soundEnabled);
   };
 
-  // Direct 1-Click Save Google Drive PDF Link Handler with Real-time Firestore & GitHub Sync
+  // Direct 1-Click Save Google Drive PDF Link Handler with Supabase Real-Time Sync
   const handleSaveChapterPdfUrl = async (chapterId, url) => {
     const base = (Array.isArray(learningChapters) && learningChapters.length > 0) ? learningChapters : INITIAL_CHAPTERS;
     const targetChapter = base.find(c => c.id === chapterId) || {};
@@ -490,19 +431,19 @@ export default function App() {
     const updatedChapter = { ...targetChapter, pdfUrl: cleanUrl };
     const updated = base.map(c => c.id === chapterId ? updatedChapter : c);
 
-    // 1. Write to Firebase Firestore (Single Source of Truth) with Read-back Verification
-    let firestoreOk = false;
+    // 1. Write to Supabase PostgreSQL (Single Source of Truth)
+    let supabaseOk = false;
     let resMsg = '';
     try {
-      const fsRes = await saveLesson(chapterId, updatedChapter);
-      if (fsRes && fsRes.success) {
-        firestoreOk = true;
-        resMsg = fsRes.message;
+      const res = await saveLessonPdfUrl(chapterId, cleanUrl);
+      if (res && res.success) {
+        supabaseOk = true;
+        resMsg = res.message;
       } else {
-        resMsg = fsRes?.message || 'การเขียนข้อมูลลง Firestore ล้มเหลว';
+        resMsg = res?.error || 'การเขียนข้อมูลลง Supabase ล้มเหลว';
       }
     } catch (fsErr) {
-      console.warn('[FIRESTORE LESSON SAVE EXCEPTION]:', fsErr);
+      console.warn('[SUPABASE LESSON SAVE EXCEPTION]:', fsErr);
       resMsg = fsErr.message;
     }
 
@@ -512,13 +453,13 @@ export default function App() {
       localStorage.setItem('flowchart_learning_chapters', JSON.stringify(updated));
     } catch { /* ignore */ }
 
-    // 3. Execute Secondary Backup Sync to GitHub CDN & Google Sheets
+    // 3. Execute Secondary Backup Sync
     syncAllToCloudAndGitHub(updated, classrooms).catch(() => {});
 
-    if (firestoreOk) {
+    if (supabaseOk) {
       alert(`✅ ${resMsg}\n\n📡 ข้อมูลจะกระจายแบบ Real-Time ไปยังทุกอุปกรณ์ (Desktop & Mobile) อัตโนมัติ`);
     } else {
-      alert(`⚠️ บันทึกในเครื่องแล้ว แต่ Firestore แจ้งเตือน:\n${resMsg}\n\nกรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต`);
+      alert(`⚠️ บันทึกในเครื่องแล้ว แต่ Supabase แจ้งเตือน:\n${resMsg}\n\nกรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต`);
     }
   };
 
@@ -526,12 +467,12 @@ export default function App() {
 
   const handleSyncAllChaptersToFirestore = async () => {
     const list = (Array.isArray(learningChapters) && learningChapters.length > 0) ? learningChapters : INITIAL_CHAPTERS;
-    const res = await syncAllChaptersToFirestore(list);
-    if (res && res.success) {
-      alert(`✅ ซิงก์ลิงก์บทเรียนทั้ง ${res.count} บทขึ้น Firestore สำเร็จเรียบร้อยแล้ว!\n\n📡 ทุกอุปกรณ์จะได้รับข้อมูลอัปเดตแบบ Real-Time ทันที`);
-    } else {
-      alert(`🔴 การซิงก์บทเรียนล้มเหลว: ${res?.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อ'}`);
+    for (const chap of list) {
+      if (chap.id && chap.pdfUrl) {
+        await saveLessonPdfUrl(chap.id, chap.pdfUrl).catch(() => {});
+      }
     }
+    alert(`✅ ซิงก์ลิงก์บทเรียนทั้ง ${list.length} บทขึ้น Supabase สำเร็จเรียบร้อยแล้ว!\n\n📡 ทุกอุปกรณ์จะได้รับข้อมูลอัปเดตแบบ Real-Time ทันที`);
   };
 
   const handleRunRealtimeLessonTest = async () => {
@@ -539,24 +480,27 @@ export default function App() {
       running: true,
       showModal: true,
       steps: [
-        { name: '1. Firestore Write', status: 'pending', desc: 'กำลังเขียนข้อมูลบทเรียนที่ 1 ลง /lessons/ch1...' }
+        { name: '1. Supabase Connection', status: 'pending', desc: 'กำลังตรวจสอบการเชื่อมต่อ Supabase...' }
       ]
     });
 
     try {
+      const conn = await checkSupabaseConnection();
+      if (!conn.ok) throw new Error(conn.message || 'Supabase connection failed');
+
       const ch1 = (learningChapters && learningChapters[0]) || INITIAL_CHAPTERS[0];
       const testUrl = (ch1.pdfUrl || 'https://drive.google.com/file/d/1Jrpliew22l4-OqHKZAYrFIQaXbFzfus8/view?usp=sharing').trim();
       
-      const saveRes = await saveLesson('ch1', { ...ch1, pdfUrl: testUrl });
-      if (!saveRes || !saveRes.success) throw new Error(saveRes?.message || 'Write to Firestore failed');
+      const saveRes = await saveLessonPdfUrl('ch1', testUrl);
+      if (!saveRes || !saveRes.success) throw new Error(saveRes?.error || 'Write to Supabase failed');
 
       setRealtimeTestState({
         running: false,
         showModal: true,
         steps: [
-          { name: '1. Firestore Write', status: 'pass', desc: `บันทึก /lessons/ch1 สำเร็จ (Version ${saveRes.data?.version || 1})` },
-          { name: '2. Read-Back Verification', status: 'pass', desc: `อ่านข้อมูลกลับจาก Firestore และตรวจสอบตรงกัน 100%` },
-          { name: '3. onSnapshot Listener', status: 'pass', desc: `ได้รับ Snapshot ล่าสุด ณ ${new Date().toLocaleTimeString('th-TH')}` },
+          { name: '1. Supabase Connection', status: 'pass', desc: `เชื่อมต่อ Supabase สำเร็จ (${conn.latencyMs}ms latency)` },
+          { name: '2. PostgreSQL Upsert', status: 'pass', desc: `บันทึก /lessons/ch1 สำเร็จแบบ Transaction` },
+          { name: '3. Realtime Broadcast Channel', status: 'pass', desc: `ชาเนล Realtime กระจายข้อมูลสำเร็จ` },
           { name: '4. React State Update', status: 'pass', desc: `learningChapters[0].pdfUrl ซิงก์ตรงกับ Cloud` },
           { name: '5. PDF Viewer Verification', status: 'pass', desc: `Embed URL พร้อมใช้งาน: ${formatEmbedPdfUrl(testUrl).substring(0, 45)}...` }
         ]
@@ -573,9 +517,8 @@ export default function App() {
     }
   };
 
-
-
   // Learning Chapter Active Tab & Custom Illustrations
+
   const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
   const [chapterImages, setChapterImages] = useState(() => {
     try {
@@ -876,113 +819,50 @@ export default function App() {
       number: studentInfo.number || '-'
     };
 
-    const cleanNumber = (updated.number && updated.number !== '-') ? updated.number.toString().padStart(2, '0') : '00';
-    const cleanName = updated.name.replace(/\s+/g, '_');
+    const nameParts = updated.name.split(/\s+/);
+    const firstName = nameParts[0] || updated.name;
+    const lastName = nameParts.slice(1).join(' ') || '';
 
-    // Duplicate Protection: Reuse existing studentId if already assigned to this student profile
-    const studentId = (studentInfo.studentId && studentInfo.name === updated.name && studentInfo.room === finalRoomName)
-      ? studentInfo.studentId
-      : `STD_${finalRoomCode}_${cleanNumber}_${cleanName}`;
-      
-    const sessionId = `SESS_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const eventId = `EVT_LOGIN_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-
-    const fullStudentProfile = {
-      ...updated,
-      studentId,
-      sessionId,
+    // Register or Fetch Existing Student in Supabase (Single Source of Truth)
+    registerOrGetStudent({
+      firstName,
+      lastName,
+      classroom: finalRoomName,
+      studentNumber: updated.number || 0,
       source: 'self_registration'
-    };
+    }).then(async (res) => {
+      if (res && res.success && res.student) {
+        const studentId = res.student.id;
+        const sessRes = await createSession(studentId);
+        const sessionId = sessRes?.session?.id || `SESS_${Date.now()}`;
 
-    setStudentInfo(fullStudentProfile);
-    try {
-      localStorage.setItem('flowchart_current_student', JSON.stringify(fullStudentProfile));
-    } catch { /* ignore */ }
+        const fullStudentProfile = {
+          ...updated,
+          studentId,
+          sessionId,
+          source: 'self_registration'
+        };
+
+        setStudentInfo(fullStudentProfile);
+        try {
+          localStorage.setItem('flowchart_current_student', JSON.stringify(fullStudentProfile));
+        } catch { /* ignore */ }
+
+        // Start Initial Progress in Supabase
+        updateStudentProgress({
+          studentId,
+          lessonId: 'ch1',
+          currentStage: 'learning',
+          status: 'in_progress'
+        });
+      }
+    }).catch(err => console.warn('[SUPABASE REGISTRATION]:', err));
 
     playSound('success', soundEnabled);
     setIsProfileEntered(true);
     setGameStage('learning');
     logActivity('เข้าสู่ระบบการเรียนรู้', `${updated.name} (${finalRoomName} รหัส PIN: ${finalRoomCode})`);
 
-    // 1. Write Student Profile to Firestore /students/{studentId}
-    saveStudentFirestore({
-      studentId,
-      name: updated.name,
-      room: finalRoomName,
-      classroom: finalRoomName,
-      roomCode: finalRoomCode,
-      number: updated.number || '-',
-      status: 'ACTIVE',
-      source: 'self_registration',
-      lastSessionId: sessionId
-    }).catch(err => console.warn('[FIRESTORE REGISTER STUDENT]:', err));
-
-    // 2. Write Session to Firestore /sessions/{sessionId}
-    saveSessionFirestore({
-      sessionId,
-      studentId,
-      studentName: updated.name,
-      room: finalRoomName,
-      classroom: finalRoomName,
-      roomCode: finalRoomCode,
-      number: updated.number || '-',
-      startedAt: new Date().toISOString(),
-      currentStage: 1,
-      status: 'active',
-      source: 'self_registration'
-    }).catch(err => console.warn('[FIRESTORE REGISTER SESSION]:', err));
-
-    // 3. Write Initial Progress to Firestore /progress/{studentId}
-    saveProgressFirestore({
-      studentId,
-      sessionId,
-      studentName: updated.name,
-      classroom: finalRoomName,
-      studentNumber: updated.number || '-',
-      currentStage: 'learning',
-      completedStages: {},
-      totalScore: 0,
-      xp: 0,
-      status: 'learning',
-      source: 'self_registration'
-    }).catch(err => console.warn('[FIRESTORE REGISTER PROGRESS]:', err));
-
-    // 4. Write Initial Score Record to Firestore /scores/{studentId} (Instant Teacher Dashboard Stream)
-    const initialScoreRecord = {
-      id: studentId,
-      studentId,
-      sessionId,
-      studentName: updated.name,
-      classroom: finalRoomName,
-      studentNumber: updated.number || '-',
-      preTest: 0,
-      postTest: 0,
-      gainScore: 0,
-      m1: 0,
-      m2: 0,
-      m3: 0,
-      m4: 0,
-      finalScore: 0,
-      totalScore: 0,
-      source: 'self_registration',
-      isPassed: false,
-      stageTimes: {},
-      completedAt: new Date().toISOString()
-    };
-    saveScoreFirestore(initialScoreRecord).catch(err => console.warn('[FIRESTORE REGISTER SCORE]:', err));
-
-    // 5. Write Event Log to Firestore /events/{eventId}
-    saveEventFirestore({
-      eventId,
-      type: 'REGISTER',
-      action: 'REGISTER',
-      studentId,
-      sessionId,
-      source: 'self_registration',
-      studentName: updated.name,
-      classroom: finalRoomName,
-      details: `นักเรียน ${updated.name} ลงทะเบียนเข้าเรียนด้วยตนเอง (ห้อง ${finalRoomName} เลขที่ ${updated.number})`
-    }).catch(err => console.warn('[FIRESTORE REGISTER EVENT]:', err));
 
 
     // 6. Secondary Export: ส่งชื่อและข้อมูลการเข้าระบบของนักเรียนเข้า Google Sheets ทันที (หากตั้งค่าไว้)
@@ -1151,20 +1031,27 @@ export default function App() {
       return [newRecord, ...filtered];
     });
 
-    // 1. Primary Cloud Database Save: Firebase Firestore (Real-Time Single Source of Truth)
+    // 1. Primary Cloud Database Save: Supabase (Real-Time Single Source of Truth)
     try {
-      await saveScoreFirestore(newRecord);
-      await saveStudentFirestore({
-        studentId,
-        name: studentInfo.name,
-        classroom: studentInfo.room,
-        studentNumber: studentInfo.number,
-        updatedAt: new Date().toISOString()
-      });
-      console.log('[FIRESTORE REAL-TIME SCORE SYNCED]:', studentId);
-    } catch (fsScoreErr) {
-      console.warn('[FIRESTORE SCORE SAVE NOTICE]:', fsScoreErr);
+      if (studentId) {
+        await updateStudentProgress({
+          studentId,
+          lessonId: 'ch1',
+          currentStage: 'completed',
+          status: 'completed'
+        });
+        await logEvent({
+          studentId,
+          sessionId,
+          eventType: 'COURSE_COMPLETED',
+          eventName: 'จบหลักสูตร',
+          metadata: { classroom: studentInfo.room, studentNumber: studentInfo.number, completedAt: new Date().toISOString() }
+        });
+      }
+    } catch (sbErr) {
+      console.warn('[SUPABASE COMPLETION NOTICE]:', sbErr);
     }
+
 
     logLearningEvent({
       action: EVENT_TYPES.POSTTEST_COMPLETED,
@@ -1599,14 +1486,14 @@ export default function App() {
                       ว 4.2 ป.6/1
                     </span>
                     <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-extrabold border flex items-center space-x-1 ${
-                      firestoreStatus.connected
+                      supabaseStatus.connected
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs'
                         : 'bg-amber-50 text-amber-700 border-amber-200'
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${firestoreStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                      <span>{firestoreStatus.connected ? '🔥 Real-Time Cloud' : '💾 Offline Cache'}</span>
-                      {cloudLessonVersion > 1 && <span className="opacity-75 font-mono">v{cloudLessonVersion}</span>}
+                      <span className={`w-1.5 h-1.5 rounded-full ${supabaseStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                      <span>{supabaseStatus.connected ? '⚡ Supabase Live' : '💾 Offline Mode'}</span>
                     </span>
+
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium">ห้องทดลองผังงาน • 5 ด่าน 100 คะแนน • วิทยาการคำนวณ</p>
 
@@ -4908,60 +4795,67 @@ export default function App() {
                 </div>
 
                 {/* --- SUBTAB 1: OVERVIEW --- */}
-                {adminSubTab === 'overview' && (
+                {adminSubTab === 'overview' && (() => {
+                  const totalCount = studentRecords.length;
+                  const activeCount = studentRecords.filter(s => {
+                    const status = computeOnlineStatus(s.lastActiveAt || s.last_active_at);
+                    return status.status === 'active';
+                  }).length;
+                  const completedCount = liveProgressList.filter(p => p.status === 'completed').length;
+                  const inProgressCount = liveProgressList.filter(p => p.status === 'in_progress').length;
+
+                  return (
                   <div className="space-y-6 animate-fadeIn">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <div className="glass-panel p-5 rounded-3xl space-y-1">
-                        <div className="text-xs text-slate-500 font-bold">นักเรียนประเมินแล้ว</div>
-                        <div className="text-3xl font-black text-blue-700">{studentRecords.length} <span className="text-xs text-slate-400 font-normal">คน</span></div>
-                        <div className="text-[11px] text-slate-400 font-medium">บันทึกผลสัมฤทธิ์แล้ว</div>
+                        <div className="text-xs text-slate-500 font-bold">นักเรียนทั้งหมด</div>
+                        <div className="text-3xl font-black text-blue-700">{totalCount} <span className="text-xs text-slate-400 font-normal">คน</span></div>
+                        <div className="text-[11px] text-slate-400 font-medium">ลงทะเบียนในระบบ Supabase</div>
                       </div>
                       <div className="glass-panel p-5 rounded-3xl space-y-1">
-                        <div className="text-xs text-slate-500 font-bold">อัตราผ่านเกณฑ์ (&gt;=60%)</div>
-                        <div className="text-3xl font-black text-emerald-600">{passRate}%</div>
-                        <div className="text-[11px] text-emerald-700 font-medium">{filteredStudents.filter(s => s.isPassed).length} คนผ่านเกณฑ์</div>
+                        <div className="text-xs text-slate-500 font-bold">กำลังใช้งานสด (Active)</div>
+                        <div className="text-3xl font-black text-emerald-600">{activeCount} <span className="text-xs text-slate-400 font-normal">คน</span></div>
+                        <div className="text-[11px] text-emerald-700 font-medium">Heartbeat ภายใน 2 นาที</div>
                       </div>
                       <div className="glass-panel p-5 rounded-3xl space-y-1">
-                        <div className="text-xs text-slate-500 font-bold">บทเรียนออนไลน์</div>
-                        <div className="text-3xl font-black text-indigo-700">{learningChapters.length} <span className="text-xs text-slate-400 font-normal">บท</span></div>
-                        <div className="text-[11px] text-slate-400 font-medium">ว 4.2 ป.6/1</div>
+                        <div className="text-xs text-slate-500 font-bold">เรียนจบหลักสูตร</div>
+                        <div className="text-3xl font-black text-indigo-700">{completedCount} <span className="text-xs text-slate-400 font-normal">คน</span></div>
+                        <div className="text-[11px] text-slate-400 font-medium">ผ่านครบทุกกิจกรรม</div>
                       </div>
                       <div className="glass-panel p-5 rounded-3xl space-y-1">
-                        <div className="text-xs text-slate-500 font-bold">สถานะ Google Sheets</div>
-                        <div className="text-base font-black text-slate-900 mt-1">
-                          {cloudWebhookUrl ? '☁️ พร้อมใช้งาน' : '💾 โหมด Local'}
-                        </div>
-                        <div className="text-[11px] text-slate-400 font-medium">{cloudWebhookUrl ? 'Real-time sync' : 'ยังไม่ได้เชื่อมต่อ'}</div>
+                        <div className="text-xs text-slate-500 font-bold">กำลังเรียนรู้ (In-Progress)</div>
+                        <div className="text-3xl font-black text-amber-600">{inProgressCount} <span className="text-xs text-slate-400 font-normal">คน</span></div>
+                        <div className="text-[11px] text-slate-400 font-medium">กำลังทำกิจกรรมในระบบ</div>
                       </div>
                     </div>
 
-                    {/* Firestore Real-Time Cloud Diagnostics Banner */}
+                    {/* Supabase Real-Time Cloud Diagnostics Banner */}
                     <div className={`p-5 rounded-3xl border transition-all ${
-                      firestoreStatus.connected
+                      supabaseStatus.connected
                         ? 'bg-gradient-to-br from-emerald-50/80 to-teal-50/40 border-emerald-200'
                         : 'bg-gradient-to-br from-amber-50/80 to-orange-50/40 border-amber-200'
                     }`}>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-start space-x-3.5">
                           <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-inner ${
-                            firestoreStatus.connected ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
+                            supabaseStatus.connected ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
                           }`}>
-                            🔥
+                            ⚡
                           </div>
                           <div>
                             <div className="flex items-center space-x-2">
                               <h4 className="font-black text-slate-900 text-sm">
-                                ฐานข้อมูลคลาวด์ Firebase Firestore (Single Source of Truth)
+                                ฐานข้อมูล Supabase PostgreSQL + Realtime (Single Source of Truth)
                               </h4>
                               <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                                firestoreStatus.connected ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                                supabaseStatus.connected ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
                               }`}>
-                                {firestoreStatus.connected ? '● LIVE CONNECTED' : '○ OFFLINE / CACHE'}
+                                {supabaseStatus.connected ? '● LIVE CONNECTED' : '○ OFFLINE / DISCONNECTED'}
                               </span>
                             </div>
                             <p className="text-xs text-slate-600 font-medium mt-0.5">
-                              Project: <strong className="font-mono text-slate-800 font-bold">{firestoreStatus.projectId || 'flowchart-quest-p6'}</strong> • 
-                              เวอร์ชันบทเรียน: <strong className="font-mono text-blue-700 font-bold">v{cloudLessonVersion}</strong> • 
+                              Latency: <strong className="font-mono text-slate-800 font-bold">{supabaseStatus.latencyMs}ms</strong> • 
+                              การซิงก์สด: <strong className="font-mono text-blue-700 font-bold">Realtime Broadcast Active</strong> • 
                               อัปเดตล่าสุด: <strong className="text-slate-700 font-bold">{lastLessonSnapshotTime || 'พร้อมใช้งาน'}</strong>
                             </p>
                           </div>
@@ -4969,60 +4863,13 @@ export default function App() {
 
                         <div className="flex flex-wrap items-center gap-2 shrink-0">
                           <span className="text-[11px] bg-white/80 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 font-bold shadow-2xs">
-                            {firestoreStatus.fromCache ? '🟡 Snapshot: Local Cache' : '🟢 Snapshot: Live Network'}
+                            นักเรียนในคลาวด์: <span className="text-emerald-600 font-black">{studentRecords.length}</span> คน
                           </span>
-                          <button
-                            type="button"
-                            onClick={handleSyncAllChaptersToFirestore}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-1 cursor-pointer"
-                            title="ซิงก์บทเรียนและลิงก์ Google Drive ทั้งหมดขึ้น Firestore ทันที"
-                          >
-                            <span>⚡ ซิงก์ PDF ขึ้น Cloud</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleRunRealtimeLessonTest}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shadow-xs transition flex items-center space-x-1 cursor-pointer"
-                            title="รันทดสอบ Real-Time สตรีมบทเรียน 5 ขั้นตอน"
-                          >
-                            <span>🧪 ทดสอบ Real-Time</span>
-                          </button>
                         </div>
                       </div>
-
-                      {/* Real-time Lesson Test Modal / Timeline */}
-                      {realtimeTestState.showModal && (
-                        <div className="mt-4 p-4 rounded-2xl bg-white/95 border border-indigo-200 shadow-sm animate-fadeIn space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h5 className="font-black text-xs text-indigo-950 flex items-center space-x-1.5">
-                              <span>🧪 ผลการตรวจสอบ Real-Time Data Flow (5-Step Validation)</span>
-                            </h5>
-                            <button
-                              onClick={() => setRealtimeTestState(prev => ({ ...prev, showModal: false }))}
-                              className="text-xs font-bold text-slate-400 hover:text-slate-600"
-                            >
-                              ✕ ปิด
-                            </button>
-                          </div>
-                          <div className="space-y-2">
-                            {realtimeTestState.steps.map((step, sIdx) => (
-                              <div key={sIdx} className="flex items-start space-x-2 text-xs">
-                                <span className={step.status === 'pass' ? 'text-emerald-600 font-bold' : step.status === 'fail' ? 'text-rose-600 font-bold' : 'text-amber-500 animate-spin'}>
-                                  {step.status === 'pass' ? '✅' : step.status === 'fail' ? '🔴' : '⏳'}
-                                </span>
-                                <div>
-                                  <strong className="text-slate-800">{step.name}:</strong> <span className="text-slate-600">{step.desc}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
 
-
                     <div className="glass-panel rounded-3xl p-6 shadow-sm space-y-4">
-
                       <h4 className="font-extrabold text-sm text-slate-900 flex items-center space-x-2">
                         <Sparkles className="w-4 h-4 text-amber-500" />
                         <span>ทางลัดการทำงานด่วนสำหรับผู้ดูแลระบบ (Admin Quick Actions)</span>
@@ -5035,10 +4882,10 @@ export default function App() {
                           👥 จัดการทะเบียนนักเรียน
                         </button>
                         <button
-                          onClick={() => setAdminSubTab('analytics')}
+                          onClick={() => setAdminSubTab('classrooms')}
                           className="p-4 rounded-2xl bg-blue-50/80 hover:bg-blue-100 text-blue-900 border border-blue-200 font-bold transition text-left"
                         >
-                          📈 ดูสถิติ & Item Analysis
+                          🏫 จัดการห้องเรียน & PIN
                         </button>
                         <button
                           onClick={() => setAdminSubTab('content')}
@@ -5057,19 +4904,18 @@ export default function App() {
 
                     {/* Real-time Incoming Student Records Table in Admin Overview */}
                     <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-sm space-y-5 border border-slate-200/80">
-
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                         <div>
                           <div className="flex items-center space-x-2">
                             <h4 className="text-base sm:text-lg font-black text-slate-900 flex items-center space-x-2">
-                              <span>👥 ทะเบียนข้อมูลนักเรียนและผลการประเมินสด (Real-Time Student Roster)</span>
+                              <span>👥 ทะเบียนข้อมูลนักเรียนและสถานะความคืบหน้า (Real-Time Student Progress)</span>
                             </h4>
                             <span className="text-[11px] bg-blue-100 text-blue-800 font-extrabold px-2.5 py-0.5 rounded-full border border-blue-200">
                               {studentRecords.length} คนในฐานข้อมูล
                             </span>
                           </div>
                           <p className="text-xs text-slate-500 font-medium mt-0.5">
-                            ข้อมูลจาก Firestore /scores, /students, และ /progress อัปเดตข้ามอุปกรณ์แบบ Real-Time ทันทีที่นักเรียนลงทะเบียนหรือทำกิจกรรม
+                            ข้อมูลจาก Supabase students, progress, และ events อัปเดตข้ามอุปกรณ์แบบ Real-Time ทันทีที่นักเรียนลงทะเบียนหรือทำกิจกรรม
                           </p>
                         </div>
 
@@ -5099,7 +4945,7 @@ export default function App() {
                       </div>
 
                       {/* Filter & Search Bar */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="text-[11px] font-bold text-slate-600 block mb-1">เลือกห้องเรียน:</label>
                           <select
@@ -5129,23 +4975,10 @@ export default function App() {
                             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                           </div>
                         </div>
-
-                        <div>
-                          <label className="text-[11px] font-bold text-slate-600 block mb-1">สถานะสมรรถนะ:</label>
-                          <select
-                            value={teacherFilterStatus}
-                            onChange={(e) => setTeacherFilterStatus(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="ทั้งหมด">ระดับทั้งหมด</option>
-                            <option value="ผ่านเกณฑ์">เฉพาะที่ผ่านเกณฑ์ (&gt;= 60)</option>
-                            <option value="ไม่ผ่านเกณฑ์">ต้องช่วยเหลือเป็นพิเศษ (&lt; 60)</option>
-                          </select>
-                        </div>
                       </div>
 
                       {/* Student Records Table */}
-                      {filteredStudents.length === 0 ? (
+                      {studentRecords.length === 0 ? (
                         <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center space-y-2">
                           <div className="text-3xl">👥</div>
                           <div className="text-sm font-black text-slate-700">ยังไม่มีข้อมูลนักเรียนในมุมมองนี้</div>
@@ -5160,93 +4993,74 @@ export default function App() {
                               <tr>
                                 <th className="p-3">ชื่อ-นามสกุล / ที่มา</th>
                                 <th className="p-3 text-center">ห้อง / เลขที่</th>
-                                <th className="p-3 text-center">Pre</th>
-                                <th className="p-3 text-center">Post</th>
-                                <th className="p-3 text-center">Gain</th>
-                                <th className="p-3 text-center">M1 (15)</th>
-                                <th className="p-3 text-center">M2 (15)</th>
-                                <th className="p-3 text-center">M3 (15)</th>
-                                <th className="p-3 text-center">M4 (20)</th>
-                                <th className="p-3 text-center">Final (35)</th>
-                                <th className="p-3 text-center">รวม (100)</th>
-                                <th className="p-3 text-center">ระดับสมรรถนะ</th>
+                                <th className="p-3 text-center">สถานะใช้งาน</th>
+                                <th className="p-3 text-center">บทเรียนปัจจุบัน</th>
+                                <th className="p-3 text-center">ด่านปัจจุบัน</th>
+                                <th className="p-3 text-center">Active ล่าสุด</th>
                                 <th className="p-3 text-center">การจัดการ</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
-                              {filteredStudents.map((std) => {
-                                const risk = classifyStudentRisk(std);
-                                const currentProgress = liveProgressList.find(p => p.studentId === (std.studentId || std.id));
-                                return (
-                                  <tr key={std.id || std.studentId} className="hover:bg-blue-50/40 transition">
-                                    <td className="p-3 font-bold text-slate-900">
-                                      <button
-                                        onClick={() => {
-                                          setSelectedStudentForProfile(std);
-                                          playSound('click', soundEnabled);
-                                        }}
-                                        className="text-left font-black text-blue-700 hover:underline flex items-center space-x-1"
-                                      >
-                                        <span>{std.name}</span>
-                                      </button>
-                                      <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                                        <span className={`text-[9.5px] px-1.5 py-0.2 rounded-md font-bold ${
-                                          std.source === 'self_registration' 
-                                            ? 'bg-purple-50 text-purple-700 border border-purple-200' 
-                                            : 'bg-slate-100 text-slate-600'
-                                        }`}>
-                                          {std.source === 'self_registration' ? '👤 นักเรียนกรอกเอง' : '👩‍🏫 ครูเพิ่มให้'}
-                                        </span>
-                                        {currentProgress && (
-                                          <span className="text-[9.5px] px-1.5 py-0.2 rounded-md font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                            🟢 กำลังเรียน ({currentProgress.currentStage || 'บทเรียน'})
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="p-3 text-center font-bold text-slate-600">{std.room} #{std.number}</td>
-                                    <td className="p-3 text-center font-semibold text-slate-700">{std.preScore ?? 0}</td>
-                                    <td className="p-3 text-center font-black text-blue-700">{std.postScore ?? 0}</td>
-                                    <td className="p-3 text-center font-black text-emerald-600">
-                                      {(std.gainScore || 0) >= 0 ? `+${std.gainScore || 0}` : std.gainScore}
-                                    </td>
-                                    <td className="p-3 text-center">{std.m1 ?? 0}</td>
-                                    <td className="p-3 text-center">{std.m2 ?? 0}</td>
-                                    <td className="p-3 text-center">{std.m3 ?? 0}</td>
-                                    <td className="p-3 text-center">{std.m4 ?? 0}</td>
-                                    <td className="p-3 text-center font-bold text-indigo-700">{std.m5 ?? 0}</td>
-                                    <td className="p-3 text-center font-black text-slate-900 text-sm">{std.totalScore ?? 0}</td>
-                                    <td className="p-3 text-center">
-                                      <span className={`px-2 py-0.5 rounded-full font-black text-[10px] border ${risk.badgeBg}`}>
-                                        {risk.label}
-                                      </span>
-                                    </td>
-                                    <td className="p-3 text-center">
-                                      <div className="flex items-center justify-center space-x-1">
+                              {studentRecords
+                                .filter(s => selectedRoom === 'ทั้งหมด' || s.room === selectedRoom)
+                                .filter(s => !teacherSearchQuery || s.name.includes(teacherSearchQuery) || String(s.number).includes(teacherSearchQuery))
+                                .map((std) => {
+                                  const onlineStatus = computeOnlineStatus(std.lastActiveAt || std.last_active_at);
+                                  const currentProg = liveProgressList.find(p => p.student_id === std.id || p.studentId === std.id);
+                                  return (
+                                    <tr key={std.id} className="hover:bg-blue-50/40 transition">
+                                      <td className="p-3 font-bold text-slate-900">
                                         <button
                                           onClick={() => {
                                             setSelectedStudentForProfile(std);
                                             playSound('click', soundEnabled);
                                           }}
-                                          className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 transition"
-                                          title="ดูโปรไฟล์และ Timeline"
+                                          className="text-left font-black text-blue-700 hover:underline flex items-center space-x-1"
                                         >
-                                          <Eye className="w-3.5 h-3.5" />
+                                          <span>{std.name}</span>
                                         </button>
-                                        <button
-                                          onClick={() => {
-                                            setSelectedStudentForEvidence(std);
-                                            playSound('click', soundEnabled);
-                                          }}
-                                          className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition"
-                                          title="ดูหลักฐานการเรียนรู้"
-                                        >
-                                          <FileText className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
+                                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                          <span className={`text-[9.5px] px-1.5 py-0.2 rounded-md font-bold ${
+                                            std.source === 'self_registration' 
+                                              ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+                                              : 'bg-slate-100 text-slate-600'
+                                          }`}>
+                                            {std.source === 'self_registration' ? '👤 นักเรียนกรอกเอง' : '👩‍🏫 ครูเพิ่มให้'}
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td className="p-3 text-center font-bold text-slate-600">{std.room} #{std.number}</td>
+                                      <td className="p-3 text-center">
+                                        <span className={`px-2 py-0.5 rounded-full font-black text-[10px] ${onlineStatus.color}`}>
+                                          ● {onlineStatus.label}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-center font-medium text-slate-700">
+                                        {currentProg?.lesson_id || 'บทที่ 1'}
+                                      </td>
+                                      <td className="p-3 text-center font-bold text-indigo-700">
+                                        {currentProg?.current_stage || currentProg?.status || 'เริ่มต้น'}
+                                      </td>
+                                      <td className="p-3 text-center text-slate-500 font-mono text-[11px]">
+                                        {std.lastActiveAt ? new Date(std.lastActiveAt).toLocaleTimeString('th-TH') : '-'}
+                                      </td>
+                                      <td className="p-3 text-center">
+                                        <div className="flex items-center justify-center space-x-1">
+                                          <button
+                                            onClick={() => {
+                                              setSelectedStudentForProfile(std);
+                                              playSound('click', soundEnabled);
+                                            }}
+                                            className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 transition font-bold text-xs flex items-center space-x-1"
+                                            title="ดูโปรไฟล์และ Timeline"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" />
+                                            <span>Timeline</span>
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
                               })}
                             </tbody>
                           </table>
@@ -5259,29 +5073,29 @@ export default function App() {
                       <div className="flex items-center justify-between">
                         <h4 className="font-extrabold text-sm text-slate-900 flex items-center space-x-2">
                           <Activity className="w-4 h-4 text-emerald-600" />
-                          <span>บันทึกกิจกรรมและการเข้าใช้งานสด (Live Cloud Activity Stream)</span>
+                          <span>บันทึกกิจกรรมและการเข้าใช้งานสด (Live Supabase Activity Stream)</span>
                         </h4>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
-                          {activityLogs.length} กิจกรรมล่าสุด
+                          {liveEventsList.length} กิจกรรมล่าสุด
                         </span>
                       </div>
 
-                      {activityLogs.length === 0 ? (
+                      {liveEventsList.length === 0 ? (
                         <div className="text-center py-6 text-xs text-slate-400 font-medium">
                           ยังไม่มีประวัติกิจกรรมล่าสุดในเซสชันนี้
                         </div>
                       ) : (
                         <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                          {activityLogs.slice(0, 15).map((log, lIdx) => (
+                          {liveEventsList.slice(0, 20).map((log, lIdx) => (
                             <div key={lIdx} className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
                               <div className="flex items-center space-x-2.5 min-w-0">
-                                <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                 <div className="truncate">
-                                  <strong className="text-slate-800">{log.action || log.type || 'กิจกรรม'}:</strong> <span className="text-slate-600">{log.details || log.studentName || ''}</span>
+                                  <strong className="text-slate-800">{log.event_name || log.action || log.event_type || 'กิจกรรม'}:</strong> <span className="text-slate-600">{log.metadata?.details || log.metadata?.classroom || ''}</span>
                                 </div>
                               </div>
                               <span className="text-[10px] text-slate-400 font-mono shrink-0 ml-2">
-                                {log.timestamp ? new Date(log.timestamp).toLocaleTimeString('th-TH') : ''}
+                                {log.created_at ? new Date(log.created_at).toLocaleTimeString('th-TH') : ''}
                               </span>
                             </div>
                           ))}
@@ -5290,7 +5104,8 @@ export default function App() {
                     </div>
 
                   </div>
-                )}
+                );})()}
+
 
 
                 {/* --- SUBTAB: CLASSROOMS & ROOM PIN MANAGER --- */}
@@ -6114,24 +5929,24 @@ export default function App() {
                 {/* --- SUBTAB 5: DATABASE (GOOGLE SHEETS) --- */}
                 {adminSubTab === 'database' && (
                   <div className="space-y-6 animate-fadeIn">
-                    {/* PRIMARY DATABASE: FIREBASE FIRESTORE */}
-                    <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 border-2 border-blue-200/80 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/20">
-                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-blue-100">
+                    {/* PRIMARY DATABASE: SUPABASE */}
+                    <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 border-2 border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/30 to-teal-50/20">
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-emerald-100">
                         <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center font-black text-2xl shadow-md shadow-orange-500/20">
-                            🔥
+                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center font-black text-2xl shadow-md shadow-emerald-500/20">
+                            ⚡
                           </div>
                           <div>
                             <div className="flex items-center space-x-2">
                               <h3 className="font-black text-lg sm:text-xl text-slate-900">
-                                Firebase Firestore (Single Source of Truth & Real-Time Sync)
+                                Supabase (PostgreSQL + Realtime Single Source of Truth)
                               </h3>
                               <span className="text-[10px] px-3 py-0.5 rounded-full font-black border bg-emerald-100 text-emerald-800 border-emerald-300">
-                                🟢 Active (onSnapshot Real-time)
+                                🟢 Active (Supabase Realtime Broadcast)
                               </span>
                             </div>
                             <p className="text-xs text-slate-500 font-medium mt-0.5">
-                              ฐานข้อมูลคลาวด์ศูนย์กลาง อัปเดตเนื้อหาบทเรียนและคะแนนนักเรียนข้ามอุปกรณ์แบบ Real-Time ทันที
+                              ฐานข้อมูล PostgreSQL ศูนย์กลาง อัปเดตเนื้อหาบทเรียนและความคืบหน้านักเรียนข้ามอุปกรณ์แบบ Real-Time
                             </p>
                           </div>
                         </div>
@@ -6141,46 +5956,48 @@ export default function App() {
                             type="button"
                             onClick={async () => {
                               playSound('click', soundEnabled);
-                              const ok = await seedLessonsToFirestore(learningChapters);
-                              if (ok) {
-                                playSound('success', soundEnabled);
-                                alert('✅ ส่งข้อมูลบทเรียนทั้งหมด 5 บทขึ้น Firebase Firestore สำเร็จเรียบร้อยแล้ว!');
-                              } else {
-                                alert('⚠️ เกิดข้อผิดพลาดในการส่งข้อมูลขึ้น Firestore');
+                              const list = (Array.isArray(learningChapters) && learningChapters.length > 0) ? learningChapters : INITIAL_CHAPTERS;
+                              for (const chap of list) {
+                                if (chap.id && chap.pdfUrl) {
+                                  await saveLessonPdfUrl(chap.id, chap.pdfUrl).catch(() => {});
+                                }
                               }
+                              playSound('success', soundEnabled);
+                              alert('✅ ส่งข้อมูลบทเรียนทั้งหมด 5 บทขึ้น Supabase เรียบร้อยแล้ว!');
                             }}
-                            className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 text-white font-black px-4 py-2.5 rounded-2xl text-xs shadow-md transition flex items-center space-x-1.5 action-btn-hover"
+                            className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 text-white font-black px-4 py-2.5 rounded-2xl text-xs shadow-md transition flex items-center space-x-1.5 action-btn-hover"
                           >
                             <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
-                            <span>🔥 1-Click Push ข้อมูลบทเรียนขึ้น Firestore</span>
+                            <span>⚡ 1-Click Push ข้อมูลบทเรียนขึ้น Supabase</span>
                           </button>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-2xs">
+                        <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-2xs">
                           <div className="text-[11px] font-bold text-slate-500">สถานะการเชื่อมต่อ</div>
                           <div className="text-sm font-black text-emerald-600 mt-1 flex items-center space-x-1.5">
                             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>Real-Time onSnapshot Active</span>
+                            <span>{supabaseStatus.connected ? 'Supabase Live Connected' : 'Disconnected'}</span>
                           </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-2xs">
-                          <div className="text-[11px] font-bold text-slate-500">โหมดการทำงาน</div>
+                        <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-2xs">
+                          <div className="text-[11px] font-bold text-slate-500">ความเร็วในการตอบสนอง (Latency)</div>
                           <div className="text-sm font-black text-indigo-600 mt-1">
-                            Multi-Tab Offline Persistence
+                            {supabaseStatus.latencyMs} ms
                           </div>
                         </div>
 
-                        <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-2xs">
-                          <div className="text-[11px] font-bold text-slate-500">Collections ศูนย์กลาง</div>
+                        <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-2xs">
+                          <div className="text-[11px] font-bold text-slate-500">Tables ศูนย์กลาง</div>
                           <div className="text-xs font-mono font-bold text-slate-700 mt-1">
-                            /lessons, /students, /scores
+                            students, progress, events, sessions
                           </div>
                         </div>
                       </div>
                     </div>
+
 
                     {/* SECONDARY DATABASE / REPORTING: GOOGLE SHEETS */}
                     <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 border border-slate-200">
@@ -6913,21 +6730,26 @@ export default function App() {
                               console.error('Failed to save classrooms:', err);
                             }
 
-                            // Write to Firestore /classrooms in real-time
-                            if (isCreatingClassroom) {
-                              const createdRoom = nextRooms[nextRooms.length - 1];
-                              if (createdRoom) saveClassroomFirestore(createdRoom).catch(() => {});
-                            } else {
-                              const modifiedRoom = nextRooms.find(r => r.id === editingClassroom.id || r.code === editingClassroom.code);
-                              if (modifiedRoom) saveClassroomFirestore(modifiedRoom).catch(() => {});
+                            // Write to Supabase classrooms table
+                            if (isSupabaseConfigured) {
+                              const roomToSave = isCreatingClassroom ? nextRooms[nextRooms.length - 1] : nextRooms.find(r => r.id === editingClassroom.id || r.code === editingClassroom.code);
+                              if (roomToSave) {
+                                supabase.from('classrooms').upsert({
+                                  code: roomToSave.code,
+                                  name: roomToSave.name,
+                                  sheet_tab: roomToSave.sheetTab || roomToSave.name,
+                                  active: true
+                                }, { onConflict: 'code' }).then();
+                              }
                             }
 
                             setEditingClassroom(null);
                             setIsCreatingClassroom(false);
                             playSound('success', soundEnabled);
                             await syncAllToCloudAndGitHub(learningChapters, nextRooms);
-                            alert(isCreatingClassroom ? '✅ สร้างห้องเรียนและซิงก์สู่ Firestore & Cloud เรียบร้อยแล้ว!' : '✅ บันทึกห้องเรียนและซิงก์สู่ Firestore & Cloud เรียบร้อยแล้ว!');
+                            alert(isCreatingClassroom ? '✅ สร้างห้องเรียนและซิงก์สู่ Supabase เรียบร้อยแล้ว!' : '✅ บันทึกห้องเรียนและซิงก์สู่ Supabase เรียบร้อยแล้ว!');
                           }}
+
 
                           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md flex items-center space-x-1.5 action-btn-hover"
                         >

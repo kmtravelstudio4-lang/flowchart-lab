@@ -4,7 +4,8 @@ import {
   Check, X, AlertCircle, ChevronDown, Download, FileSpreadsheet, FileDown
 } from 'lucide-react';
 import { logActivity } from '../utils/auditLogger';
-import { subscribeStudents, saveStudent as saveStudentFirestore } from '../services/firestoreService';
+import { registerOrGetStudent } from '../services/supabaseService';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const STORAGE_ROSTER_KEY = 'flowchart_student_roster';
 
@@ -18,30 +19,45 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
     }
   });
 
-  // Subscribe to real-time students from Firestore
+  // Fetch & Subscribe to real-time students from Supabase
   useEffect(() => {
-    const unsubscribe = subscribeStudents((cloudStudents) => {
-      if (Array.isArray(cloudStudents) && cloudStudents.length > 0) {
-        setRoster(prev => {
-          const combined = [...cloudStudents];
-          if (Array.isArray(prev)) {
-            prev.forEach(p => {
-              if (!combined.some(c => c.studentId === p.studentId || (c.name === p.name && c.room === p.room))) {
-                combined.push(p);
-              }
-            });
-          }
-          try {
-            localStorage.setItem(STORAGE_ROSTER_KEY, JSON.stringify(combined));
-          } catch {}
-          return combined;
-        });
+    if (!isSupabaseConfigured) return;
+
+    const fetchStudents = async () => {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('classroom', { ascending: true })
+        .order('student_number', { ascending: true });
+
+      if (!error && Array.isArray(data)) {
+        const formatted = data.map(s => ({
+          studentId: s.id,
+          name: `${s.first_name} ${s.last_name}`.trim(),
+          room: s.classroom,
+          number: String(s.student_number),
+          status: 'ACTIVE',
+          createdAt: s.created_at,
+          lastActiveAt: s.last_active_at
+        }));
+        setRoster(formatted);
       }
-    });
+    };
+
+    fetchStudents();
+
+    const channel = supabase
+      .channel('roster_live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, () => {
+        fetchStudents();
+      })
+      .subscribe();
+
     return () => {
-      if (typeof unsubscribe === 'function') unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, []);
+
 
 
   // Handle Download CSV Template
@@ -110,34 +126,62 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
     }
 
     if (isAddingNew) {
-      const newStudent = {
-        studentId: formData.studentId.trim() || `STD_${Date.now()}_${Math.random().toString(36).substr(2, 3)}`,
-        name: formData.name.trim(),
-        room: formData.room,
-        number: formData.number.trim(),
-        status: formData.status || 'ACTIVE',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
+      const nameParts = formData.name.trim().split(/\s+/);
+      const firstName = nameParts[0] || formData.name.trim();
+      const lastName = nameParts.slice(1).join(' ') || '';
 
-      setRoster(prev => [newStudent, ...prev]);
-      saveStudentFirestore(newStudent).catch(() => {});
+      registerOrGetStudent({
+        firstName,
+        lastName,
+        classroom: formData.room,
+        studentNumber: formData.number.trim(),
+        source: 'teacher_roster'
+      }).then(res => {
+        if (res.success && res.student) {
+          const newEntry = {
+            studentId: res.student.id,
+            name: `${res.student.first_name} ${res.student.last_name}`.trim(),
+            room: res.student.classroom,
+            number: String(res.student.student_number),
+            status: 'ACTIVE',
+            createdAt: res.student.created_at,
+            lastActiveAt: res.student.last_active_at
+          };
+          setRoster(prev => [newEntry, ...prev.filter(p => p.studentId !== res.student.id)]);
+        }
+      });
+
       logActivity({
         action: 'ADD_STUDENT',
-        target: `${newStudent.name} (${newStudent.room})`,
+        target: `${formData.name} (${formData.room})`,
         result: 'SUCCESS'
       });
     } else if (editingStudent) {
+      const nameParts = formData.name.trim().split(/\s+/);
+      const firstName = nameParts[0] || formData.name.trim();
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      if (isSupabaseConfigured && editingStudent.studentId) {
+        supabase
+          .from('students')
+          .update({
+            first_name: firstName,
+            last_name: lastName,
+            classroom: formData.room,
+            student_number: parseInt(formData.number, 10) || 0
+          })
+          .eq('id', editingStudent.studentId)
+          .then();
+      }
+
       const updated = {
         ...editingStudent,
         name: formData.name.trim(),
         room: formData.room,
         number: formData.number.trim(),
-        status: formData.status,
-        updatedAt: new Date().toISOString()
+        status: formData.status
       };
       setRoster(prev => prev.map(s => s.studentId === editingStudent.studentId ? updated : s));
-      saveStudentFirestore(updated).catch(() => {});
 
       logActivity({
         action: 'EDIT_STUDENT',
@@ -152,8 +196,11 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
   };
 
   // Handle Delete Student
-  const handleDeleteStudent = (student) => {
+  const handleDeleteStudent = async (student) => {
     if (window.confirm(`คุณต้องการลบนักเรียน "${student.name}" (ห้อง ${student.room} เลขที่ ${student.number}) ออกจากทะเบียนใช่หรือไม่?`)) {
+      if (isSupabaseConfigured && student.studentId) {
+        await supabase.from('students').delete().eq('id', student.studentId);
+      }
       setRoster(prev => prev.filter(s => s.studentId !== student.studentId));
       logActivity({
         action: 'DELETE_STUDENT',
@@ -169,7 +216,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const text = event.target.result;
         const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
@@ -178,40 +225,38 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
           return;
         }
 
-        // Expected CSV format: ชื่อ,ห้อง,เลขที่
         let importedCount = 0;
-        const newStudents = [];
 
         for (let i = 1; i < lines.length; i++) {
           const parts = lines[i].split(',').map(p => p.trim().replace(/^"|"$/g, ''));
           if (parts.length >= 3) {
             const [name, room, number] = parts;
             if (name && room && number) {
-              const stdObj = {
-                studentId: `STD_${Date.now()}_${i}`,
-                name,
-                room,
-                number,
-                status: 'ACTIVE',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              };
-              newStudents.push(stdObj);
-              saveStudentFirestore(stdObj).catch(() => {});
+              const nameParts = name.trim().split(/\s+/);
+              const firstName = nameParts[0] || name.trim();
+              const lastName = nameParts.slice(1).join(' ') || '';
+
+              await registerOrGetStudent({
+                firstName,
+                lastName,
+                classroom: room,
+                studentNumber: number,
+                source: 'csv_import'
+              });
               importedCount++;
             }
           }
         }
 
 
-        if (newStudents.length > 0) {
-          setRoster(prev => [...newStudents, ...prev]);
+
+        if (importedCount > 0) {
           logActivity({
             action: 'IMPORT_STUDENTS_CSV',
             target: `${importedCount} นักเรียน`,
             result: 'SUCCESS'
           });
-          alert(`✅ นำเข้ารายชื่อนักเรียนสำเร็จทั้งหมด ${importedCount} คน`);
+          alert(`✅ นำเข้ารายชื่อนักเรียนขึ้นฐานข้อมูลสำเร็จทั้งหมด ${importedCount} คน`);
         }
       } catch (err) {
         alert(`เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: ${err.message}`);
@@ -219,6 +264,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
     };
     reader.readAsText(file, 'UTF-8');
   };
+
 
   // Filtered Roster
   const filteredRoster = roster.filter(s => {
