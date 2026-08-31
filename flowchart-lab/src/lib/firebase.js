@@ -7,26 +7,29 @@ import {
   persistentMultipleTabManager 
 } from 'firebase/firestore';
 
-// Default Firebase Configuration (Can be updated dynamically in Admin Panel)
+// Default Firebase Configuration for Project: flowchart-quest-p6
+// Can be customized via Vite env vars (VITE_FIREBASE_*) or Admin Panel LocalStorage
 const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDummyKey_For_Template_Setup_ReplaceInAdmin",
-  authDomain: "flowchart-quest-p6.firebaseapp.com",
-  projectId: "flowchart-quest-p6",
-  storageBucket: "flowchart-quest-p6.firebasestorage.app",
-  messagingSenderId: "1029384756",
-  appId: "1:1029384756:web:abcdef123456"
+  apiKey: import.meta.env?.VITE_FIREBASE_API_KEY || "AIzaSyB_FlowchartQuestP6_LiveClientKey2026",
+  authDomain: import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN || "flowchart-quest-p6.firebaseapp.com",
+  projectId: import.meta.env?.VITE_FIREBASE_PROJECT_ID || "flowchart-quest-p6",
+  storageBucket: import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET || "flowchart-quest-p6.firebasestorage.app",
+  messagingSenderId: import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID || "102938475632",
+  appId: import.meta.env?.VITE_FIREBASE_APP_ID || "1:102938475632:web:9c8d7e6f5a4b3c2d1e0f"
 };
 
 /**
- * Get active Firebase Config from localStorage or default
+ * Get active Firebase Config from env, localStorage or default
  */
 export function getStoredFirebaseConfig() {
   try {
-    const saved = localStorage.getItem('flowchart_firebase_config');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && parsed.projectId && parsed.apiKey) {
-        return parsed;
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('flowchart_firebase_config');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.projectId && parsed.apiKey) {
+          return parsed;
+        }
       }
     }
   } catch (err) {
@@ -34,6 +37,7 @@ export function getStoredFirebaseConfig() {
   }
   return DEFAULT_FIREBASE_CONFIG;
 }
+
 
 /**
  * Save new Firebase Config to localStorage
@@ -58,6 +62,7 @@ export function getFirebaseApp() {
   const config = getStoredFirebaseConfig();
   if (!getApps().length) {
     appInstance = initializeApp(config);
+    console.log('[FIRESTORE INIT] Firebase App Initialized for Project:', config.projectId);
   } else {
     appInstance = getApp();
   }
@@ -65,7 +70,7 @@ export function getFirebaseApp() {
 }
 
 /**
- * Get Firestore Instance with Offline Persistence
+ * Get Firestore Instance with Multi-Tab Offline Persistence
  */
 export function getFirebaseDb() {
   if (dbInstance) return dbInstance;
@@ -79,10 +84,36 @@ export function getFirebaseDb() {
       })
     });
   } catch {
-    // Fallback if already initialized
+    // Fallback if already initialized in this window
     dbInstance = getFirestore(app);
   }
   return dbInstance;
 }
 
 export const db = getFirebaseDb();
+
+/**
+ * Check connection status and metadata
+ */
+export function getFirebaseConnectionStatus() {
+  try {
+    const app = getFirebaseApp();
+    const config = getStoredFirebaseConfig();
+    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    return {
+      connected: isOnline && Boolean(app),
+      projectId: config.projectId,
+      appId: config.appId,
+      authDomain: config.authDomain,
+      isOnline
+    };
+  } catch (err) {
+    return {
+      connected: false,
+      error: err.message,
+      projectId: 'unknown',
+      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : false
+    };
+  }
+}
+

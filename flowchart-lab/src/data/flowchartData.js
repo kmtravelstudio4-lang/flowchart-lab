@@ -127,8 +127,10 @@ export const LEARNING_CHAPTERS = [
       }
     ],
     targetMissionIdx: 2,
-    targetMissionName: 'ด่าน 3: อ่านผังงาน (Flow Reader)'
+    targetMissionName: 'ด่าน 3: อ่านผังงาน (Flow Reader)',
+    pdfUrl: 'https://drive.google.com/file/d/1jEe3CBveyyh8y024CYm7BeI4OEKOOWXj/view?usp=sharing'
   },
+
   {
     id: 'ch5',
     chapterNum: 5,
@@ -152,9 +154,11 @@ export const LEARNING_CHAPTERS = [
       }
     ],
     targetMissionIdx: 3,
-    targetMissionName: 'ด่าน 4: นักสืบ Bug (Bug Detective)'
+    targetMissionName: 'ด่าน 4: นักสืบ Bug (Bug Detective)',
+    pdfUrl: 'https://drive.google.com/file/d/1o2nI6QAxBhq7BdTyuAiY1WfRdeWKmRNI/view?usp=sharing'
   }
 ];
+
 
 // --- Standard Flowchart Symbols Handbook ---
 export const ALL_FLOWCHART_SYMBOLS = [

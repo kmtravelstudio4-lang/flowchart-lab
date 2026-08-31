@@ -2,26 +2,42 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 1. Lessons Collection: Everyone can read, authenticated admin/teacher can write
+    // 1. Lessons Collection: Public read for all students/teachers, validated schema on write
     match /lessons/{lessonId} {
       allow read: if true;
-      allow write: if true; // In production, restrict to: request.auth != null
+      allow write: if request.resource.data.keys().hasAll(['id', 'title', 'version'])
+                   && request.resource.data.version >= 1;
     }
 
-    // 2. Students Collection: Students can create/update their own profile
+    // 2. Classrooms Collection: Read & write classroom lists and PIN codes
+    match /classrooms/{classroomId} {
+      allow read: if true;
+      allow write: if request.resource.data.keys().hasAll(['id', 'code', 'name'])
+                   && request.resource.data.code.size() > 0;
+    }
+
+    // 3. Students Collection: Read & write student profiles with required ID
     match /students/{studentId} {
-      allow read, write: if true;
+      allow read, write: if studentId != null && studentId.size() > 0;
     }
 
-    // 3. Scores Collection: Read/Write assessment scores
+    // 4. Scores Collection: Read/Write assessment scores with strict boundary checks
     match /scores/{studentId} {
       allow read: if true;
       allow write: if request.resource.data.totalScore <= 100 
+                   && request.resource.data.totalScore >= 0
                    && request.resource.data.preTest <= 10 
-                   && request.resource.data.postTest <= 10;
+                   && request.resource.data.preTest >= 0
+                   && request.resource.data.postTest <= 10
+                   && request.resource.data.postTest >= 0;
     }
 
-    // 4. Events & Evidence Collections
+    // 5. Progress Collection: Live stage tracking & student XP
+    match /progress/{studentId} {
+      allow read, write: if studentId != null && studentId.size() > 0;
+    }
+
+    // 6. Events & Learning Evidence Collections
     match /events/{eventId} {
       allow read, create: if true;
     }
@@ -30,8 +46,24 @@ service cloud.firestore {
       allow read, create: if true;
     }
 
-    // 5. System Configuration
+    // 7. Sessions Management
+    match /sessions/{sessionId} {
+      allow read, write: if true;
+    }
+
+    // 8. Certificates Verification Metadata
+    match /certificates/{certificateId} {
+      allow read: if true;
+      allow write: if request.resource.data.totalScore >= 0;
+    }
+
+    // 9. System Configuration & Question Bank
     match /systemConfig/{configId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /questionBank/{questionId} {
       allow read: if true;
       allow write: if true;
     }

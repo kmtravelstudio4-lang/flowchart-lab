@@ -1,11 +1,10 @@
-// Flowchart Quest - Student Roster Management Component (CRUD, CSV Template & CSV Import/Export)
-
 import React, { useState, useEffect } from 'react';
 import { 
   Users, UserPlus, Edit3, Trash2, Search, Upload, 
   Check, X, AlertCircle, ChevronDown, Download, FileSpreadsheet, FileDown
 } from 'lucide-react';
 import { logActivity } from '../utils/auditLogger';
+import { subscribeStudents, saveStudent as saveStudentFirestore } from '../services/firestoreService';
 
 const STORAGE_ROSTER_KEY = 'flowchart_student_roster';
 
@@ -19,29 +18,31 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
     }
   });
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [roomFilter, setRoomFilter] = useState('ALL');
-  const [editingStudent, setEditingStudent] = useState(null); // null | student object
-  const [isAddingNew, setIsAddingNew] = useState(false);
-  const [formError, setFormError] = useState('');
-
-  // Form State
-  const [formData, setFormData] = useState({
-    studentId: '',
-    name: '',
-    room: 'ป.6/1',
-    number: '',
-    status: 'ACTIVE' // 'ACTIVE' | 'INACTIVE'
-  });
-
-  // Save roster changes
+  // Subscribe to real-time students from Firestore
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_ROSTER_KEY, JSON.stringify(roster));
-    } catch (err) {
-      console.error('Failed to save roster:', err);
-    }
-  }, [roster]);
+    const unsubscribe = subscribeStudents((cloudStudents) => {
+      if (Array.isArray(cloudStudents) && cloudStudents.length > 0) {
+        setRoster(prev => {
+          const combined = [...cloudStudents];
+          if (Array.isArray(prev)) {
+            prev.forEach(p => {
+              if (!combined.some(c => c.studentId === p.studentId || (c.name === p.name && c.room === p.room))) {
+                combined.push(p);
+              }
+            });
+          }
+          try {
+            localStorage.setItem(STORAGE_ROSTER_KEY, JSON.stringify(combined));
+          } catch {}
+          return combined;
+        });
+      }
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
 
   // Handle Download CSV Template
   const handleDownloadCSVTemplate = () => {
@@ -120,20 +121,23 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
       };
 
       setRoster(prev => [newStudent, ...prev]);
+      saveStudentFirestore(newStudent).catch(() => {});
       logActivity({
         action: 'ADD_STUDENT',
         target: `${newStudent.name} (${newStudent.room})`,
         result: 'SUCCESS'
       });
     } else if (editingStudent) {
-      setRoster(prev => prev.map(s => s.studentId === editingStudent.studentId ? {
-        ...s,
+      const updated = {
+        ...editingStudent,
         name: formData.name.trim(),
         room: formData.room,
         number: formData.number.trim(),
         status: formData.status,
         updatedAt: new Date().toISOString()
-      } : s));
+      };
+      setRoster(prev => prev.map(s => s.studentId === editingStudent.studentId ? updated : s));
+      saveStudentFirestore(updated).catch(() => {});
 
       logActivity({
         action: 'EDIT_STUDENT',
@@ -183,7 +187,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
           if (parts.length >= 3) {
             const [name, room, number] = parts;
             if (name && room && number) {
-              newStudents.push({
+              const stdObj = {
                 studentId: `STD_${Date.now()}_${i}`,
                 name,
                 room,
@@ -191,11 +195,14 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
                 status: 'ACTIVE',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
-              });
+              };
+              newStudents.push(stdObj);
+              saveStudentFirestore(stdObj).catch(() => {});
               importedCount++;
             }
           }
         }
+
 
         if (newStudents.length > 0) {
           setRoster(prev => [...newStudents, ...prev]);

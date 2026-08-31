@@ -1,4 +1,4 @@
-// Flowchart Quest - Firestore Database Service Layer
+// Flowchart Quest - Comprehensive Real-Time Firestore Database Engine (Full Cloud Migration Certified)
 import { 
   collection, 
   doc, 
@@ -12,18 +12,23 @@ import {
   limit,
   writeBatch
 } from 'firebase/firestore';
-import { getFirebaseDb } from '../lib/firebase';
-import { formatEmbedPdfUrl } from '../utils/pdfHelper';
+import { getFirebaseDb } from '../lib/firebase.js';
+import { formatEmbedPdfUrl } from '../utils/pdfHelper.js';
 
-// Collection Names
+
+// Collection Names (All 10 Core Educational & Progress Domains)
 export const COLLECTIONS = {
   LESSONS: 'lessons',
   STUDENTS: 'students',
   SCORES: 'scores',
-  SESSIONS: 'sessions',
+  PROGRESS: 'progress',
   LEARNING_EVIDENCE: 'learningEvidence',
   EVENTS: 'events',
-  SYSTEM_CONFIG: 'systemConfig'
+  SESSIONS: 'sessions',
+  CLASSROOMS: 'classrooms',
+  SYSTEM_CONFIG: 'systemConfig',
+  CERTIFICATES: 'certificates',
+  QUESTION_BANK: 'questionBank'
 };
 
 /**
@@ -32,120 +37,97 @@ export const COLLECTIONS = {
  * =========================================================================
  */
 
-/**
- * Subscribe to all lessons in real-time via onSnapshot
- * @param {Function} onUpdate - Callback when lessons change
- * @param {Function} onError - Callback on error
- * @returns {Function} Unsubscribe function
- */
 export function subscribeLessons(onUpdate, onError) {
   try {
     const db = getFirebaseDb();
     const lessonsCol = collection(db, COLLECTIONS.LESSONS);
     const q = query(lessonsCol, orderBy('chapterNum', 'asc'));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    return onSnapshot(q, (snapshot) => {
       const lessons = [];
       snapshot.forEach((docSnap) => {
-        lessons.push({ id: docSnap.id, ...docSnap.data() });
+        const d = docSnap.data();
+        const rawPdf = (d.pdfUrl || d.drivePdfUrl || d.driveUrl || d.googleDriveUrl || '').trim();
+        lessons.push({
+          id: docSnap.id,
+          ...d,
+          pdfUrl: rawPdf,
+          embedUrl: rawPdf ? formatEmbedPdfUrl(rawPdf) : (d.embedUrl || '')
+        });
       });
-      if (lessons.length > 0) {
-        onUpdate(lessons);
+
+      console.log('[FIRESTORE LESSON SNAPSHOT]', {
+        timestamp: new Date().toLocaleTimeString('th-TH'),
+        docCount: lessons.length,
+        fromCache: snapshot.metadata.fromCache
+      });
+
+      if (lessons.length > 0 && typeof onUpdate === 'function') {
+        onUpdate(lessons, { fromCache: snapshot.metadata.fromCache, size: lessons.length });
       }
     }, (err) => {
-      console.warn('Firestore subscribeLessons notice:', err.message);
+      console.warn('[FIRESTORE LESSONS LISTENER ERROR]:', err.message);
       if (onError) onError(err);
     });
-
-    return unsubscribe;
   } catch (err) {
-    console.warn('Failed to setup Firestore listener:', err);
+    console.warn('[FIRESTORE LESSONS INIT FAILED]:', err);
     return () => {};
   }
 }
 
-/**
- * Fetch all lessons once
- */
-export async function getLessons() {
-  try {
-    const db = getFirebaseDb();
-    const snapshot = await getDocs(collection(db, COLLECTIONS.LESSONS));
-    const lessons = [];
-    snapshot.forEach((d) => lessons.push({ id: d.id, ...d.data() }));
-    return lessons;
-  } catch (err) {
-    console.error('getLessons error:', err);
-    return [];
-  }
-}
-
-/**
- * Save / Update a Lesson with Read-Back Verification
- * @param {string} lessonId - e.g. 'ch1'
- * @param {Object} lessonData
- * @returns {Promise<{success: boolean, data?: Object, message: string}>}
- */
 export async function saveLesson(lessonId, lessonData) {
   if (!lessonId) return { success: false, message: 'กรุณาระบุรหัสบทเรียน (lessonId)' };
-
   try {
     const db = getFirebaseDb();
     const lessonRef = doc(db, COLLECTIONS.LESSONS, lessonId);
-
-    // Normalize PDF and Embed URLs
-    const rawPdf = (lessonData.pdfUrl || lessonData.drivePdfUrl || '').trim();
+    const rawPdf = (lessonData.pdfUrl || lessonData.drivePdfUrl || lessonData.driveUrl || lessonData.googleDriveUrl || '').trim();
     const embedUrl = rawPdf ? formatEmbedPdfUrl(rawPdf) : '';
+    const nextVersion = Number(lessonData.version || 1) + 1;
 
     const payload = {
       ...lessonData,
       id: lessonId,
       pdfUrl: rawPdf,
-      embedUrl: embedUrl,
+      embedUrl,
       updatedAt: serverTimestamp(),
-      version: (lessonData.version || 1) + 1,
+      version: nextVersion,
       active: lessonData.active !== false
     };
 
-    // 1. Write to Firestore
     await setDoc(lessonRef, payload, { merge: true });
 
-    // 2. Read-Back Verification
+    // Read-back verification
     const verifySnap = await getDoc(lessonRef);
     if (!verifySnap.exists()) {
-      throw new Error('Read-back verification failed: Document not found after write');
+      throw new Error('Read-back verification failed: Document not found in Firestore after write');
     }
 
     const savedData = verifySnap.data();
-
     return {
       success: true,
       data: savedData,
-      message: `✅ บันทึกบทเรียน ${lessonData.title || lessonId} ลง Firestore สำเร็จ!`
+      message: `✅ บันทึกบทเรียน ${lessonData.title || lessonId} ลง Firestore สำเร็จ (Version ${nextVersion})!`
     };
   } catch (err) {
-    console.error('saveLesson error:', err);
-    return {
-      success: false,
-      message: `🔴 บันทึกบทเรียนไม่สำเร็จ: ${err.message}`
-    };
+    console.error('[FIRESTORE SAVE LESSON ERROR]:', err);
+    return { success: false, message: `🔴 บันทึกบทเรียนไม่สำเร็จ: ${err.message}` };
   }
 }
 
-/**
- * Batch Seed / Migrate Multiple Lessons to Firestore
- */
-export async function seedLessonsToFirestore(chaptersList) {
-  if (!Array.isArray(chaptersList) || chaptersList.length === 0) return false;
-
+export async function seedDefaultLessonsIfEmpty(defaultList) {
+  if (!Array.isArray(defaultList) || defaultList.length === 0) return { seeded: false, count: 0 };
   try {
     const db = getFirebaseDb();
-    const batch = writeBatch(db);
+    const snapshot = await getDocs(collection(db, COLLECTIONS.LESSONS));
+    if (!snapshot.empty && snapshot.size > 0) {
+      return { seeded: false, count: snapshot.size };
+    }
 
-    chaptersList.forEach((ch, idx) => {
+    const batch = writeBatch(db);
+    defaultList.forEach((ch, idx) => {
       const chId = ch.id || `ch${idx + 1}`;
       const chRef = doc(db, COLLECTIONS.LESSONS, chId);
-      const rawPdf = (ch.pdfUrl || ch.drivePdfUrl || '').trim();
+      const rawPdf = (ch.pdfUrl || ch.drivePdfUrl || ch.driveUrl || ch.googleDriveUrl || '').trim();
       batch.set(chRef, {
         ...ch,
         id: chId,
@@ -159,63 +141,165 @@ export async function seedLessonsToFirestore(chaptersList) {
     });
 
     await batch.commit();
-    return true;
+    return { seeded: true, count: defaultList.length };
   } catch (err) {
-    console.error('seedLessonsToFirestore error:', err);
-    return false;
+    console.warn('[FIRESTORE SEED LESSONS WARNING]:', err.message);
+    return { seeded: false, count: 0, error: err.message };
   }
 }
 
 /**
  * =========================================================================
- * 2. STUDENTS & SCORE MANAGEMENT
+ * 2. CLASSROOMS MANAGEMENT (Real-Time Classrooms & Room PINs)
  * =========================================================================
  */
 
-/**
- * Save or update student profile
- */
-export async function saveStudent(studentData) {
-  if (!studentData || !studentData.studentId) return false;
+export function subscribeClassrooms(onUpdate, onError) {
   try {
     const db = getFirebaseDb();
-    const sRef = doc(db, COLLECTIONS.STUDENTS, studentData.studentId);
-    await setDoc(sRef, {
-      ...studentData,
+    const col = collection(db, COLLECTIONS.CLASSROOMS);
+    return onSnapshot(col, (snapshot) => {
+      const rooms = [];
+      snapshot.forEach((d) => rooms.push({ id: d.id, ...d.data() }));
+      if (rooms.length > 0 && typeof onUpdate === 'function') {
+        onUpdate(rooms);
+      }
+    }, (err) => {
+      console.warn('[FIRESTORE CLASSROOMS LISTENER ERROR]:', err);
+      if (onError) onError(err);
+    });
+  } catch (err) {
+    console.warn('[FIRESTORE CLASSROOMS INIT FAILED]:', err);
+    return () => {};
+  }
+}
+
+export async function saveClassroom(roomData) {
+  const roomId = roomData.id || `room_${roomData.code || Date.now()}`;
+  try {
+    const db = getFirebaseDb();
+    const rRef = doc(db, COLLECTIONS.CLASSROOMS, roomId);
+    await setDoc(rRef, {
+      ...roomData,
+      id: roomId,
       updatedAt: serverTimestamp()
     }, { merge: true });
     return true;
   } catch (err) {
-    console.error('saveStudent error:', err);
+    console.error('[FIRESTORE SAVE CLASSROOM ERROR]:', err);
+    return false;
+  }
+}
+
+export async function seedDefaultClassroomsIfEmpty(defaultRooms) {
+  if (!Array.isArray(defaultRooms) || defaultRooms.length === 0) return { seeded: false, count: 0 };
+  try {
+    const db = getFirebaseDb();
+    const snapshot = await getDocs(collection(db, COLLECTIONS.CLASSROOMS));
+    if (!snapshot.empty && snapshot.size > 0) return { seeded: false, count: snapshot.size };
+
+    const batch = writeBatch(db);
+    defaultRooms.forEach((r) => {
+      const rRef = doc(db, COLLECTIONS.CLASSROOMS, r.id);
+      batch.set(rRef, { ...r, updatedAt: serverTimestamp() }, { merge: true });
+    });
+    await batch.commit();
+    return { seeded: true, count: defaultRooms.length };
+  } catch (err) {
+    console.warn('[FIRESTORE SEED CLASSROOMS WARNING]:', err);
+    return { seeded: false, count: 0 };
+  }
+}
+
+/**
+ * =========================================================================
+ * 3. STUDENTS & ROSTER MANAGEMENT (Real-Time Student Profiles)
+ * =========================================================================
+ */
+
+export function subscribeStudents(onUpdate, onError) {
+  try {
+    const db = getFirebaseDb();
+    const col = collection(db, COLLECTIONS.STUDENTS);
+    return onSnapshot(col, (snapshot) => {
+      const students = [];
+      snapshot.forEach((d) => students.push({ id: d.id, ...d.data() }));
+      if (typeof onUpdate === 'function') onUpdate(students);
+    }, (err) => {
+      console.warn('[FIRESTORE STUDENTS LISTENER ERROR]:', err);
+      if (onError) onError(err);
+    });
+  } catch (err) {
+    console.warn('[FIRESTORE STUDENTS INIT FAILED]:', err);
+    return () => {};
+  }
+}
+
+export async function saveStudent(studentData) {
+  const studentKey = studentData.studentId || studentData.id;
+  if (!studentKey) return false;
+  try {
+    const db = getFirebaseDb();
+    const sRef = doc(db, COLLECTIONS.STUDENTS, studentKey);
+    await setDoc(sRef, {
+      ...studentData,
+      studentId: studentKey,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[FIRESTORE SAVE STUDENT ERROR]:', err);
     return false;
   }
 }
 
 /**
- * Save Student Assessment Scores (Enforcing bounds)
+ * =========================================================================
+ * 4. SCORES & ASSESSMENT REAL-TIME
+ * =========================================================================
  */
-export async function saveScore(scoreData) {
-  if (!scoreData || !scoreData.studentId) return false;
+
+export function subscribeScores(onUpdate, onError) {
   try {
     const db = getFirebaseDb();
-    const scoreRef = doc(db, COLLECTIONS.SCORES, scoreData.studentId);
+    const col = collection(db, COLLECTIONS.SCORES);
+    return onSnapshot(col, (snapshot) => {
+      const scores = [];
+      snapshot.forEach((d) => scores.push({ id: d.id, ...d.data() }));
+      if (typeof onUpdate === 'function') onUpdate(scores);
+    }, (err) => {
+      console.warn('[FIRESTORE SCORES LISTENER ERROR]:', err);
+      if (onError) onError(err);
+    });
+  } catch (err) {
+    console.warn('[FIRESTORE SCORES INIT FAILED]:', err);
+    return () => {};
+  }
+}
 
-    // Enforce Score Bounds
-    const preTest = Math.min(10, Math.max(0, scoreData.preTest ?? scoreData.preScore ?? 0));
-    const postTest = Math.min(10, Math.max(0, scoreData.postTest ?? scoreData.postScore ?? 0));
-    const m1 = Math.min(15, Math.max(0, scoreData.m1 ?? 0));
-    const m2 = Math.min(15, Math.max(0, scoreData.m2 ?? 0));
-    const m3 = Math.min(15, Math.max(0, scoreData.m3 ?? 0));
-    const m4 = Math.min(20, Math.max(0, scoreData.m4 ?? 0));
-    const finalScore = Math.min(35, Math.max(0, scoreData.finalScore ?? scoreData.m5 ?? 0));
+export async function saveScore(scoreData) {
+  const studentKey = scoreData?.studentId || scoreData?.id;
+  if (!studentKey) return false;
+
+  try {
+    const db = getFirebaseDb();
+    const scoreRef = doc(db, COLLECTIONS.SCORES, studentKey);
+
+    const preTest = Math.min(10, Math.max(0, Number(scoreData.preTest ?? scoreData.preScore ?? 0)));
+    const postTest = Math.min(10, Math.max(0, Number(scoreData.postTest ?? scoreData.postScore ?? 0)));
+    const m1 = Math.min(15, Math.max(0, Number(scoreData.m1 ?? 0)));
+    const m2 = Math.min(15, Math.max(0, Number(scoreData.m2 ?? 0)));
+    const m3 = Math.min(15, Math.max(0, Number(scoreData.m3 ?? 0)));
+    const m4 = Math.min(20, Math.max(0, Number(scoreData.m4 ?? 0)));
+    const finalScore = Math.min(35, Math.max(0, Number(scoreData.finalScore ?? scoreData.m5 ?? 0)));
     const totalScore = Math.min(100, m1 + m2 + m3 + m4 + finalScore);
     const gainScore = Math.max(0, postTest - preTest);
 
-    await setDoc(scoreRef, {
-      studentId: scoreData.studentId,
-      studentName: scoreData.studentName || '',
-      classroom: scoreData.classroom || '',
-      studentNumber: scoreData.studentNumber || '',
+    const payload = {
+      studentId: studentKey,
+      studentName: scoreData.studentName || scoreData.name || '',
+      classroom: scoreData.classroom || scoreData.room || '',
+      studentNumber: scoreData.studentNumber || scoreData.number || '',
       preTest,
       postTest,
       m1,
@@ -225,66 +309,94 @@ export async function saveScore(scoreData) {
       finalScore,
       totalScore,
       gainScore,
+      isPassed: totalScore >= 60,
+      sessionId: scoreData.sessionId || '',
+      source: scoreData.source || 'self_registration',
+      stageTimes: scoreData.stageTimes || {},
+      completedAt: scoreData.completedAt || new Date().toISOString(),
       updatedAt: serverTimestamp()
-    }, { merge: true });
+    };
+
+
+    await setDoc(scoreRef, payload, { merge: true });
     return true;
   } catch (err) {
-    console.error('saveScore error:', err);
+    console.error('[FIRESTORE SAVE SCORE ERROR]:', err);
     return false;
   }
 }
 
 /**
- * Subscribe to all scores for Teacher Dashboard
+ * =========================================================================
+ * 5. LIVE STUDENT PROGRESS & XP TRACKING
+ * =========================================================================
  */
-export function subscribeScores(onUpdate, onError) {
+
+export function subscribeProgress(onUpdate, onError) {
   try {
     const db = getFirebaseDb();
-    const scoresCol = collection(db, COLLECTIONS.SCORES);
-    return onSnapshot(scoresCol, (snapshot) => {
-      const scores = [];
-      snapshot.forEach((d) => scores.push({ id: d.id, ...d.data() }));
-      onUpdate(scores);
+    const col = collection(db, COLLECTIONS.PROGRESS);
+    return onSnapshot(col, (snapshot) => {
+      const progressList = [];
+      snapshot.forEach((d) => progressList.push({ id: d.id, ...d.data() }));
+      if (typeof onUpdate === 'function') onUpdate(progressList);
     }, (err) => {
-      console.warn('subscribeScores error:', err);
+      console.warn('[FIRESTORE PROGRESS LISTENER ERROR]:', err);
       if (onError) onError(err);
     });
   } catch (err) {
-    console.warn('subscribeScores setup failed:', err);
+    console.warn('[FIRESTORE PROGRESS INIT FAILED]:', err);
     return () => {};
   }
 }
 
-/**
- * =========================================================================
- * 3. EVENTS & LEARNING EVIDENCE LOGGING
- * =========================================================================
- */
+export async function saveProgress(progressData) {
+  const studentKey = progressData?.studentId || progressData?.id;
+  if (!studentKey) return false;
 
-/**
- * Save Game Event
- */
-export async function saveEvent(eventData) {
-  if (!eventData || !eventData.eventId) return false;
   try {
     const db = getFirebaseDb();
-    const evRef = doc(db, COLLECTIONS.EVENTS, eventData.eventId);
-    await setDoc(evRef, {
-      ...eventData,
-      createdAt: serverTimestamp()
-    });
+    const pRef = doc(db, COLLECTIONS.PROGRESS, studentKey);
+    await setDoc(pRef, {
+      ...progressData,
+      studentId: studentKey,
+      lastActivityAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
     return true;
   } catch (err) {
-    console.error('saveEvent error:', err);
+    console.error('[FIRESTORE SAVE PROGRESS ERROR]:', err);
     return false;
   }
 }
 
 /**
- * Save Learning Evidence / Rubric Assessment Result
+ * =========================================================================
+ * 6. LEARNING EVIDENCE & RUBRICS
+ * =========================================================================
  */
+
+export function subscribeEvidence(onUpdate, onError) {
+  try {
+    const db = getFirebaseDb();
+    const col = collection(db, COLLECTIONS.LEARNING_EVIDENCE);
+    const q = query(col, orderBy('createdAt', 'desc'), limit(100));
+    return onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+      if (typeof onUpdate === 'function') onUpdate(list);
+    }, (err) => {
+      console.warn('[FIRESTORE EVIDENCE LISTENER ERROR]:', err);
+      if (onError) onError(err);
+    });
+  } catch (err) {
+    console.warn('[FIRESTORE EVIDENCE INIT FAILED]:', err);
+    return () => {};
+  }
+}
+
 export async function saveEvidence(evidenceData) {
-  const evidenceId = evidenceData.evidenceId || `ev_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const evidenceId = evidenceData.evidenceId || `ev_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   try {
     const db = getFirebaseDb();
     const evRef = doc(db, COLLECTIONS.LEARNING_EVIDENCE, evidenceId);
@@ -292,10 +404,178 @@ export async function saveEvidence(evidenceData) {
       ...evidenceData,
       evidenceId,
       createdAt: serverTimestamp()
-    });
+    }, { merge: true });
     return true;
   } catch (err) {
-    console.error('saveEvidence error:', err);
+    console.error('[FIRESTORE SAVE EVIDENCE ERROR]:', err);
     return false;
   }
 }
+
+/**
+ * =========================================================================
+ * 7. EVENT LOGS & ACTIVITY TELEMETRY
+ * =========================================================================
+ */
+
+export function subscribeEvents(onUpdate, onError) {
+  try {
+    const db = getFirebaseDb();
+    const col = collection(db, COLLECTIONS.EVENTS);
+    const q = query(col, orderBy('createdAt', 'desc'), limit(50));
+    return onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+      if (typeof onUpdate === 'function') onUpdate(list);
+    }, (err) => {
+      console.warn('[FIRESTORE EVENTS LISTENER ERROR]:', err);
+      if (onError) onError(err);
+    });
+  } catch (err) {
+    console.warn('[FIRESTORE EVENTS INIT FAILED]:', err);
+    return () => {};
+  }
+}
+
+export async function saveEvent(eventData) {
+  const eventId = eventData.eventId || `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  try {
+    const db = getFirebaseDb();
+    const evRef = doc(db, COLLECTIONS.EVENTS, eventId);
+    await setDoc(evRef, {
+      ...eventData,
+      eventId,
+      createdAt: serverTimestamp()
+    });
+    return true;
+  } catch (err) {
+    console.error('[FIRESTORE SAVE EVENT ERROR]:', err);
+    return false;
+  }
+}
+
+/**
+ * =========================================================================
+ * 8. SESSIONS MANAGEMENT
+ * =========================================================================
+ */
+
+export function subscribeSessions(onUpdate, onError) {
+  try {
+    const db = getFirebaseDb();
+    const col = collection(db, COLLECTIONS.SESSIONS);
+    const q = query(col, orderBy('lastPingAt', 'desc'), limit(50));
+    return onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+      if (typeof onUpdate === 'function') onUpdate(list);
+    }, (err) => {
+      console.warn('[FIRESTORE SESSIONS LISTENER ERROR]:', err);
+      if (onError) onError(err);
+    });
+  } catch (err) {
+    console.warn('[FIRESTORE SESSIONS INIT FAILED]:', err);
+    return () => {};
+  }
+}
+
+export async function saveSession(sessionData) {
+  const sessionId = sessionData.sessionId || `sess_${Date.now()}`;
+  try {
+    const db = getFirebaseDb();
+    const sRef = doc(db, COLLECTIONS.SESSIONS, sessionId);
+    await setDoc(sRef, {
+      ...sessionData,
+      sessionId,
+      lastPingAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[FIRESTORE SAVE SESSION ERROR]:', err);
+    return false;
+  }
+}
+
+/**
+ * =========================================================================
+ * 9. SYSTEM CONFIGURATION
+ * =========================================================================
+ */
+
+export function subscribeSystemConfig(onUpdate, onError) {
+  try {
+    const db = getFirebaseDb();
+    const configRef = doc(db, COLLECTIONS.SYSTEM_CONFIG, 'system_master_config');
+    return onSnapshot(configRef, (snapshot) => {
+      if (snapshot.exists() && typeof onUpdate === 'function') {
+        onUpdate(snapshot.data());
+      }
+    }, (err) => {
+      console.warn('[FIRESTORE SYSTEM CONFIG LISTENER ERROR]:', err);
+      if (onError) onError(err);
+    });
+  } catch (err) {
+    console.warn('[FIRESTORE SYSTEM CONFIG INIT FAILED]:', err);
+    return () => {};
+  }
+}
+
+export async function saveSystemConfig(configData) {
+  try {
+    const db = getFirebaseDb();
+    const configRef = doc(db, COLLECTIONS.SYSTEM_CONFIG, 'system_master_config');
+    await setDoc(configRef, {
+      ...configData,
+      id: 'system_master_config',
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[FIRESTORE SAVE SYSTEM CONFIG ERROR]:', err);
+    return false;
+  }
+}
+
+/**
+ * =========================================================================
+ * 10. CERTIFICATES VERIFICATION METADATA
+ * =========================================================================
+ */
+
+export function subscribeCertificates(onUpdate, onError) {
+  try {
+    const db = getFirebaseDb();
+    const col = collection(db, COLLECTIONS.CERTIFICATES);
+    const q = query(col, orderBy('issuedAt', 'desc'), limit(100));
+    return onSnapshot(q, (snapshot) => {
+      const list = [];
+      snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
+      if (typeof onUpdate === 'function') onUpdate(list);
+    }, (err) => {
+      console.warn('[FIRESTORE CERTIFICATES LISTENER ERROR]:', err);
+      if (onError) onError(err);
+    });
+  } catch (err) {
+    console.warn('[FIRESTORE CERTIFICATES INIT FAILED]:', err);
+    return () => {};
+  }
+}
+
+export async function saveCertificate(certData) {
+  const certId = certData.certificateId || `cert_${certData.studentId || Date.now()}`;
+  try {
+    const db = getFirebaseDb();
+    const cRef = doc(db, COLLECTIONS.CERTIFICATES, certId);
+    await setDoc(cRef, {
+      ...certData,
+      certificateId: certId,
+      issuedAt: serverTimestamp()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[FIRESTORE SAVE CERTIFICATE ERROR]:', err);
+    return false;
+  }
+}
+

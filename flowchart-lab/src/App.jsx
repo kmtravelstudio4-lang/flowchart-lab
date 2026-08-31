@@ -55,13 +55,26 @@ import masterSystemConfig from './data/system_config.json';
 import { 
   subscribeLessons, 
   saveLesson, 
-  seedLessonsToFirestore, 
+  seedDefaultLessonsIfEmpty, 
+  subscribeClassrooms,
+  saveClassroom as saveClassroomFirestore,
+  seedDefaultClassroomsIfEmpty,
+  subscribeStudents as subscribeStudentsFirestore, 
   saveStudent as saveStudentFirestore, 
+  subscribeScores as subscribeScoresFirestore, 
   saveScore as saveScoreFirestore, 
+  subscribeProgress as subscribeProgressFirestore,
+  saveProgress as saveProgressFirestore,
+  subscribeEvidence as subscribeEvidenceFirestore,
   saveEvidence as saveEvidenceFirestore,
-  subscribeScores as subscribeScoresFirestore 
+  subscribeEvents as subscribeEventsFirestore,
+  saveEvent as saveEventFirestore,
+  saveSession as saveSessionFirestore,
+  saveCertificate as saveCertificateFirestore
 } from './services/firestoreService';
-import { getStoredFirebaseConfig, saveFirebaseConfig } from './lib/firebase';
+import { getStoredFirebaseConfig, saveFirebaseConfig, getFirebaseConnectionStatus } from './lib/firebase';
+
+
 
 // Default 4 Pre-Configured Classrooms with PIN codes (Merged with system_config)
 export const DEFAULT_CLASSROOMS = (masterSystemConfig && Array.isArray(masterSystemConfig.classrooms) && masterSystemConfig.classrooms.length > 0)
@@ -239,11 +252,48 @@ export default function App() {
     } catch { /* ignore */ }
   }, [learningChapters]);
 
-  // Real-time Cloud Sync: โหลดบทเรียนและลิงก์ PDF ล่าสุดจาก Firebase Firestore (Real-Time Listener) + GitHub CDN
+  // Teacher Dashboard Database State
+  const [studentRecords, setStudentRecords] = useState(() => {
+    try {
+      const saved = localStorage.getItem('flowchart_student_records');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  // Live Diagnostics & Connection Tracking State
+  const [firestoreStatus, setFirestoreStatus] = useState(() => getFirebaseConnectionStatus());
+  const [lastLessonSnapshotTime, setLastLessonSnapshotTime] = useState(null);
+  const [cloudLessonVersion, setCloudLessonVersion] = useState(1);
+
+
+  // Live Real-Time Firestore State Collections
+  const [liveProgressList, setLiveProgressList] = useState([]);
+  const [liveEventsList, setLiveEventsList] = useState([]);
+
+  // Real-time Cloud Sync: Firestore onSnapshot (Master Single Source of Truth for all Collections)
   useEffect(() => {
-    // 1. Real-Time Firestore onSnapshot Listener (Single Source of Truth)
-    const unsubscribeFirestore = subscribeLessons((cloudLessons) => {
+    // 1. Initial connection check and safe one-time seeds
+    seedDefaultLessonsIfEmpty(INITIAL_CHAPTERS).catch(err => console.warn('[FIRESTORE LESSON SEED]:', err));
+    seedDefaultClassroomsIfEmpty(DEFAULT_CLASSROOMS).catch(err => console.warn('[FIRESTORE ROOM SEED]:', err));
+
+    // 2. Real-Time Lessons Listener
+    const unsubscribeFirestore = subscribeLessons((cloudLessons, metadata) => {
       if (Array.isArray(cloudLessons) && cloudLessons.length > 0) {
+        const timeNow = new Date().toLocaleTimeString('th-TH');
+        setLastLessonSnapshotTime(timeNow);
+        setFirestoreStatus(prev => ({ 
+          ...prev, 
+          connected: true, 
+          fromCache: Boolean(metadata?.fromCache),
+          lastSync: timeNow 
+        }));
+
+        const maxVer = Math.max(...cloudLessons.map(l => Number(l.version || 1)), 1);
+        setCloudLessonVersion(maxVer);
+
         setLearningChapters(prev => {
           const baseList = (prev && prev.length > 0) ? prev : INITIAL_CHAPTERS;
           const merged = baseList.map(base => {
@@ -267,94 +317,105 @@ export default function App() {
           return fullList;
         });
       }
+    }, (err) => {
+      console.warn('[FIRESTORE LESSON LISTENER WARNING]:', err.message);
+      setFirestoreStatus(prev => ({ ...prev, connected: false, error: err.message }));
     });
 
-    // 2. Static CDN Fast-Load from public/system_config.json
-    const fetchCloudChapters = async () => {
-      try {
-        const staticRes = await fetch(`./system_config.json?v=${Date.now()}`, {
-          headers: { 'Accept': 'application/json' }
-        });
-        if (staticRes.ok) {
-          const staticData = await staticRes.json();
-          if (staticData && Array.isArray(staticData.chapters) && staticData.chapters.length > 0) {
-            setLearningChapters(prev => {
-              const baseList = (prev && prev.length > 0) ? prev : INITIAL_CHAPTERS;
-              const merged = baseList.map(base => {
-                const match = staticData.chapters.find(d => d && d.id === base.id);
-                if (match) {
-                  return {
-                    ...base,
-                    ...match,
-                    pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || match.slidesUrl || match.slideUrl || match.documentUrl || base.pdfUrl || '').trim(),
-                    symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
-                    keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
-                  };
-                }
-                return base;
-              });
-              const customExtras = staticData.chapters.filter(d => d && d.id && !baseList.some(b => b.id === d.id));
-              const fullList = [...merged, ...customExtras];
-              try {
-                localStorage.setItem('flowchart_learning_chapters', JSON.stringify(fullList));
-              } catch {}
-              return fullList;
+    // 3. Real-Time Classrooms Listener
+    const unsubscribeClassrooms = subscribeClassrooms((cloudRooms) => {
+      if (Array.isArray(cloudRooms) && cloudRooms.length > 0) {
+        setClassrooms(cloudRooms);
+        try {
+          localStorage.setItem('flowchart_classrooms', JSON.stringify(cloudRooms));
+        } catch {}
+      }
+    });
+
+    // 4. Real-Time Student Scores Listener for Teacher Dashboard
+    const unsubscribeScores = subscribeScoresFirestore((cloudScores) => {
+      if (Array.isArray(cloudScores) && cloudScores.length > 0) {
+        setStudentRecords(prev => {
+          const mapped = cloudScores.map(cs => ({
+            id: cs.studentId || cs.id,
+            studentId: cs.studentId || cs.id,
+            name: cs.studentName || cs.name || '',
+            room: cs.classroom || cs.room || 'ห้อง ป.6/1',
+            number: cs.studentNumber || cs.number || '-',
+            preScore: cs.preTest ?? cs.preScore ?? 0,
+            postScore: cs.postTest ?? cs.postScore ?? 0,
+            gainScore: cs.gainScore ?? ((cs.postTest ?? 0) - (cs.preTest ?? 0)),
+            m1: cs.m1 || 0,
+            m2: cs.m2 || 0,
+            m3: cs.m3 || 0,
+            m4: cs.m4 || 0,
+            m5: cs.finalScore || cs.m5 || 0,
+            totalScore: cs.totalScore || 0,
+            isPassed: cs.isPassed !== undefined ? cs.isPassed : (cs.totalScore >= 60),
+            stageTimes: cs.stageTimes || {},
+            completedAt: cs.completedAt || new Date().toISOString()
+          }));
+
+          const combined = [...mapped];
+          if (Array.isArray(prev)) {
+            prev.forEach(p => {
+              if (!combined.some(c => c.id === p.id || (c.name === p.name && c.room === p.room))) {
+                combined.push(p);
+              }
             });
           }
-        }
-      } catch (err) {
-        console.log('Static config fetch fallback:', err);
+          try {
+            localStorage.setItem('flowchart_student_records', JSON.stringify(combined));
+          } catch {}
+          return combined;
+        });
       }
+    });
 
-      // 3. Fallback to Google Sheets if configured
-      if (cloudWebhookUrl) {
-        try {
-          const res = await fetch(`${cloudWebhookUrl}?configKey=system_master_config`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-          });
-          const contentType = res.headers.get('content-type') || '';
-          if (res.ok && contentType.includes('json')) {
-            const raw = await res.json();
-            const data = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.chapters) ? raw.chapters : null);
-            if (data && data.length > 0) {
-              setLearningChapters(prev => {
-                const baseList = (prev && prev.length > 0) ? prev : INITIAL_CHAPTERS;
-                const merged = baseList.map(base => {
-                  const match = data.find(d => d && d.id === base.id);
-                  if (match) {
-                    return {
-                      ...base,
-                      ...match,
-                      pdfUrl: (match.pdfUrl || match.drivePdfUrl || match.driveUrl || match.googleDriveUrl || match.slidesUrl || match.slideUrl || match.documentUrl || base.pdfUrl || '').trim(),
-                      symbols: Array.isArray(match.symbols) && match.symbols.length > 0 ? match.symbols : (base.symbols || []),
-                      keyPoints: Array.isArray(match.keyPoints) && match.keyPoints.length > 0 ? match.keyPoints : (base.keyPoints || [])
-                    };
-                  }
-                  return base;
-                });
-                const customExtras = data.filter(d => d && d.id && !baseList.some(b => b.id === d.id));
-                const fullList = [...merged, ...customExtras];
-                try {
-                  localStorage.setItem('flowchart_learning_chapters', JSON.stringify(fullList));
-                } catch {}
-                return fullList;
-              });
-            }
-          }
-        } catch (err) {
-          console.log('Google Sheets config fetch fallback:', err);
-        }
+    // 5. Real-Time Progress Listener
+    const unsubscribeProgress = subscribeProgressFirestore((cloudProgress) => {
+      if (Array.isArray(cloudProgress)) {
+        setLiveProgressList(cloudProgress);
       }
-    };
-    fetchCloudChapters();
+    });
+
+    // 6. Real-Time Events Activity Feed
+    const unsubscribeEvents = subscribeEventsFirestore((cloudEvents) => {
+      if (Array.isArray(cloudEvents)) {
+        setLiveEventsList(cloudEvents);
+      }
+    });
 
     return () => {
-      if (typeof unsubscribeFirestore === 'function') {
-        unsubscribeFirestore();
-      }
+      if (typeof unsubscribeFirestore === 'function') unsubscribeFirestore();
+      if (typeof unsubscribeClassrooms === 'function') unsubscribeClassrooms();
+      if (typeof unsubscribeScores === 'function') unsubscribeScores();
+      if (typeof unsubscribeProgress === 'function') unsubscribeProgress();
+      if (typeof unsubscribeEvents === 'function') unsubscribeEvents();
     };
-  }, [cloudWebhookUrl]);
+  }, []);
+
+  // Automatic Live Progress Emission to Firestore when Student advances
+  useEffect(() => {
+    if (studentInfo && studentInfo.name && studentInfo.room) {
+      const studentKey = `std_${studentInfo.room.replace('/', '_')}_${studentInfo.number || 'x'}_${studentInfo.name.replace(/\s+/g, '_')}`;
+      const totalScore = (missionScores.m1 || 0) + (missionScores.m2 || 0) + (missionScores.m3 || 0) + (missionScores.m4 || 0) + (missionScores.m5 || 0);
+      
+      saveProgressFirestore({
+        studentId: studentKey,
+        studentName: studentInfo.name,
+        classroom: studentInfo.room,
+        studentNumber: studentInfo.number,
+        currentStage: gameStage,
+        completedStages,
+        totalScore,
+        userXP,
+        status: completedStages.posttest ? 'COMPLETED' : 'IN_PROGRESS'
+      }).catch(() => {});
+    }
+  }, [gameStage, completedStages, missionScores, userXP, studentInfo]);
+
+
 
   // Editing Chapter Modal State in Admin
   const [editingChapter, setEditingChapter] = useState(null); // null | chapter object
@@ -422,30 +483,42 @@ export default function App() {
   const handleSaveChapterPdfUrl = async (chapterId, url) => {
     const base = (Array.isArray(learningChapters) && learningChapters.length > 0) ? learningChapters : INITIAL_CHAPTERS;
     const targetChapter = base.find(c => c.id === chapterId) || {};
-    const updatedChapter = { ...targetChapter, pdfUrl: (url || '').trim() };
+    const cleanUrl = (url || '').trim();
+    const updatedChapter = { ...targetChapter, pdfUrl: cleanUrl };
     const updated = base.map(c => c.id === chapterId ? updatedChapter : c);
+
+    // 1. Write to Firebase Firestore (Single Source of Truth) with Read-back Verification
+    let firestoreOk = false;
+    let resMsg = '';
+    try {
+      const fsRes = await saveLesson(chapterId, updatedChapter);
+      if (fsRes && fsRes.success) {
+        firestoreOk = true;
+        resMsg = fsRes.message;
+      } else {
+        resMsg = fsRes?.message || 'การเขียนข้อมูลลง Firestore ล้มเหลว';
+      }
+    } catch (fsErr) {
+      console.warn('[FIRESTORE LESSON SAVE EXCEPTION]:', fsErr);
+      resMsg = fsErr.message;
+    }
+
+    // 2. Optimistic local cache update
     setLearningChapters(updated);
     try {
       localStorage.setItem('flowchart_learning_chapters', JSON.stringify(updated));
     } catch { /* ignore */ }
 
-    // 1. Write to Firebase Firestore (Single Source of Truth) with Read-back Verification
-    let firestoreOk = false;
-    try {
-      const fsRes = await saveLesson(chapterId, updatedChapter);
-      if (fsRes && fsRes.success) {
-        firestoreOk = true;
-      }
-    } catch (fsErr) {
-      console.warn('Firestore lesson save notice:', fsErr);
-    }
+    // 3. Execute Secondary Backup Sync to GitHub CDN & Google Sheets
+    syncAllToCloudAndGitHub(updated, classrooms).catch(() => {});
 
-    // 2. Execute Unified Real-time Sync to GitHub CDN & Google Sheets
-    await syncAllToCloudAndGitHub(updated, classrooms);
-    alert(firestoreOk 
-      ? '✅ บันทึกและกระจายข้อมูลสู่ Firebase Firestore (Real-time) & GitHub CDN เรียบร้อยแล้ว!' 
-      : '✅ บันทึกและซิงก์ข้อมูลบทเรียนขึ้นระบบ Cloud & GitHub CDN เรียบร้อยแล้ว!');
+    if (firestoreOk) {
+      alert(`✅ ${resMsg}\n\n📡 ข้อมูลจะกระจายแบบ Real-Time ไปยังทุกอุปกรณ์ (Desktop & Mobile) อัตโนมัติ`);
+    } else {
+      alert(`⚠️ บันทึกในเครื่องแล้ว แต่ Firestore แจ้งเตือน:\n${resMsg}\n\nกรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต`);
+    }
   };
+
 
   // Learning Chapter Active Tab & Custom Illustrations
   const [currentChapterIdx, setCurrentChapterIdx] = useState(0);
@@ -532,16 +605,6 @@ export default function App() {
   const [isExporting, setIsExporting] = useState(false);
   const certificateRef = useRef(null);
 
-  // Teacher Dashboard Database State
-  const [studentRecords, setStudentRecords] = useState(() => {
-    try {
-      const saved = localStorage.getItem('flowchart_student_records');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // ignore
-    }
-    return [];
-  });
 
   const [teacherFilterRoom, setTeacherFilterRoom] = useState('ทั้งหมด');
   const [teacherFilterStatus, setTeacherFilterStatus] = useState('ทั้งหมด');
@@ -758,9 +821,27 @@ export default function App() {
       number: studentInfo.number || '-'
     };
 
-    setStudentInfo(updated);
+    const cleanNumber = (updated.number && updated.number !== '-') ? updated.number.toString().padStart(2, '0') : '00';
+    const cleanName = updated.name.replace(/\s+/g, '_');
+
+    // Duplicate Protection: Reuse existing studentId if already assigned to this student profile
+    const studentId = (studentInfo.studentId && studentInfo.name === updated.name && studentInfo.room === finalRoomName)
+      ? studentInfo.studentId
+      : `STD_${finalRoomCode}_${cleanNumber}_${cleanName}`;
+      
+    const sessionId = `SESS_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const eventId = `EVT_LOGIN_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    const fullStudentProfile = {
+      ...updated,
+      studentId,
+      sessionId,
+      source: 'self_registration'
+    };
+
+    setStudentInfo(fullStudentProfile);
     try {
-      localStorage.setItem('flowchart_current_student', JSON.stringify(updated));
+      localStorage.setItem('flowchart_current_student', JSON.stringify(fullStudentProfile));
     } catch { /* ignore */ }
 
     playSound('success', soundEnabled);
@@ -768,14 +849,94 @@ export default function App() {
     setGameStage('learning');
     logActivity('เข้าสู่ระบบการเรียนรู้', `${updated.name} (${finalRoomName} รหัส PIN: ${finalRoomCode})`);
 
-    // Immediate Cloud Sync: ส่งชื่อและข้อมูลการเข้าระบบของนักเรียนเข้า Google Sheets ทันที
+    // 1. Write Student Profile to Firestore /students/{studentId}
+    saveStudentFirestore({
+      studentId,
+      name: updated.name,
+      room: finalRoomName,
+      classroom: finalRoomName,
+      roomCode: finalRoomCode,
+      number: updated.number || '-',
+      status: 'ACTIVE',
+      source: 'self_registration',
+      lastSessionId: sessionId
+    }).catch(err => console.warn('[FIRESTORE REGISTER STUDENT]:', err));
+
+    // 2. Write Session to Firestore /sessions/{sessionId}
+    saveSessionFirestore({
+      sessionId,
+      studentId,
+      studentName: updated.name,
+      room: finalRoomName,
+      classroom: finalRoomName,
+      roomCode: finalRoomCode,
+      number: updated.number || '-',
+      startedAt: new Date().toISOString(),
+      currentStage: 1,
+      status: 'active',
+      source: 'self_registration'
+    }).catch(err => console.warn('[FIRESTORE REGISTER SESSION]:', err));
+
+    // 3. Write Initial Progress to Firestore /progress/{studentId}
+    saveProgressFirestore({
+      studentId,
+      sessionId,
+      studentName: updated.name,
+      classroom: finalRoomName,
+      studentNumber: updated.number || '-',
+      currentStage: 'learning',
+      completedStages: {},
+      totalScore: 0,
+      xp: 0,
+      status: 'learning',
+      source: 'self_registration'
+    }).catch(err => console.warn('[FIRESTORE REGISTER PROGRESS]:', err));
+
+    // 4. Write Initial Score Record to Firestore /scores/{studentId} (Instant Teacher Dashboard Stream)
+    const initialScoreRecord = {
+      id: studentId,
+      studentId,
+      sessionId,
+      studentName: updated.name,
+      classroom: finalRoomName,
+      studentNumber: updated.number || '-',
+      preTest: 0,
+      postTest: 0,
+      gainScore: 0,
+      m1: 0,
+      m2: 0,
+      m3: 0,
+      m4: 0,
+      finalScore: 0,
+      totalScore: 0,
+      source: 'self_registration',
+      isPassed: false,
+      stageTimes: {},
+      completedAt: new Date().toISOString()
+    };
+    saveScoreFirestore(initialScoreRecord).catch(err => console.warn('[FIRESTORE REGISTER SCORE]:', err));
+
+    // 5. Write Event Log to Firestore /events/{eventId}
+    saveEventFirestore({
+      eventId,
+      type: 'REGISTER',
+      action: 'REGISTER',
+      studentId,
+      sessionId,
+      source: 'self_registration',
+      studentName: updated.name,
+      classroom: finalRoomName,
+      details: `นักเรียน ${updated.name} ลงทะเบียนเข้าเรียนด้วยตนเอง (ห้อง ${finalRoomName} เลขที่ ${updated.number})`
+    }).catch(err => console.warn('[FIRESTORE REGISTER EVENT]:', err));
+
+
+    // 6. Secondary Export: ส่งชื่อและข้อมูลการเข้าระบบของนักเรียนเข้า Google Sheets ทันที (หากตั้งค่าไว้)
     if (cloudWebhookUrl && cloudWebhookUrl.trim()) {
-      const studentId = `std_${finalRoomName.replace('/', '_')}_${updated.number || '0'}_${Date.now()}`;
       const loginRecord = {
         id: studentId,
-        eventId: `evt_login_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        studentId: studentId,
-        sessionId: `sess_${Date.now()}`,
+        eventId,
+        studentId,
+        sessionId,
         name: updated.name,
         room: finalRoomName,
         roomCode: finalRoomCode,
@@ -808,6 +969,7 @@ export default function App() {
       });
     }
   };
+
 
   // --- Guest / General User Mode (เล่นโดยไม่ต้องกรอกชื่อ) ---
   const handleGuestLogin = () => {
@@ -934,6 +1096,21 @@ export default function App() {
       return [newRecord, ...filtered];
     });
 
+    // 1. Primary Cloud Database Save: Firebase Firestore (Real-Time Single Source of Truth)
+    try {
+      await saveScoreFirestore(newRecord);
+      await saveStudentFirestore({
+        studentId,
+        name: studentInfo.name,
+        classroom: studentInfo.room,
+        studentNumber: studentInfo.number,
+        updatedAt: new Date().toISOString()
+      });
+      console.log('[FIRESTORE REAL-TIME SCORE SYNCED]:', studentId);
+    } catch (fsScoreErr) {
+      console.warn('[FIRESTORE SCORE SAVE NOTICE]:', fsScoreErr);
+    }
+
     logLearningEvent({
       action: EVENT_TYPES.POSTTEST_COMPLETED,
       studentId,
@@ -944,7 +1121,7 @@ export default function App() {
       details: { isPassed, gainScore, stageTimes: currentTimes }
     });
 
-    // Cloud Database Sync (Google Sheets Webhook)
+    // 2. Secondary Export to Google Sheets Webhook (Optional External Backup)
     if (cloudWebhookUrl && cloudWebhookUrl.trim()) {
       try {
         logLearningEvent({ action: EVENT_TYPES.SYNC_STARTED, studentId, sessionId, target: 'Google Sheets' });
@@ -952,16 +1129,17 @@ export default function App() {
         logLearningEvent({ action: EVENT_TYPES.SYNC_COMPLETED, studentId, sessionId, result: 'SUCCESS' });
         setCloudSyncToast({
           show: true,
-          message: res.message || 'บันทึกข้อมูลลง Google Sheets เรียบร้อยแล้ว ☁️',
+          message: res.message || 'บันทึกข้อมูลขึ้นระบบ Firestore & Google Sheets เรียบร้อยแล้ว ☁️',
           mode: res.mode || 'cloud'
         });
         setTimeout(() => setCloudSyncToast({ show: false, message: '', mode: 'cloud' }), 5000);
       } catch (err) {
         logLearningEvent({ action: EVENT_TYPES.SYNC_FAILED, studentId, sessionId, result: 'FAIL', details: { error: err.message } });
-        console.warn('Sync error:', err);
+        console.warn('Google Sheets sync notice:', err);
       }
     }
   };
+
 
   // --- Mission 1 Handlers (Drag & Drop) ---
   const handleM1Drop = (e, slotId) => {
@@ -1365,8 +1543,18 @@ export default function App() {
                     <span className="text-[10.5px] px-2.5 py-0.5 rounded-full bg-blue-100/80 text-blue-700 font-extrabold border border-blue-200 shadow-2xs">
                       ว 4.2 ป.6/1
                     </span>
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-extrabold border flex items-center space-x-1 ${
+                      firestoreStatus.connected
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${firestoreStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                      <span>{firestoreStatus.connected ? '🔥 Real-Time Cloud' : '💾 Offline Cache'}</span>
+                      {cloudLessonVersion > 1 && <span className="opacity-75 font-mono">v{cloudLessonVersion}</span>}
+                    </span>
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium">ห้องทดลองผังงาน • 5 ด่าน 100 คะแนน • วิทยาการคำนวณ</p>
+
                 </div>
               </div>
 
@@ -3811,7 +3999,22 @@ export default function App() {
                               >
                                 <span>{std.name}</span>
                               </button>
+                              <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                <span className={`text-[9.5px] px-1.5 py-0.2 rounded-md font-bold ${
+                                  std.source === 'self_registration' 
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {std.source === 'self_registration' ? '👤 นักเรียนกรอกเอง' : '👩‍🏫 ครูเพิ่มให้'}
+                                </span>
+                                {liveProgressList.find(p => p.studentId === (std.studentId || std.id)) && (
+                                  <span className="text-[9.5px] px-1.5 py-0.2 rounded-md font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    🟢 กำลังเรียน ({liveProgressList.find(p => p.studentId === (std.studentId || std.id))?.currentStage || 'บทเรียน'})
+                                  </span>
+                                )}
+                              </div>
                             </td>
+
                             <td className="p-3.5 text-center text-slate-600 font-bold">{std.room} #{std.number}</td>
                             <td className="p-3.5 text-center font-semibold text-slate-700">{std.preScore}</td>
                             <td className="p-3.5 text-center font-black text-blue-700">{std.postScore}</td>
@@ -4677,7 +4880,48 @@ export default function App() {
                       </div>
                     </div>
 
+                    {/* Firestore Real-Time Cloud Diagnostics Banner */}
+                    <div className={`p-5 rounded-3xl border transition-all ${
+                      firestoreStatus.connected
+                        ? 'bg-gradient-to-br from-emerald-50/80 to-teal-50/40 border-emerald-200'
+                        : 'bg-gradient-to-br from-amber-50/80 to-orange-50/40 border-amber-200'
+                    }`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-start space-x-3.5">
+                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-inner ${
+                            firestoreStatus.connected ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
+                          }`}>
+                            🔥
+                          </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h4 className="font-black text-slate-900 text-sm">
+                                ฐานข้อมูลคลาวด์ Firebase Firestore (Single Source of Truth)
+                              </h4>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                                firestoreStatus.connected ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                              }`}>
+                                {firestoreStatus.connected ? '● LIVE CONNECTED' : '○ OFFLINE / CACHE'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 font-medium mt-0.5">
+                              Project: <strong className="font-mono text-slate-800 font-bold">{firestoreStatus.projectId || 'flowchart-quest-p6'}</strong> • 
+                              เวอร์ชันบทเรียน: <strong className="font-mono text-blue-700 font-bold">v{cloudLessonVersion}</strong> • 
+                              อัปเดตล่าสุด: <strong className="text-slate-700 font-bold">{lastLessonSnapshotTime || 'พร้อมใช้งาน'}</strong>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 shrink-0">
+                          <span className="text-[11px] bg-white/80 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 font-bold shadow-2xs">
+                            บทเรียนในคลาวด์: <span className="text-emerald-600 font-black">{learningChapters.length}</span> บท
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="glass-panel rounded-3xl p-6 shadow-sm space-y-4">
+
                       <h4 className="font-extrabold text-sm text-slate-900 flex items-center space-x-2">
                         <Sparkles className="w-4 h-4 text-amber-500" />
                         <span>ทางลัดการทำงานด่วนสำหรับผู้ดูแลระบบ (Admin Quick Actions)</span>
@@ -6317,12 +6561,22 @@ export default function App() {
                               console.error('Failed to save classrooms:', err);
                             }
 
+                            // Write to Firestore /classrooms in real-time
+                            if (isCreatingClassroom) {
+                              const createdRoom = nextRooms[nextRooms.length - 1];
+                              if (createdRoom) saveClassroomFirestore(createdRoom).catch(() => {});
+                            } else {
+                              const modifiedRoom = nextRooms.find(r => r.id === editingClassroom.id || r.code === editingClassroom.code);
+                              if (modifiedRoom) saveClassroomFirestore(modifiedRoom).catch(() => {});
+                            }
+
                             setEditingClassroom(null);
                             setIsCreatingClassroom(false);
                             playSound('success', soundEnabled);
                             await syncAllToCloudAndGitHub(learningChapters, nextRooms);
-                            alert(isCreatingClassroom ? '✅ สร้างห้องเรียนและซิงก์ขึ้น Google Sheets & GitHub สำเร็จแล้ว!' : '✅ บันทึกห้องเรียนและซิงก์ขึ้น Google Sheets & GitHub เรียบร้อยแล้ว!');
+                            alert(isCreatingClassroom ? '✅ สร้างห้องเรียนและซิงก์สู่ Firestore & Cloud เรียบร้อยแล้ว!' : '✅ บันทึกห้องเรียนและซิงก์สู่ Firestore & Cloud เรียบร้อยแล้ว!');
                           }}
+
                           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md flex items-center space-x-1.5 action-btn-hover"
                         >
                           <Save className="w-3.5 h-3.5" />
