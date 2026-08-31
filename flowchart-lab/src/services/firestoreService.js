@@ -41,9 +41,8 @@ export function subscribeLessons(onUpdate, onError) {
   try {
     const db = getFirebaseDb();
     const lessonsCol = collection(db, COLLECTIONS.LESSONS);
-    const q = query(lessonsCol, orderBy('chapterNum', 'asc'));
 
-    return onSnapshot(q, (snapshot) => {
+    return onSnapshot(lessonsCol, (snapshot) => {
       const lessons = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
@@ -51,10 +50,14 @@ export function subscribeLessons(onUpdate, onError) {
         lessons.push({
           id: docSnap.id,
           ...d,
+          chapterNum: Number(d.chapterNum) || 1,
           pdfUrl: rawPdf,
           embedUrl: rawPdf ? formatEmbedPdfUrl(rawPdf) : (d.embedUrl || '')
         });
       });
+
+      // Reliable JS-side sort by chapterNum
+      lessons.sort((a, b) => (Number(a.chapterNum) || 0) - (Number(b.chapterNum) || 0));
 
       console.log('[FIRESTORE LESSON SNAPSHOT]', {
         timestamp: new Date().toLocaleTimeString('th-TH'),
@@ -63,7 +66,12 @@ export function subscribeLessons(onUpdate, onError) {
       });
 
       if (lessons.length > 0 && typeof onUpdate === 'function') {
-        onUpdate(lessons, { fromCache: snapshot.metadata.fromCache, size: lessons.length });
+        onUpdate(lessons, { 
+          fromCache: snapshot.metadata.fromCache, 
+          hasPendingWrites: snapshot.metadata.hasPendingWrites,
+          size: lessons.length,
+          timestamp: new Date().toISOString()
+        });
       }
     }, (err) => {
       console.warn('[FIRESTORE LESSONS LISTENER ERROR]:', err.message);
@@ -96,13 +104,25 @@ export async function saveLesson(lessonId, lessonData) {
 
     await setDoc(lessonRef, payload, { merge: true });
 
-    // Read-back verification
+    // Strict Read-back verification
     const verifySnap = await getDoc(lessonRef);
     if (!verifySnap.exists()) {
       throw new Error('Read-back verification failed: Document not found in Firestore after write');
     }
 
     const savedData = verifySnap.data();
+    const readBackPdf = (savedData.pdfUrl || '').trim();
+    if (rawPdf && readBackPdf !== rawPdf) {
+      throw new Error(`Read-back PDF mismatch: expected "${rawPdf}" but received "${readBackPdf}"`);
+    }
+
+    console.log('[FIRESTORE WRITE SUCCESS]', {
+      lessonId,
+      pdfUrl: readBackPdf,
+      version: nextVersion,
+      updatedAt: new Date().toISOString()
+    });
+
     return {
       success: true,
       data: savedData,
@@ -113,6 +133,34 @@ export async function saveLesson(lessonId, lessonData) {
     return { success: false, message: `🔴 บันทึกบทเรียนไม่สำเร็จ: ${err.message}` };
   }
 }
+
+export async function syncAllChaptersToFirestore(chaptersList) {
+  if (!Array.isArray(chaptersList) || chaptersList.length === 0) return { success: false, count: 0 };
+  try {
+    const db = getFirebaseDb();
+    const batch = writeBatch(db);
+    chaptersList.forEach((ch, idx) => {
+      const chId = ch.id || `ch${idx + 1}`;
+      const chRef = doc(db, COLLECTIONS.LESSONS, chId);
+      const rawPdf = (ch.pdfUrl || ch.drivePdfUrl || ch.driveUrl || ch.googleDriveUrl || '').trim();
+      batch.set(chRef, {
+        ...ch,
+        id: chId,
+        chapterNum: ch.chapterNum || (idx + 1),
+        pdfUrl: rawPdf,
+        embedUrl: rawPdf ? formatEmbedPdfUrl(rawPdf) : '',
+        updatedAt: serverTimestamp(),
+        active: true
+      }, { merge: true });
+    });
+    await batch.commit();
+    return { success: true, count: chaptersList.length };
+  } catch (err) {
+    console.error('[FIRESTORE SYNC ALL LESSONS ERROR]:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 
 export async function seedDefaultLessonsIfEmpty(defaultList) {
   if (!Array.isArray(defaultList) || defaultList.length === 0) return { seeded: false, count: 0 };

@@ -38,14 +38,22 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Safety: NEVER cache non-GET, Google Apps Script webhooks, or dynamic data
+  // Safety: NEVER cache non-GET, Google Drive, Docs, Firebase, Firestore, or external APIs
   if (
     request.method !== 'GET' ||
     url.hostname.includes('script.google.com') ||
-    url.pathname.includes('/macros/s/')
+    url.hostname.includes('drive.google.com') ||
+    url.hostname.includes('docs.google.com') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('firebaseio.com') ||
+    url.hostname.includes('firebasestorage.app') ||
+    url.pathname.includes('/macros/s/') ||
+    url.pathname.includes('/preview') ||
+    url.pathname.includes('/view')
   ) {
     return; // Pass-through to network directly
   }
+
 
   // Cache-First with Network Fallback for Static Assets
   event.respondWith(

@@ -131,7 +131,7 @@ export default function HorizontalPdfViewer({
 
         {/* Embedded Google Drive Preview Iframe */}
         <iframe
-          key={iframeKey}
+          key={`${embedUrl}_${strategyIndex}_${iframeKey}`}
           src={embedUrl}
           title={`Google Drive PDF - ${title}`}
           className="w-full h-full border-0 bg-white"
@@ -139,7 +139,17 @@ export default function HorizontalPdfViewer({
           onLoad={() => setIsLoading(false)}
         />
       </div>
+
+      {/* Optional Diagnostic Footer (Visible in debug mode) */}
+      {typeof window !== 'undefined' && window.location.search.includes('debug=1') && (
+        <div className="bg-slate-900 text-slate-300 p-2.5 rounded-xl text-[10.5px] font-mono flex flex-wrap items-center justify-between gap-2 border border-slate-800">
+          <span>📚 Lesson: <strong>ch{chapterNum}</strong></span>
+          <span className="truncate max-w-[280px]">🔗 Embed: {embedUrl}</span>
+          <span className="text-emerald-400 font-bold">🟢 Live Streamed</span>
+        </div>
+      )}
     </div>
   );
 }
+
 
