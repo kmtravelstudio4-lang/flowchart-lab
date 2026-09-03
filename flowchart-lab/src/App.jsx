@@ -621,6 +621,7 @@ export default function App() {
   const [teacherSearchQuery, setTeacherSearchQuery] = useState('');
   const [teacherFilterStartDate, setTeacherFilterStartDate] = useState('');
   const [teacherFilterEndDate, setTeacherFilterEndDate] = useState('');
+  const [selectedRoom, setSelectedRoom] = useState('ทั้งหมด');
 
   // Sandbox State
   const [sandboxNodes, setSandboxNodes] = useState([
