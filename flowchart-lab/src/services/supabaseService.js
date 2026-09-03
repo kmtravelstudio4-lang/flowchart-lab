@@ -367,6 +367,43 @@ export const saveLessonPdfUrl = async (lessonId, pdfUrl) => {
 /**
  * 7. ADMIN OVERVIEW & REAL-TIME SUBSCRIPTIONS
  */
+/**
+ * Record student live score update to Supabase Events & Activity Attempts in Real-Time
+ */
+export const recordLiveScore = async ({
+  studentId,
+  sessionId = null,
+  classroom = 'ห้อง ป.6/1',
+  studentNumber = 1,
+  stageId = 'game',
+  scores = {}
+}) => {
+  if (!studentId) return { success: false };
+  if (!isSupabaseConfigured) return { success: true, localOnly: true };
+
+  const payload = {
+    scores,
+    stage_id: stageId,
+    classroom,
+    student_number: studentNumber,
+    timestamp: new Date().toISOString()
+  };
+
+  try {
+    await supabase.from('events').insert({
+      student_id: studentId,
+      event_type: 'score_updated',
+      event_name: `อัปเดตคะแนนสด: ${scores.total || 0}/100`,
+      metadata: payload
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.debug('[RECORD LIVE SCORE ERROR]:', err);
+    return { success: false, error: err.message };
+  }
+};
+
 export const fetchAdminDashboardData = async () => {
   if (!isSupabaseConfigured) {
     return { students: [], progress: [], events: [], classrooms: [] };
@@ -376,14 +413,38 @@ export const fetchAdminDashboardData = async () => {
     const [studentsRes, progressRes, eventsRes, classroomsRes] = await Promise.all([
       supabase.from('students').select('*').order('last_active_at', { ascending: false }),
       supabase.from('progress').select('*'),
-      supabase.from('events').select('*, students(first_name, last_name, classroom, student_number)').order('created_at', { ascending: false }).limit(30),
+      supabase.from('events').select('*, students(first_name, last_name, classroom, student_number)').order('created_at', { ascending: false }).limit(60),
       supabase.from('classrooms').select('*').order('code', { ascending: true })
     ]);
 
+    const students = studentsRes.data || [];
+    const events = eventsRes.data || [];
+
+    // Correlate latest score events onto each student
+    const studentsWithScores = students.map(s => {
+      const studentEvents = events.filter(e => e.student_id === s.id && (e.event_type === 'score_updated' || e.event_type === 'COURSE_COMPLETED'));
+      const latestScoreEvent = studentEvents[0]; // ordered desc
+      const scores = latestScoreEvent?.metadata?.scores || {};
+
+      return {
+        ...s,
+        preScore: scores.preScore !== undefined ? scores.preScore : null,
+        postScore: scores.postScore !== undefined ? scores.postScore : null,
+        gainScore: scores.gainScore !== undefined ? scores.gainScore : 0,
+        m1: scores.m1 !== undefined ? scores.m1 : 0,
+        m2: scores.m2 !== undefined ? scores.m2 : 0,
+        m3: scores.m3 !== undefined ? scores.m3 : 0,
+        m4: scores.m4 !== undefined ? scores.m4 : 0,
+        m5: scores.m5 !== undefined ? scores.m5 : 0,
+        totalScore: scores.total !== undefined ? scores.total : 0,
+        isPassed: scores.total !== undefined ? scores.total >= 60 : false
+      };
+    });
+
     return {
-      students: studentsRes.data || [],
+      students: studentsWithScores,
       progress: progressRes.data || [],
-      events: eventsRes.data || [],
+      events: events,
       classrooms: classroomsRes.data || []
     };
   } catch (err) {

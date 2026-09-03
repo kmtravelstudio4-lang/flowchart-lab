@@ -64,6 +64,7 @@ import {
   updateHeartbeat, 
   updateStudentProgress, 
   recordActivityAttempt, 
+  recordLiveScore,
   logEvent, 
   fetchAdminDashboardData, 
   subscribeAdminRealtime, 
@@ -311,7 +312,17 @@ export default function App() {
           number: s.student_number,
           source: s.registration_source,
           lastActiveAt: s.last_active_at,
-          createdAt: s.created_at
+          createdAt: s.created_at,
+          preScore: s.preScore !== undefined ? s.preScore : null,
+          postScore: s.postScore !== undefined ? s.postScore : null,
+          gainScore: s.gainScore !== undefined ? s.gainScore : 0,
+          m1: s.m1 !== undefined ? s.m1 : 0,
+          m2: s.m2 !== undefined ? s.m2 : 0,
+          m3: s.m3 !== undefined ? s.m3 : 0,
+          m4: s.m4 !== undefined ? s.m4 : 0,
+          m5: s.m5 !== undefined ? s.m5 : 0,
+          totalScore: s.totalScore !== undefined ? s.totalScore : 0,
+          isPassed: s.isPassed !== undefined ? s.isPassed : false
         }));
         setStudentRecords(mapped);
       }
@@ -338,7 +349,35 @@ export default function App() {
       },
       onEventInsert: (payload) => {
         if (payload && payload.new) {
-          setLiveEventsList(prev => [payload.new, ...prev.slice(0, 29)]);
+          const newEvt = payload.new;
+          setLiveEventsList(prev => [newEvt, ...prev.slice(0, 29)]);
+
+          // If score updated, update student record live on teacher dashboard
+          if (newEvt.event_type === 'score_updated' && newEvt.metadata?.scores) {
+            const scores = newEvt.metadata.scores;
+            setStudentRecords(prev => {
+              const idx = prev.findIndex(s => s.id === newEvt.student_id || s.studentId === newEvt.student_id);
+              if (idx >= 0) {
+                const copy = [...prev];
+                copy[idx] = {
+                  ...copy[idx],
+                  preScore: scores.preScore !== undefined ? scores.preScore : copy[idx].preScore,
+                  postScore: scores.postScore !== undefined ? scores.postScore : copy[idx].postScore,
+                  gainScore: scores.gainScore !== undefined ? scores.gainScore : copy[idx].gainScore,
+                  m1: scores.m1 !== undefined ? scores.m1 : copy[idx].m1,
+                  m2: scores.m2 !== undefined ? scores.m2 : copy[idx].m2,
+                  m3: scores.m3 !== undefined ? scores.m3 : copy[idx].m3,
+                  m4: scores.m4 !== undefined ? scores.m4 : copy[idx].m4,
+                  m5: scores.m5 !== undefined ? scores.m5 : copy[idx].m5,
+                  totalScore: scores.total !== undefined ? scores.total : copy[idx].totalScore,
+                  isPassed: scores.total !== undefined ? scores.total >= 60 : copy[idx].isPassed,
+                  lastActiveAt: new Date().toISOString()
+                };
+                return copy;
+              }
+              return prev;
+            });
+          }
         }
       }
     });
@@ -1001,6 +1040,78 @@ export default function App() {
     playSound('success', soundEnabled);
   };
 
+  // --- Real-Time Student Score Synchronizer ---
+  const syncLiveStudentScore = async (scoreDelta = {}) => {
+    if (!studentInfo || !studentInfo.name || !studentInfo.name.trim()) return;
+
+    const updated = {
+      ...missionScores,
+      ...scoreDelta
+    };
+
+    const m1 = Math.min(Math.max(0, Number(updated.m1 || 0)), 15);
+    const m2 = Math.min(Math.max(0, Number(updated.m2 || 0)), 15);
+    const m3 = Math.min(Math.max(0, Number(updated.m3 || 0)), 15);
+    const m4 = Math.min(Math.max(0, Number(updated.m4 || 0)), 20);
+    const m5 = Math.min(Math.max(0, Number(updated.m5 || 0)), 35);
+    const preScore = updated.preScore !== null && updated.preScore !== undefined ? Number(updated.preScore) : null;
+    const postScore = updated.postScore !== null && updated.postScore !== undefined ? Number(updated.postScore) : null;
+    const gainScore = (postScore !== null && preScore !== null) ? (postScore - preScore) : 0;
+    const total = Math.min(m1 + m2 + m3 + m4 + m5, 100);
+    const isPassed = total >= 60;
+
+    const sId = studentInfo.studentId || studentInfo.id || `std_${studentInfo.room}_${studentInfo.number}`;
+
+    const liveRecord = {
+      id: sId,
+      studentId: sId,
+      sessionId: studentInfo.sessionId || `sess_${Date.now()}`,
+      name: studentInfo.name,
+      room: studentInfo.room || 'ห้อง ป.6/1',
+      roomCode: studentInfo.roomCode || '601',
+      number: studentInfo.number || '-',
+      preScore,
+      postScore,
+      gainScore,
+      m1,
+      m2,
+      m3,
+      m4,
+      m5,
+      totalScore: total,
+      isPassed,
+      lastActiveAt: new Date().toISOString()
+    };
+
+    // 1. Update local student records
+    setStudentRecords(prev => {
+      const idx = prev.findIndex(r => r.id === sId || (r.name === liveRecord.name && r.room === liveRecord.room));
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], ...liveRecord };
+        return copy;
+      }
+      return [liveRecord, ...prev];
+    });
+
+    // 2. Broadcast live score to Supabase
+    if (studentInfo.studentId) {
+      recordLiveScore({
+        studentId: studentInfo.studentId,
+        sessionId: studentInfo.sessionId,
+        classroom: studentInfo.room,
+        studentNumber: studentInfo.number,
+        stageId: gameStage,
+        scores: { preScore, postScore, gainScore, m1, m2, m3, m4, m5, total }
+      }).catch(() => {});
+    }
+
+    // 3. Background Sync to Google Sheets
+    if (cloudWebhookUrl && cloudWebhookUrl.trim()) {
+      syncScoreToDatabase(liveRecord, cloudWebhookUrl).catch(() => {});
+    }
+  };
+
   // --- Pre-Test Handlers ---
   const handleSelectPreOption = (qId, optIdx) => {
     if (preSubmitted) return;
@@ -1025,6 +1136,7 @@ export default function App() {
     setCompletedStages(prev => ({ ...prev, pretest: true }));
     setUserXP(prev => prev + score * 10);
     playSound('success', soundEnabled);
+    syncLiveStudentScore({ preScore: score });
   };
 
   // --- Post-Test Handlers ---
@@ -1058,8 +1170,9 @@ export default function App() {
     setUserXP(prev => prev + score * 15);
     playSound('success', soundEnabled);
 
-    // Save student completion record to Teacher database
+    // Save student completion record to Teacher database & broadcast real-time
     saveStudentRecordToDatabase(updatedScores);
+    syncLiveStudentScore({ postScore: score, isCompleted: true });
   };
 
   // Save record to persistent array & Cloud Database
@@ -1236,6 +1349,7 @@ export default function App() {
       setComboCount(prev => prev + 1);
       setUserXP(prev => prev + 150);
       setMissionScores(prev => ({ ...prev, m1: 15 }));
+      syncLiveStudentScore({ m1: 15 });
       setM1Result({
         success: true,
         canContinue: true,
@@ -1293,6 +1407,7 @@ export default function App() {
       if (m2LevelIdx >= STEP_MASTER_LEVELS.length - 1) {
         setMissionScores(prev => ({ ...prev, m2: 15 }));
         setUserXP(prev => prev + 150);
+        syncLiveStudentScore({ m2: 15 });
       }
     } else {
       playSound('error', soundEnabled);
@@ -1350,6 +1465,7 @@ export default function App() {
       if (m3LevelIdx >= FLOW_READER_LEVELS.length - 1) {
         setMissionScores(prev => ({ ...prev, m3: 15 }));
         setUserXP(prev => prev + 150);
+        syncLiveStudentScore({ m3: 15 });
       }
     } else {
       playSound('error', soundEnabled);
@@ -1401,6 +1517,7 @@ export default function App() {
       });
       setMissionScores(prev => ({ ...prev, m4: 20 }));
       setUserXP(prev => prev + 200);
+      syncLiveStudentScore({ m4: 20 });
     } else {
       playSound('error', soundEnabled);
       setM4Result({
@@ -1418,6 +1535,7 @@ export default function App() {
     setMissionScores(prev => ({ ...prev, m5: finalScore }));
     setCompletedStages(prev => ({ ...prev, final: true }));
     setUserXP(prev => prev + 350);
+    syncLiveStudentScore({ m5: finalScore });
   };
 
   // --- Certificate PNG Download (100% Fail-safe Canvas) ---
@@ -5285,7 +5403,7 @@ export default function App() {
                           <div className="text-3xl">👥</div>
                           <div className="text-sm font-black text-slate-700">ยังไม่มีข้อมูลนักเรียนในมุมมองนี้</div>
                           <p className="text-xs text-slate-500 max-w-md mx-auto">
-                            เมื่อนักเรียนเปิดเว็บ กรอกชื่อ และกด "เริ่มเรียน" หรือเมื่อครูนำเข้ารายชื่อ ข้อมูลจะปรากฏที่นี่แบบ Real-Time อัตโนมัติ
+                            เมื่อนักเรียนเปิดเว็บ กรอกชื่อ และกด "เริ่มเรียน" หรือเมื่อครูนำเข้ารายชื่อ ข้อมูลและคะแนนจะปรากฏที่นี่แบบ Real-Time อัตโนมัติ
                           </p>
                         </div>
                       ) : (
@@ -5293,13 +5411,17 @@ export default function App() {
                           <table className="w-full text-left text-xs">
                             <thead className="bg-slate-100 text-slate-700 font-black border-b border-slate-200 text-[11px]">
                               <tr>
-                                <th className="p-3">ชื่อ-นามสกุล / ที่มา</th>
+                                <th className="p-3">ชื่อ-นามสกุล</th>
                                 <th className="p-3 text-center">ห้อง / เลขที่</th>
-                                <th className="p-3 text-center">สถานะใช้งาน</th>
-                                <th className="p-3 text-center">บทเรียนปัจจุบัน</th>
+                                <th className="p-3 text-center">สถานะสด</th>
                                 <th className="p-3 text-center">ด่านปัจจุบัน</th>
-                                <th className="p-3 text-center">Active ล่าสุด</th>
-                                <th className="p-3 text-center">การจัดการ</th>
+                                <th className="p-3 text-center">Pre (10)</th>
+                                <th className="p-3 text-center">M1-M5 (70)</th>
+                                <th className="p-3 text-center">Post (10)</th>
+                                <th className="p-3 text-center">รวม (100)</th>
+                                <th className="p-3 text-center">Gain</th>
+                                <th className="p-3 text-center">ผลประเมิน</th>
+                                <th className="p-3 text-center">จัดการ</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
@@ -5309,6 +5431,10 @@ export default function App() {
                                 .map((std) => {
                                   const onlineStatus = computeOnlineStatus(std.lastActiveAt || std.last_active_at);
                                   const currentProg = liveProgressList.find(p => p.student_id === std.id || p.studentId === std.id);
+                                  const missionTotal = (std.m1 || 0) + (std.m2 || 0) + (std.m3 || 0) + (std.m4 || 0) + (std.m5 || 0);
+                                  const total = std.totalScore !== undefined ? std.totalScore : missionTotal;
+                                  const isPassed = total >= 60;
+
                                   return (
                                     <tr key={std.id} className="hover:bg-blue-50/40 transition">
                                       <td className="p-3 font-bold text-slate-900">
@@ -5337,14 +5463,40 @@ export default function App() {
                                           ● {onlineStatus.label}
                                         </span>
                                       </td>
-                                      <td className="p-3 text-center font-medium text-slate-700">
-                                        {currentProg?.lesson_id || 'บทที่ 1'}
-                                      </td>
                                       <td className="p-3 text-center font-bold text-indigo-700">
-                                        {currentProg?.current_stage || currentProg?.status || 'เริ่มต้น'}
+                                        {currentProg?.current_stage || currentProg?.status || (total > 0 ? 'กำลังเรียน' : 'เริ่มต้น')}
                                       </td>
-                                      <td className="p-3 text-center text-slate-500 font-mono text-[11px]">
-                                        {std.lastActiveAt ? new Date(std.lastActiveAt).toLocaleTimeString('th-TH') : '-'}
+                                      <td className="p-3 text-center font-bold text-slate-700">
+                                        {std.preScore !== null && std.preScore !== undefined ? `${std.preScore}/10` : '-'}
+                                      </td>
+                                      <td className="p-3 text-center font-bold text-blue-700">
+                                        {missionTotal}/70
+                                      </td>
+                                      <td className="p-3 text-center font-bold text-slate-700">
+                                        {std.postScore !== null && std.postScore !== undefined ? `${std.postScore}/10` : '-'}
+                                      </td>
+                                      <td className="p-3 text-center">
+                                        <span className="font-black text-xs text-blue-800 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200">
+                                          {total}/100
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-center font-black text-xs">
+                                        {std.gainScore > 0 ? (
+                                          <span className="text-emerald-600">+{std.gainScore}</span>
+                                        ) : std.gainScore === 0 ? (
+                                          <span className="text-slate-400">0</span>
+                                        ) : (
+                                          <span className="text-rose-500">{std.gainScore}</span>
+                                        )}
+                                      </td>
+                                      <td className="p-3 text-center">
+                                        <span className={`px-2 py-0.5 rounded-full font-black text-[10px] border ${
+                                          isPassed 
+                                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                                            : 'bg-amber-50 text-amber-800 border-amber-300'
+                                        }`}>
+                                          {isPassed ? '✅ ผ่านเกณฑ์' : '⏳ รอพัฒนา'}
+                                        </span>
                                       </td>
                                       <td className="p-3 text-center">
                                         <div className="flex items-center justify-center space-x-1">
@@ -5357,7 +5509,7 @@ export default function App() {
                                             title="ดูโปรไฟล์และ Timeline"
                                           >
                                             <Eye className="w-3.5 h-3.5" />
-                                            <span>Timeline</span>
+                                            <span>ดูผล</span>
                                           </button>
                                         </div>
                                       </td>
