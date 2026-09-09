@@ -390,12 +390,25 @@ export const recordLiveScore = async ({
   };
 
   try {
+    const isCompleted = stageId === 'completed' || stageId === 'final' || scores.isCompleted;
+    const eventType = isCompleted ? 'COURSE_COMPLETED' : 'score_updated';
+    const eventName = isCompleted 
+      ? `จบหลักสูตรและผ่านการประเมิน: ${scores.total || scores.totalScore || 0}/100` 
+      : `อัปเดตคะแนนสด: ${scores.total || scores.totalScore || 0}/100`;
+
+    // 1. Insert into events
     await supabase.from('events').insert({
       student_id: studentId,
-      event_type: 'score_updated',
-      event_name: `อัปเดตคะแนนสด: ${scores.total || 0}/100`,
+      event_type: eventType,
+      event_name: eventName,
       metadata: payload
     });
+
+    // 2. Also update last_active_at on students table for real-time online status
+    await supabase
+      .from('students')
+      .update({ last_active_at: new Date().toISOString() })
+      .eq('id', studentId);
 
     return { success: true };
   } catch (err) {
@@ -413,7 +426,7 @@ export const fetchAdminDashboardData = async () => {
     const [studentsRes, progressRes, eventsRes, classroomsRes] = await Promise.all([
       supabase.from('students').select('*').order('last_active_at', { ascending: false }),
       supabase.from('progress').select('*'),
-      supabase.from('events').select('*, students(first_name, last_name, classroom, student_number)').order('created_at', { ascending: false }).limit(60),
+      supabase.from('events').select('*, students(first_name, last_name, classroom, student_number)').order('created_at', { ascending: false }).limit(100),
       supabase.from('classrooms').select('*').order('code', { ascending: true })
     ]);
 
@@ -424,20 +437,20 @@ export const fetchAdminDashboardData = async () => {
     const studentsWithScores = students.map(s => {
       const studentEvents = events.filter(e => e.student_id === s.id && (e.event_type === 'score_updated' || e.event_type === 'COURSE_COMPLETED'));
       const latestScoreEvent = studentEvents[0]; // ordered desc
-      const scores = latestScoreEvent?.metadata?.scores || {};
+      const rawScores = latestScoreEvent?.metadata?.scores || latestScoreEvent?.metadata || {};
 
       return {
         ...s,
-        preScore: scores.preScore !== undefined ? scores.preScore : null,
-        postScore: scores.postScore !== undefined ? scores.postScore : null,
-        gainScore: scores.gainScore !== undefined ? scores.gainScore : 0,
-        m1: scores.m1 !== undefined ? scores.m1 : 0,
-        m2: scores.m2 !== undefined ? scores.m2 : 0,
-        m3: scores.m3 !== undefined ? scores.m3 : 0,
-        m4: scores.m4 !== undefined ? scores.m4 : 0,
-        m5: scores.m5 !== undefined ? scores.m5 : 0,
-        totalScore: scores.total !== undefined ? scores.total : 0,
-        isPassed: scores.total !== undefined ? scores.total >= 60 : false
+        preScore: rawScores.preScore !== undefined ? rawScores.preScore : null,
+        postScore: rawScores.postScore !== undefined ? rawScores.postScore : null,
+        gainScore: rawScores.gainScore !== undefined ? rawScores.gainScore : 0,
+        m1: rawScores.m1 !== undefined ? rawScores.m1 : 0,
+        m2: rawScores.m2 !== undefined ? rawScores.m2 : 0,
+        m3: rawScores.m3 !== undefined ? rawScores.m3 : 0,
+        m4: rawScores.m4 !== undefined ? rawScores.m4 : 0,
+        m5: rawScores.m5 !== undefined ? rawScores.m5 : 0,
+        totalScore: rawScores.total !== undefined ? rawScores.total : (rawScores.totalScore !== undefined ? rawScores.totalScore : 0),
+        isPassed: rawScores.total !== undefined ? rawScores.total >= 60 : (rawScores.totalScore !== undefined ? rawScores.totalScore >= 60 : false)
       };
     });
 
@@ -454,31 +467,36 @@ export const fetchAdminDashboardData = async () => {
 };
 
 /**
- * Subscribe to Supabase Realtime Channels for Admin
+ * Subscribe to Supabase Realtime Channels for Admin & Teacher Dashboard
  * @param {Object} callbacks
  * @returns {Function} Unsubscribe cleanup function
  */
 export const subscribeAdminRealtime = ({
   onStudentChange,
   onProgressChange,
-  onEventInsert
+  onEventChange,
+  onStatusChange
 }) => {
   if (!isSupabaseConfigured) {
     return () => {};
   }
 
   const channel = supabase
-    .channel('admin_live_feed')
+    .channel('flowchart_quest_live_feed')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, (payload) => {
       if (typeof onStudentChange === 'function') onStudentChange(payload);
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'progress' }, (payload) => {
       if (typeof onProgressChange === 'function') onProgressChange(payload);
     })
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, (payload) => {
-      if (typeof onEventInsert === 'function') onEventInsert(payload);
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
+      if (typeof onEventChange === 'function') onEventChange(payload);
     })
-    .subscribe();
+    .subscribe((status) => {
+      if (typeof onStatusChange === 'function') {
+        onStatusChange(status);
+      }
+    });
 
   return () => {
     supabase.removeChannel(channel);

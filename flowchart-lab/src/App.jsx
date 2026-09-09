@@ -287,21 +287,9 @@ export default function App() {
   const [liveEventsList, setLiveEventsList] = useState([]);
 
   // Supabase Realtime & Initial Data Load
-  useEffect(() => {
-    // 1. Connection check
-    checkSupabaseConnection().then(res => {
-      setSupabaseStatus({
-        connected: res.ok,
-        latencyMs: res.latencyMs || 0,
-        message: res.message
-      });
-      if (res.ok) {
-        setLastLessonSnapshotTime(new Date().toLocaleTimeString('th-TH'));
-      }
-    });
-
-    // 2. Fetch Initial Admin Dashboard Data
-    const loadDashboard = async () => {
+  // 2. Fetch Initial and Live Admin/Teacher Dashboard Data
+  const loadDashboard = useCallback(async () => {
+    try {
       const data = await fetchAdminDashboardData();
       if (data && Array.isArray(data.students)) {
         const mapped = data.students.map(s => ({
@@ -335,8 +323,26 @@ export default function App() {
       if (data && Array.isArray(data.classrooms) && data.classrooms.length > 0) {
         setClassrooms(data.classrooms);
       }
-    };
+      setLastSyncTime(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (err) {
+      console.warn('[LOAD DASHBOARD ERROR]:', err);
+    }
+  }, []);
 
+  useEffect(() => {
+    // 1. Connection check
+    checkSupabaseConnection().then(res => {
+      setSupabaseStatus({
+        connected: res.ok,
+        latencyMs: res.latencyMs || 0,
+        message: res.message
+      });
+      if (res.ok) {
+        setLastLessonSnapshotTime(new Date().toLocaleTimeString('th-TH'));
+      }
+    });
+
+    // 2. Initial Data Load
     loadDashboard();
 
     // 3. Supabase Realtime Subscription
@@ -347,30 +353,31 @@ export default function App() {
       onProgressChange: () => {
         loadDashboard();
       },
-      onEventInsert: (payload) => {
+      onEventChange: (payload) => {
         if (payload && payload.new) {
           const newEvt = payload.new;
-          setLiveEventsList(prev => [newEvt, ...prev.slice(0, 29)]);
+          setLiveEventsList(prev => [newEvt, ...prev.slice(0, 49)]);
 
-          // If score updated, update student record live on teacher dashboard
-          if (newEvt.event_type === 'score_updated' && newEvt.metadata?.scores) {
-            const scores = newEvt.metadata.scores;
+          // If score updated or course completed, update student record live on teacher dashboard immediately
+          if ((newEvt.event_type === 'score_updated' || newEvt.event_type === 'COURSE_COMPLETED') && (newEvt.metadata?.scores || newEvt.metadata)) {
+            const rawScores = newEvt.metadata.scores || newEvt.metadata;
             setStudentRecords(prev => {
               const idx = prev.findIndex(s => s.id === newEvt.student_id || s.studentId === newEvt.student_id);
               if (idx >= 0) {
                 const copy = [...prev];
+                const total = rawScores.total !== undefined ? rawScores.total : (rawScores.totalScore !== undefined ? rawScores.totalScore : copy[idx].totalScore);
                 copy[idx] = {
                   ...copy[idx],
-                  preScore: scores.preScore !== undefined ? scores.preScore : copy[idx].preScore,
-                  postScore: scores.postScore !== undefined ? scores.postScore : copy[idx].postScore,
-                  gainScore: scores.gainScore !== undefined ? scores.gainScore : copy[idx].gainScore,
-                  m1: scores.m1 !== undefined ? scores.m1 : copy[idx].m1,
-                  m2: scores.m2 !== undefined ? scores.m2 : copy[idx].m2,
-                  m3: scores.m3 !== undefined ? scores.m3 : copy[idx].m3,
-                  m4: scores.m4 !== undefined ? scores.m4 : copy[idx].m4,
-                  m5: scores.m5 !== undefined ? scores.m5 : copy[idx].m5,
-                  totalScore: scores.total !== undefined ? scores.total : copy[idx].totalScore,
-                  isPassed: scores.total !== undefined ? scores.total >= 60 : copy[idx].isPassed,
+                  preScore: rawScores.preScore !== undefined ? rawScores.preScore : copy[idx].preScore,
+                  postScore: rawScores.postScore !== undefined ? rawScores.postScore : copy[idx].postScore,
+                  gainScore: rawScores.gainScore !== undefined ? rawScores.gainScore : copy[idx].gainScore,
+                  m1: rawScores.m1 !== undefined ? rawScores.m1 : copy[idx].m1,
+                  m2: rawScores.m2 !== undefined ? rawScores.m2 : copy[idx].m2,
+                  m3: rawScores.m3 !== undefined ? rawScores.m3 : copy[idx].m3,
+                  m4: rawScores.m4 !== undefined ? rawScores.m4 : copy[idx].m4,
+                  m5: rawScores.m5 !== undefined ? rawScores.m5 : copy[idx].m5,
+                  totalScore: total,
+                  isPassed: total >= 60,
                   lastActiveAt: new Date().toISOString()
                 };
                 return copy;
@@ -378,6 +385,13 @@ export default function App() {
               return prev;
             });
           }
+          // Refresh list for complete data consistency
+          loadDashboard();
+        }
+      },
+      onStatusChange: (status) => {
+        if (status === 'SUBSCRIBED') {
+          setSupabaseStatus(prev => ({ ...prev, connected: true }));
         }
       }
     });
@@ -385,7 +399,21 @@ export default function App() {
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, []);
+  }, [loadDashboard]);
+
+  // Periodic Real-Time Sync Polling (Every 4s on Teacher/Admin tabs, 15s in background)
+  useEffect(() => {
+    const isDashboardActive = activeTab === 'teacher' || activeTab === 'admin';
+    const intervalMs = isDashboardActive ? 4000 : 15000;
+
+    const interval = setInterval(() => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        loadDashboard();
+      }
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [activeTab, loadDashboard]);
 
   // Heartbeat ticker for active student session
   useEffect(() => {
@@ -1192,8 +1220,8 @@ export default function App() {
 
     const currentTimes = getStoredStageTimes();
     const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const studentId = `std_${studentInfo.room.replace('/', '_')}_${studentInfo.number}_${Date.now()}`;
-    const sessionId = `sess_${Date.now()}`;
+    const studentId = studentInfo.studentId || studentInfo.id || `std_${(studentInfo.room || 'room').replace(/[\s/.]/g, '_')}_no${studentInfo.number || '0'}`;
+    const sessionId = studentInfo.sessionId || `sess_${Date.now()}`;
 
     const newRecord = {
       id: studentId,
@@ -1234,12 +1262,25 @@ export default function App() {
           currentStage: 'completed',
           status: 'completed'
         });
+        await recordLiveScore({
+          studentId,
+          sessionId,
+          classroom: studentInfo.room,
+          studentNumber: studentInfo.number,
+          stageId: 'completed',
+          scores: { preScore, postScore, gainScore, m1, m2, m3, m4, m5, total, totalScore: total, isCompleted: true }
+        });
         await logEvent({
           studentId,
           sessionId,
           eventType: 'COURSE_COMPLETED',
           eventName: 'จบหลักสูตร',
-          metadata: { classroom: studentInfo.room, studentNumber: studentInfo.number, completedAt: new Date().toISOString() }
+          metadata: { 
+            classroom: studentInfo.room, 
+            studentNumber: studentInfo.number, 
+            scores: { preScore, postScore, gainScore, m1, m2, m3, m4, m5, total },
+            completedAt: new Date().toISOString() 
+          }
         });
       }
     } catch (sbErr) {
@@ -1640,42 +1681,20 @@ export default function App() {
     }
   };
 
-  // --- Admin Login ---
+  // --- Admin & Teacher Authentication ---
   const handleAdminLogin = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     const input = (adminPinInput || '').trim();
     const targetPin = (adminPin || 'admin1234').trim();
     
-    // Always permit standard passwords or quick access
-    if (
-      !input ||
-      input === targetPin ||
-      input.toLowerCase() === targetPin.toLowerCase() ||
-      input.toLowerCase() === 'admin1234' ||
-      input.toLowerCase() === 'admin' ||
-      input === '1234' ||
-      input === '601' ||
-      input === 'kruking' ||
-      input === '0000'
-    ) {
+    if (input && input === targetPin) {
       setIsAdminUnlocked(true);
       setAdminPinError('');
       playSound('success', soundEnabled);
     } else {
-      setAdminPinError('❌ รหัสผ่านไม่ถูกต้อง (รหัสมาตรฐาน: admin1234 หรือ 1234)');
+      setAdminPinError('❌ รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
       playSound('error', soundEnabled);
     }
-  };
-
-  const handleQuickUnlock = () => {
-    setAdminPinInput('admin1234');
-    setAdminPin('admin1234');
-    try {
-      localStorage.setItem('flowchart_admin_pin', 'admin1234');
-    } catch { /* ignore */ }
-    setIsAdminUnlocked(true);
-    setAdminPinError('');
-    playSound('success', soundEnabled);
   };
 
   // --- Export Student Table to CSV (ตามห้องเรียน และ ช่วงวันที่) ---
@@ -3981,29 +4000,12 @@ export default function App() {
                   <div>
                     <input
                       type="password"
-                      placeholder="กรอกรหัสผ่าน (มาตรฐาน: admin1234 หรือ 1234)"
+                      placeholder="กรอกรหัสผ่านเพื่อเข้าใช้งาน"
                       value={adminPinInput}
                       onChange={(e) => { setAdminPinInput(e.target.value); setAdminPinError(''); }}
                       className="w-full bg-white border border-slate-300 rounded-2xl px-4 py-3.5 text-center text-base font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                       autoFocus
                     />
-                    <div className="flex items-center justify-center space-x-2 mt-2 text-[11px] text-slate-500">
-                      <span>รหัสเริ่มต้น:</span>
-                      <button
-                        type="button"
-                        onClick={() => { setAdminPinInput('admin1234'); setAdminPinError(''); }}
-                        className="font-mono font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2.5 py-0.5 rounded-lg border border-indigo-200 transition"
-                      >
-                        admin1234
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setAdminPinInput('1234'); setAdminPinError(''); }}
-                        className="font-mono font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2 py-0.5 rounded-lg border border-indigo-200 transition"
-                      >
-                        1234
-                      </button>
-                    </div>
                   </div>
 
                   {adminPinError && (
@@ -4019,15 +4021,6 @@ export default function App() {
                       className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-md transition text-sm action-btn-hover cursor-pointer"
                     >
                       เข้าสู่ระบบแดชบอร์ดคุณครู
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleQuickUnlock}
-                      className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold py-2.5 px-4 rounded-2xl transition text-xs flex items-center justify-center space-x-1.5 cursor-pointer"
-                    >
-                      <Key className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>🔓 ปลดล็อกเข้าใช้งานทันที (Quick Unlock)</span>
                     </button>
                   </div>
                 </form>
@@ -4057,18 +4050,25 @@ export default function App() {
             <div className="bg-gradient-to-r from-indigo-800 via-blue-700 to-indigo-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-indigo-600/20 border border-white/20">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center space-x-2 text-xs font-bold mb-2.5">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-bold mb-2.5">
                     <div className="flex items-center space-x-1.5 bg-white/20 px-3.5 py-1 rounded-full border border-white/30">
                       <GraduationCap className="w-4 h-4 text-amber-300" />
                       <span>แดชบอร์ดคุณครู & ระบบรายงานผลสัมฤทธิ์</span>
                     </div>
 
-                    <div className={`flex items-center space-x-1 px-3 py-1 rounded-full text-[11px] font-bold border ${
-                      cloudWebhookUrl ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/40' : 'bg-amber-500/20 text-amber-200 border-amber-300/30'
+                    <div className={`flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-bold border ${
+                      supabaseStatus.connected ? 'bg-emerald-500/30 text-emerald-200 border-emerald-400/40' : 'bg-rose-500/20 text-rose-200 border-rose-300/30'
                     }`}>
-                      <Cloud className="w-3.5 h-3.5" />
-                      <span>{cloudWebhookUrl ? 'Google Sheets Sync พร้อมใช้งาน' : 'บันทึกในเครื่อง (Local)'}</span>
+                      <span className={`w-2 h-2 rounded-full ${supabaseStatus.connected ? 'bg-emerald-400 animate-ping' : 'bg-rose-400'}`} />
+                      <span>{supabaseStatus.connected ? `Supabase Real-Time สด (${supabaseStatus.latencyMs}ms)` : 'กำลังเชื่อมต่อฐานข้อมูล...'}</span>
                     </div>
+
+                    {cloudWebhookUrl && (
+                      <div className="flex items-center space-x-1 px-3 py-1 rounded-full text-[11px] font-bold bg-sky-500/25 text-sky-200 border border-sky-400/30">
+                        <Cloud className="w-3.5 h-3.5" />
+                        <span>Google Sheets Sync</span>
+                      </div>
+                    )}
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
                     รายงานผลสัมฤทธิ์และสมรรถนะการออกแบบผังงาน
@@ -4079,6 +4079,18 @@ export default function App() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    onClick={() => {
+                      loadDashboard();
+                      playSound('click', soundEnabled);
+                    }}
+                    className="bg-white/20 hover:bg-white/30 text-white font-black px-4 py-2.5 rounded-2xl transition shadow-md text-xs flex items-center space-x-1.5 border border-white/30 action-btn-hover cursor-pointer"
+                    title="ดึงข้อมูลคะแนนล่าสุดจาก Supabase Cloud ทันที"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-cyan-200" />
+                    <span>รีเฟรชสด ({lastSyncTime})</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       setShowRosterModal(true);
@@ -5091,29 +5103,12 @@ export default function App() {
                   <div>
                     <input
                       type="password"
-                      placeholder="กรอกรหัสผ่าน (มาตรฐาน: admin1234 หรือ 1234)"
+                      placeholder="กรอกรหัสผ่านเพื่อเข้าใช้งาน"
                       value={adminPinInput}
                       onChange={(e) => { setAdminPinInput(e.target.value); setAdminPinError(''); }}
                       className="w-full bg-white border border-slate-300 rounded-2xl px-4 py-3.5 text-center text-base font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs"
                       autoFocus
                     />
-                    <div className="flex items-center justify-center space-x-2 mt-2 text-[11px] text-slate-500">
-                      <span>รหัสเริ่มต้น:</span>
-                      <button
-                        type="button"
-                        onClick={() => { setAdminPinInput('admin1234'); setAdminPinError(''); }}
-                        className="font-mono font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-200 transition"
-                      >
-                        admin1234
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setAdminPinInput('1234'); setAdminPinError(''); }}
-                        className="font-mono font-bold bg-amber-50 text-amber-800 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200 transition"
-                      >
-                        1234
-                      </button>
-                    </div>
                   </div>
 
                   {adminPinError && (
@@ -5129,15 +5124,6 @@ export default function App() {
                       className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-3.5 px-6 rounded-2xl shadow-md transition text-sm action-btn-hover cursor-pointer"
                     >
                       เข้าสู่ระบบแอดมิน (Unlock)
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleQuickUnlock}
-                      className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold py-2.5 px-4 rounded-2xl transition text-xs flex items-center justify-center space-x-1.5 cursor-pointer"
-                    >
-                      <Key className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>🔓 ปลดล็อกเข้าใช้งานทันที (Quick Unlock)</span>
                     </button>
                   </div>
                 </form>
