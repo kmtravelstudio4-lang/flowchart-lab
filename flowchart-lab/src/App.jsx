@@ -59,6 +59,7 @@ import {
   checkSupabaseConnection 
 } from './lib/supabase';
 import { 
+  getStudentByCode,
   registerOrGetStudent, 
   createSession, 
   updateHeartbeat, 
@@ -165,6 +166,7 @@ export default function App() {
         return {
           id: parsed.id || parsed.studentId || '',
           studentId: parsed.studentId || parsed.id || '',
+          studentCode: parsed.studentCode || parsed.student_code || '',
           sessionId: parsed.sessionId || '',
           name: parsed.name || '',
           roomCode: parsed.roomCode || '',
@@ -175,10 +177,14 @@ export default function App() {
     } catch {
       // ignore
     }
-    return { id: '', studentId: '', sessionId: '', name: '', roomCode: '', room: '', number: '' };
+    return { id: '', studentId: '', studentCode: '', sessionId: '', name: '', roomCode: '', room: '', number: '' };
   });
   const [isProfileEntered, setIsProfileEntered] = useState(() => Boolean(studentInfo.name && (studentInfo.studentId || studentInfo.id)));
 
+  const [studentCodeInput, setStudentCodeInput] = useState('');
+  const [isSearchingStudent, setIsSearchingStudent] = useState(false);
+  const [matchedStudentPreview, setMatchedStudentPreview] = useState(null);
+  const [isManualRegisterOpen, setIsManualRegisterOpen] = useState(false);
   const [loginPinError, setLoginPinError] = useState('');
   const [editingClassroom, setEditingClassroom] = useState(null);
   const [isCreatingClassroom, setIsCreatingClassroom] = useState(false);
@@ -933,7 +939,68 @@ export default function App() {
       initMission2(m2LevelIdx);
     }
   }, [gameStage, m2LevelIdx, initMission2]);
-  // --- Profile Submission with Classroom PIN Validation ---
+  // --- 1. Student ID Authentication (Fast Student Code Login) ---
+  const handleStudentIdLogin = async (e) => {
+    if (e) e.preventDefault();
+    const code = (studentCodeInput || '').trim();
+    if (!code) {
+      playSound('error', soundEnabled);
+      setLoginPinError('กรุณากรอกเลขประจำตัวนักเรียน');
+      return;
+    }
+
+    setIsSearchingStudent(true);
+    setLoginPinError('');
+
+    try {
+      const res = await getStudentByCode(code);
+      if (res && res.success && res.student) {
+        const student = res.student;
+        const studentId = student.id;
+        const sessRes = await createSession(studentId);
+        const sessionId = sessRes?.session?.id || `SESS_${Date.now()}`;
+
+        const fullStudentProfile = {
+          id: studentId,
+          studentId: studentId,
+          studentCode: student.student_code || code,
+          sessionId: sessionId,
+          name: `${student.first_name} ${student.last_name}`.trim(),
+          room: student.classroom,
+          roomCode: student.classroom,
+          number: String(student.student_number || '-')
+        };
+
+        setStudentInfo(fullStudentProfile);
+        try {
+          localStorage.setItem('flowchart_current_student', JSON.stringify(fullStudentProfile));
+        } catch { /* ignore */ }
+
+        // Start Initial Progress in Supabase
+        updateStudentProgress({
+          studentId,
+          lessonId: 'ch1',
+          currentStage: 'learning',
+          status: 'in_progress'
+        });
+
+        playSound('success', soundEnabled);
+        setIsProfileEntered(true);
+        setGameStage('learning');
+        logActivity('เข้าสู่ระบบด้วยรหัสนักเรียน', `${fullStudentProfile.name} (รหัส: ${code} ห้อง ${student.classroom} เลขที่ ${student.student_number})`);
+      } else {
+        playSound('error', soundEnabled);
+        setLoginPinError(res?.error || `ไม่พบเลขประจำตัว "${code}" ในระบบทะเบียนนักเรียน`);
+      }
+    } catch (err) {
+      console.error('[STUDENT LOGIN ERROR]:', err);
+      setLoginPinError(`เกิดข้อผิดพลาดในการเข้าสู่ระบบ: ${err.message}`);
+    } finally {
+      setIsSearchingStudent(false);
+    }
+  };
+
+  // --- 2. Manual Student Registration Fallback ---
   const handleSaveProfile = (e) => {
     e.preventDefault();
     if (!studentInfo.name || !studentInfo.name.trim()) {
@@ -942,6 +1009,7 @@ export default function App() {
       return;
     }
 
+    const sCode = (studentInfo.studentCode || studentCodeInput || '').trim();
     const enteredCode = (studentInfo.roomCode || '').trim();
     const activeRooms = (Array.isArray(classrooms) && classrooms.length > 0) ? classrooms : DEFAULT_CLASSROOMS;
     const matchedRoom = activeRooms.find(r => 
@@ -961,6 +1029,7 @@ export default function App() {
 
     const updated = {
       ...studentInfo,
+      studentCode: sCode,
       name: studentInfo.name.trim(),
       room: finalRoomName,
       roomCode: finalRoomCode,
@@ -973,6 +1042,7 @@ export default function App() {
 
     // Register or Fetch Existing Student in Supabase (Single Source of Truth)
     registerOrGetStudent({
+      studentCode: sCode,
       firstName,
       lastName,
       classroom: finalRoomName,
@@ -1009,18 +1079,14 @@ export default function App() {
     playSound('success', soundEnabled);
     setIsProfileEntered(true);
     setGameStage('learning');
-    logActivity('เข้าสู่ระบบการเรียนรู้', `${updated.name} (${finalRoomName} รหัส PIN: ${finalRoomCode})`);
+    logActivity('เข้าสู่ระบบการเรียนรู้', `${updated.name} (รหัส: ${sCode || '-'} ${finalRoomName})`);
 
-
-
-    // 6. Secondary Export: ส่งชื่อและข้อมูลการเข้าระบบของนักเรียนเข้า Google Sheets ทันที (หากตั้งค่าไว้)
+    // Secondary Export: ส่งชื่อและข้อมูลการเข้าระบบของนักเรียนเข้า Google Sheets ทันที (หากตั้งค่าไว้)
     if (cloudWebhookUrl && cloudWebhookUrl.trim()) {
       const loginRecord = {
-        id: studentId,
-        eventId,
-        studentId,
-        sessionId,
+        id: studentInfo.studentId || `STD_${Date.now()}`,
         name: updated.name,
+        studentCode: sCode,
         room: finalRoomName,
         roomCode: finalRoomCode,
         number: updated.number || '-',
@@ -1038,16 +1104,7 @@ export default function App() {
         completedAt: new Date().toISOString()
       };
 
-      syncScoreToDatabase(loginRecord, cloudWebhookUrl).then(res => {
-        if (res && res.success) {
-          setCloudSyncToast({
-            show: true,
-            message: `☁️ บันทึกชื่อ ${updated.name} เข้าชีทห้อง "${finalRoomName}" เรียบร้อยแล้ว!`,
-            mode: 'cloud'
-          });
-          setTimeout(() => setCloudSyncToast({ show: false, message: '', mode: 'cloud' }), 3500);
-        }
-      }).catch(err => {
+      syncScoreToDatabase(loginRecord, cloudWebhookUrl).catch(err => {
         console.warn('Initial student registration sync error:', err);
       });
     }
@@ -1744,7 +1801,13 @@ export default function App() {
     if (teacherFilterRoom !== 'ทั้งหมด' && s.room !== teacherFilterRoom) return false;
     if (teacherFilterStatus === 'ผ่าน' && !s.isPassed) return false;
     if (teacherFilterStatus === 'ไม่ผ่าน' && s.isPassed) return false;
-    if (teacherSearchQuery.trim() && !s.name.toLowerCase().includes(teacherSearchQuery.toLowerCase())) return false;
+    if (teacherSearchQuery.trim()) {
+      const q = teacherSearchQuery.toLowerCase().trim();
+      const matchName = s.name && s.name.toLowerCase().includes(q);
+      const matchCode = s.studentCode && String(s.studentCode).toLowerCase().includes(q);
+      const matchNum = s.number !== undefined && String(s.number).includes(q);
+      if (!matchName && !matchCode && !matchNum) return false;
+    }
     if (teacherFilterStartDate && s.completedAt) {
       const recordDate = s.completedAt.split('T')[0];
       if (recordDate < teacherFilterStartDate) return false;
@@ -2117,7 +2180,7 @@ export default function App() {
                     ยินดีต้อนรับสู่ Flowchart Quest
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto leading-relaxed font-medium">
-                    ผจญภัยในโลกแห่งผังงานและการใช้เหตุผลเชิงตรรกะ เรียนรู้ ลงมือสร้าง แก้ไขบั๊ก และประเมินผลสมรรถนะ
+                    กรอกเลขประจำตัวนักเรียนเพื่อเข้าสู่ระบบการเรียนรู้และบันทึกคะแนนอัตโนมัติ
                   </p>
                 </div>
 
@@ -2133,7 +2196,7 @@ export default function App() {
                           ยินดีต้อนรับกลับมา, {studentInfo.name}!
                         </h4>
                         <p className="text-[11px] text-blue-100 font-medium">
-                          ห้อง {studentInfo.room} • คุณมีคะแนนสะสม {currentTotalScore}/100
+                          {studentInfo.studentCode ? `รหัส: ${studentInfo.studentCode} • ` : ''}ห้อง {studentInfo.room} • คุณมีคะแนนสะสม {currentTotalScore}/100
                         </p>
                       </div>
                     </div>
@@ -2164,124 +2227,204 @@ export default function App() {
                         onClick={handleStudentLogout}
                         className="bg-white/20 hover:bg-white/30 text-white font-bold py-2.5 px-3 rounded-2xl text-xs transition"
                       >
-                        ↩ เริ่มใหม่
+                        ↩ สลับบัญชี
                       </button>
                     </div>
                   </div>
                 )}
 
-                <form onSubmit={handleSaveProfile} className="text-left space-y-4 max-w-md mx-auto bg-slate-50/80 p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-xs">
-                  {/* Name Input */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      👤 ชื่อ - นามสกุล นักเรียน <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="กรอกชื่อ - นามสกุล นักเรียน..."
-                      value={studentInfo.name}
-                      onChange={(e) => setStudentInfo({ ...studentInfo, name: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-2xs transition"
-                    />
-                  </div>
-
-                  {/* Classroom PIN Code Input */}
-                  <div className="p-4 rounded-2xl bg-white border border-blue-100 shadow-2xs space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-xs font-bold text-slate-800 flex items-center space-x-1.5">
-                        <Key className="w-3.5 h-3.5 text-blue-600" />
-                        <span>รหัสห้องเรียน (Classroom PIN) <span className="text-rose-500">*</span></span>
+                {/* --- PRIMARY LOGIN: STUDENT ID AUTHENTICATION --- */}
+                {!isManualRegisterOpen ? (
+                  <form onSubmit={handleStudentIdLogin} className="text-left space-y-4 max-w-md mx-auto bg-slate-50/80 p-6 sm:p-7 rounded-3xl border border-slate-200/80 shadow-xs">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center justify-between">
+                        <span className="flex items-center space-x-1.5">
+                          <Users className="w-4 h-4 text-blue-600" />
+                          <span>เลขประจำตัวนักเรียน (Student ID)</span>
+                        </span>
+                        <span className="text-[10px] text-blue-600 font-extrabold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                          ล็อกอินเร็ว
+                        </span>
                       </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          autoFocus
+                          placeholder="กรอกเลขประจำตัว เช่น 60101, 1001..."
+                          value={studentCodeInput}
+                          onChange={(e) => {
+                            setStudentCodeInput(e.target.value);
+                            setLoginPinError('');
+                          }}
+                          className="w-full bg-white border-2 border-blue-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 rounded-2xl px-4 py-3.5 text-center text-lg font-mono font-black text-blue-950 shadow-sm tracking-wider transition placeholder:text-slate-400 placeholder:text-xs placeholder:font-sans placeholder:font-normal"
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-medium mt-1.5 text-center">
+                        💡 กรอกเลขประจำตัวที่ครูผู้สอนกำหนดเพื่อเข้าเรียนและบันทึกคะแนน
+                      </p>
                     </div>
 
-                    <div className="relative">
-                      <input
-                        type="text"
-                        required
-                        placeholder="กรอกรหัส PIN ห้องเรียน..."
-                        value={studentInfo.roomCode}
-                        onChange={(e) => {
-                          const val = e.target.value.toUpperCase();
-                          const activeRooms = (Array.isArray(classrooms) && classrooms.length > 0) ? classrooms : DEFAULT_CLASSROOMS;
-                          const found = activeRooms.find(r => r.code.toUpperCase() === val);
-                          setStudentInfo({
-                            ...studentInfo,
-                            roomCode: val,
-                            room: found ? found.name : studentInfo.room
-                          });
+                    {/* Error Alert */}
+                    {loginPinError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-bold animate-fadeIn flex items-start space-x-2">
+                        <span className="shrink-0 mt-0.5">⚠️</span>
+                        <span>{loginPinError}</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={isSearchingStudent}
+                      className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-4 px-6 rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center space-x-2 transition text-sm action-btn-hover mt-3 disabled:opacity-50"
+                    >
+                      {isSearchingStudent ? (
+                        <span>กำลังตรวจสอบข้อมูล...</span>
+                      ) : (
+                        <>
+                          <span>เข้าสู่ระบบการเรียนรู้ (Log In)</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+
+                    <div className="relative my-4 flex items-center justify-center">
+                      <div className="border-t border-slate-200 w-full" />
+                      <span className="bg-slate-50 px-3 text-xs font-bold text-slate-400 absolute">หรือเลือกตัวเลือกอื่น</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsManualRegisterOpen(true);
                           setLoginPinError('');
                         }}
-                        className="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-2.5 text-center text-base font-mono font-black text-blue-900 tracking-wider shadow-inner transition"
+                        className="w-full bg-white hover:bg-slate-100 text-slate-700 font-bold py-3 px-3 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-center space-x-1.5 transition text-xs"
+                      >
+                        <UserPlus className="w-3.5 h-3.5 text-blue-600" />
+                        <span>ลงทะเบียนใหม่</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleGuestLogin}
+                        className="w-full bg-white hover:bg-slate-100 text-slate-700 font-bold py-3 px-3 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-center space-x-1.5 transition text-xs"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>เข้าเล่นทั่วไป</span>
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  /* --- SECONDARY: MANUAL SELF-REGISTRATION FALLBACK --- */
+                  <form onSubmit={handleSaveProfile} className="text-left space-y-4 max-w-md mx-auto bg-slate-50/80 p-6 sm:p-7 rounded-3xl border border-blue-200 shadow-xs animate-fadeIn">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <h4 className="font-black text-xs text-blue-900 flex items-center space-x-1.5">
+                        <UserPlus className="w-4 h-4 text-blue-600" />
+                        <span>ลงทะเบียนนักเรียนใหม่ด้วยตนเอง</span>
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setIsManualRegisterOpen(false)}
+                        className="text-xs text-blue-600 font-bold hover:underline"
+                      >
+                        ← กลับไปล็อกอินด้วยรหัส
+                      </button>
+                    </div>
+
+                    {/* Student Code (Optional in manual form) */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        🏷️ รหัสนักเรียน / เลขประจำตัว
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="เช่น 60101 หรือ 1001 (ถ้ามี)"
+                        value={studentInfo.studentCode || studentCodeInput}
+                        onChange={(e) => setStudentInfo({ ...studentInfo, studentCode: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
-                    {/* Real-time Match Feedback */}
-                    {(() => {
-                      const activeRooms = (Array.isArray(classrooms) && classrooms.length > 0) ? classrooms : DEFAULT_CLASSROOMS;
-                      const matched = activeRooms.find(r => r.code.toUpperCase() === (studentInfo.roomCode || '').trim().toUpperCase());
-                      if (matched) {
-                        return (
-                          <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold flex items-center space-x-1.5 animate-fadeIn">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span>ห้อง: <strong>{matched.name}</strong> ({matched.desc || 'ประจำชั้น'})</span>
-                          </div>
-                        );
-                      }
-                      if (studentInfo.roomCode && studentInfo.roomCode !== 'GUEST') {
-                        return (
-                          <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold flex items-center space-x-1.5 animate-fadeIn">
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span>ไม่พบรหัสห้อง "{studentInfo.roomCode}" (ตรวจสอบรหัสจากครูผู้สอน)</span>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-
-                  {/* Seat Number Input */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">🔢 เลขที่นักเรียน</label>
-                    <input
-                      type="text"
-                      placeholder="กรอกเลขที่..."
-                      value={studentInfo.number}
-                      onChange={(e) => setStudentInfo({ ...studentInfo, number: e.target.value })}
-                      className="w-full bg-white border border-slate-200 hover:border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-800 shadow-2xs transition"
-                    />
-                  </div>
-
-                  {/* Error Alert */}
-                  {loginPinError && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-bold animate-fadeIn flex items-center space-x-1.5">
-                      <span>⚠️</span>
-                      <span>{loginPinError}</span>
+                    {/* Name Input */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        👤 ชื่อ - นามสกุล นักเรียน <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="กรอกชื่อ - นามสกุล นักเรียน..."
+                        value={studentInfo.name}
+                        onChange={(e) => setStudentInfo({ ...studentInfo, name: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
-                  )}
 
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black py-4 px-6 rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center space-x-2 transition text-sm action-btn-hover mt-3"
-                  >
-                    <span>บันทึกข้อมูล & เริ่มต้นการเรียนรู้ (Start)</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                    {/* Classroom Selection */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        🏫 ห้องเรียน <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={studentInfo.room || 'ห้อง ป.6/1'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const activeRooms = (Array.isArray(classrooms) && classrooms.length > 0) ? classrooms : DEFAULT_CLASSROOMS;
+                          const found = activeRooms.find(r => r.name === val);
+                          setStudentInfo({
+                            ...studentInfo,
+                            room: val,
+                            roomCode: found ? found.code : '601'
+                          });
+                        }}
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {((Array.isArray(classrooms) && classrooms.length > 0) ? classrooms : DEFAULT_CLASSROOMS).map(r => (
+                          <option key={r.id || r.code} value={r.name}>{r.name} (รหัส {r.code})</option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div className="relative my-4 flex items-center justify-center">
-                    <div className="border-t border-slate-200 w-full" />
-                    <span className="bg-slate-50 px-3 text-xs font-bold text-slate-400 absolute">หรือเข้าเล่นทันที</span>
-                  </div>
+                    {/* Seat Number Input */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">🔢 เลขที่นักเรียน <span className="text-rose-500">*</span></label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="กรอกเลขที่..."
+                        value={studentInfo.number}
+                        onChange={(e) => setStudentInfo({ ...studentInfo, number: e.target.value })}
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
 
-                  {/* Quick Guest Mode Play Button */}
-                  <button
-                    type="button"
-                    onClick={handleGuestLogin}
-                    className="w-full bg-white hover:bg-blue-50 text-blue-700 font-extrabold py-3.5 px-6 rounded-2xl border-2 border-blue-200 hover:border-blue-400 shadow-xs flex items-center justify-center space-x-2 transition text-sm action-btn-hover"
-                  >
-                    <span>🎮 เล่นแบบผู้ใช้ทั่วไป (ไม่ต้องกรอกชื่อ)</span>
-                  </button>
-                </form>
+                    {/* Error Alert */}
+                    {loginPinError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs font-bold animate-fadeIn flex items-center space-x-1.5">
+                        <span>⚠️</span>
+                        <span>{loginPinError}</span>
+                      </div>
+                    )}
+
+                    <div className="flex space-x-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsManualRegisterOpen(false)}
+                        className="flex-1 bg-white text-slate-600 font-bold py-3 px-4 rounded-2xl text-xs border border-slate-200"
+                      >
+                        ยกเลิก
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black py-3 px-4 rounded-2xl shadow-md text-xs transition"
+                      >
+                        บันทึก & เข้าเรียน
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             )}
 
@@ -4338,10 +4481,15 @@ export default function App() {
                                   setSelectedStudentForProfile(std);
                                   playSound('click', soundEnabled);
                                 }}
-                                className="text-left font-black text-blue-700 hover:underline flex items-center space-x-1.5"
+                                className="text-left font-black text-blue-700 hover:underline flex items-center space-x-1.5 flex-wrap"
                                 title="ดูโปรไฟล์และ Timeline การเรียน"
                               >
                                 <span>{std.name}</span>
+                                {std.studentCode && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                    ID: {std.studentCode}
+                                  </span>
+                                )}
                               </button>
                               <div className="flex flex-wrap items-center gap-1 mt-0.5">
                                 <span className={`text-[9.5px] px-1.5 py-0.2 rounded-md font-bold ${
@@ -5413,7 +5561,15 @@ export default function App() {
                             <tbody className="divide-y divide-slate-100 bg-white">
                               {studentRecords
                                 .filter(s => selectedRoom === 'ทั้งหมด' || s.room === selectedRoom)
-                                .filter(s => !teacherSearchQuery || s.name.includes(teacherSearchQuery) || String(s.number).includes(teacherSearchQuery))
+                                .filter(s => {
+                                  if (!teacherSearchQuery) return true;
+                                  const q = teacherSearchQuery.toLowerCase().trim();
+                                  return (
+                                    (s.name && s.name.toLowerCase().includes(q)) ||
+                                    (s.number !== undefined && String(s.number).includes(q)) ||
+                                    (s.studentCode && String(s.studentCode).toLowerCase().includes(q))
+                                  );
+                                })
                                 .map((std) => {
                                   const onlineStatus = computeOnlineStatus(std.lastActiveAt || std.last_active_at);
                                   const currentProg = liveProgressList.find(p => p.student_id === std.id || p.studentId === std.id);
@@ -5429,9 +5585,14 @@ export default function App() {
                                             setSelectedStudentForProfile(std);
                                             playSound('click', soundEnabled);
                                           }}
-                                          className="text-left font-black text-blue-700 hover:underline flex items-center space-x-1"
+                                          className="text-left font-black text-blue-700 hover:underline flex items-center space-x-1.5 flex-wrap"
                                         >
                                           <span>{std.name}</span>
+                                          {std.studentCode && (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                              ID: {std.studentCode}
+                                            </span>
+                                          )}
                                         </button>
                                         <div className="flex flex-wrap items-center gap-1 mt-0.5">
                                           <span className={`text-[9.5px] px-1.5 py-0.2 rounded-md font-bold ${

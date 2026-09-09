@@ -25,6 +25,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
   const [editingStudent, setEditingStudent] = useState(null);
   const [formData, setFormData] = useState({
     studentId: '',
+    studentCode: '',
     name: '',
     room: 'ป.6/1',
     number: '',
@@ -55,6 +56,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
         if (!studentsRes.error && Array.isArray(studentsRes.data)) {
           const formatted = studentsRes.data.map(s => ({
             studentId: s.id,
+            studentCode: s.student_code || '',
             name: `${s.first_name} ${s.last_name}`.trim(),
             room: s.classroom,
             number: String(s.student_number),
@@ -93,9 +95,9 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
 
 
 
-  // Handle Download CSV Template
+  // Handle Download CSV Template (With Student Code)
   const handleDownloadCSVTemplate = () => {
-    const csvContent = "\uFEFFชื่อ-นามสกุล,ห้อง,เลขที่\nด.ช. สมชาย ใจดี,ป.6/1,1\nด.ญ. สมหญิง รักเรียน,ป.6/1,2\nด.ช. กิตติศักดิ์ มุ่งมั่น,ป.6/2,1";
+    const csvContent = "\uFEFFรหัสนักเรียน,ชื่อ-นามสกุล,ห้อง,เลขที่\n60101,ด.ช. สมชาย ใจดี,ป.6/1,1\n60102,ด.ญ. สมหญิง รักเรียน,ป.6/1,2\n60201,ด.ช. กิตติศักดิ์ มุ่งมั่น,ป.6/2,1";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -107,15 +109,15 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
     URL.revokeObjectURL(url);
   };
 
-  // Handle Export Current Roster as CSV
+  // Handle Export Current Roster as CSV (With Student Code)
   const handleExportRosterCSV = () => {
     if (roster.length === 0) {
       alert('ยังไม่มีข้อมูลนักเรียนในระบบ');
       return;
     }
-    let csvContent = "\uFEFFStudent ID,ชื่อ-นามสกุล,ห้อง,เลขที่,สถานะ\n";
+    let csvContent = "\uFEFFรหัสนักเรียน,ชื่อ-นามสกุล,ห้อง,เลขที่,สถานะ\n";
     roster.forEach(s => {
-      csvContent += `"${s.studentId}","${s.name}","${s.room}","${s.number}","${s.status || 'ACTIVE'}"\n`;
+      csvContent += `"${s.studentCode || ''}","${s.name}","${s.room}","${s.number}","${s.status || 'ACTIVE'}"\n`;
     });
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -146,6 +148,21 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
       return;
     }
 
+    const sCode = (formData.studentCode || '').trim();
+
+    // Check duplicate studentCode if provided
+    if (sCode) {
+      const isCodeDuplicate = roster.some(s => 
+        s.studentCode && 
+        s.studentCode.toLowerCase() === sCode.toLowerCase() &&
+        (!editingStudent || s.studentId !== editingStudent.studentId)
+      );
+      if (isCodeDuplicate) {
+        setFormError(`รหัสนักเรียน "${sCode}" มีอยู่ในระบบแล้ว`);
+        return;
+      }
+    }
+
     // Check duplicate number in the same room
     const isDuplicate = roster.some(s => 
       s.room === formData.room && 
@@ -164,6 +181,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
       const lastName = nameParts.slice(1).join(' ') || '';
 
       registerOrGetStudent({
+        studentCode: sCode,
         firstName,
         lastName,
         classroom: formData.room,
@@ -173,6 +191,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
         if (res.success && res.student) {
           const newEntry = {
             studentId: res.student.id,
+            studentCode: res.student.student_code || sCode,
             name: `${res.student.first_name} ${res.student.last_name}`.trim(),
             room: res.student.classroom,
             number: String(res.student.student_number),
@@ -186,7 +205,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
 
       logActivity({
         action: 'ADD_STUDENT',
-        target: `${formData.name} (${formData.room})`,
+        target: `${formData.name} (${formData.room}) รหัส: ${sCode || '-'}`,
         result: 'SUCCESS'
       });
     } else if (editingStudent) {
@@ -198,6 +217,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
         supabase
           .from('students')
           .update({
+            student_code: sCode,
             first_name: firstName,
             last_name: lastName,
             classroom: formData.room,
@@ -209,6 +229,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
 
       const updated = {
         ...editingStudent,
+        studentCode: sCode,
         name: formData.name.trim(),
         room: formData.room,
         number: formData.number.trim(),
@@ -218,14 +239,14 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
 
       logActivity({
         action: 'EDIT_STUDENT',
-        target: `${formData.name} (${formData.room})`,
+        target: `${formData.name} (${formData.room}) รหัส: ${sCode || '-'}`,
         result: 'SUCCESS'
       });
     }
 
     setIsAddingNew(false);
     setEditingStudent(null);
-    setFormData({ studentId: '', name: '', room: 'ป.6/1', number: '', status: 'ACTIVE' });
+    setFormData({ studentId: '', studentCode: '', name: '', room: availableRooms[0] || 'ป.6/1', number: '', status: 'ACTIVE' });
   };
 
   // Handle Delete Student
@@ -267,17 +288,26 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
         const headerParts = firstLine.split(delimiter).map(p => p.trim().replace(/^"|"$/g, '').toLowerCase());
         
         // Find column indices
+        let codeIdx = headerParts.findIndex(h => h.includes('รหัส') || h.includes('code') || h.includes('id'));
         let nameIdx = headerParts.findIndex(h => h.includes('ชื่อ') || h.includes('name'));
         let roomIdx = headerParts.findIndex(h => h.includes('ห้อง') || h.includes('room') || h.includes('class'));
         let numberIdx = headerParts.findIndex(h => h.includes('เลขที่') || h.includes('no') || h.includes('number'));
 
         let startRow = 1;
         if (nameIdx === -1 && numberIdx === -1) {
-          // No header row detected
+          // No header row detected: Assume [code, name, room, number] or [name, room, number]
           startRow = 0;
-          nameIdx = 0;
-          roomIdx = 1;
-          numberIdx = 2;
+          if (firstLine.split(delimiter).length >= 4) {
+            codeIdx = 0;
+            nameIdx = 1;
+            roomIdx = 2;
+            numberIdx = 3;
+          } else {
+            codeIdx = -1;
+            nameIdx = 0;
+            roomIdx = 1;
+            numberIdx = 2;
+          }
         } else {
           if (nameIdx === -1) nameIdx = 0;
           if (roomIdx === -1) roomIdx = 1;
@@ -288,6 +318,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
 
         for (let i = startRow; i < lines.length; i++) {
           const parts = lines[i].split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
+          const studentCode = codeIdx !== -1 && parts[codeIdx] ? parts[codeIdx].trim() : '';
           const name = parts[nameIdx];
           const room = parts[roomIdx] || 'ป.6/1';
           const number = parts[numberIdx];
@@ -298,6 +329,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
             const lastName = nameParts.slice(1).join(' ') || '';
 
             await registerOrGetStudent({
+              studentCode,
               firstName,
               lastName,
               classroom: room,
@@ -332,10 +364,12 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
   // Filtered Roster
   const filteredRoster = roster.filter(s => {
     const matchRoom = roomFilter === 'ALL' || s.room === roomFilter;
-    const matchQuery = !searchQuery.trim() || 
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.number.includes(searchQuery) ||
-      (s.studentId && s.studentId.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = searchQuery.trim().toLowerCase();
+    const matchQuery = !q || 
+      (s.studentCode && s.studentCode.toLowerCase().includes(q)) ||
+      s.name.toLowerCase().includes(q) ||
+      s.number.includes(q) ||
+      (s.studentId && s.studentId.toLowerCase().includes(q));
     return matchRoom && matchQuery;
   });
 
@@ -354,7 +388,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
                 ระบบจัดการทะเบียนนักเรียน (Student Roster Management)
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                ดาวน์โหลดแม่แบบ CSV นำเข้ารายชื่อ และส่งออกไฟล์ทะเบียนนักเรียน
+                กำหนดรหัสนักเรียนสำหรับล็อกอิน ดาวน์โหลดแม่แบบ CSV และนำเข้ารายชื่อ
               </p>
             </div>
           </div>
@@ -376,7 +410,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="ค้นหาชื่อ, เลขที่..."
+                placeholder="ค้นหารหัสนักเรียน, ชื่อ, เลขที่..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-9 pr-3 py-2 text-xs font-medium focus:ring-2 focus:ring-blue-500 shadow-2xs"
@@ -434,6 +468,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
                 setEditingStudent(null);
                 setFormData({ 
                   studentId: '', 
+                  studentCode: '',
                   name: '', 
                   room: availableRooms[0] || 'ป.6/1', 
                   number: '', 
@@ -473,7 +508,20 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  รหัสนักเรียน (สำหรับล็อกอิน)
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น 60101 หรือ 1001"
+                  value={formData.studentCode}
+                  onChange={(e) => setFormData({ ...formData, studentCode: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">ชื่อ-นามสกุลนักเรียน</label>
                 <input
@@ -534,7 +582,8 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
               <tr>
-                <th className="p-3 pl-4">เลขที่</th>
+                <th className="p-3 pl-4">รหัสนักเรียน</th>
+                <th className="p-3">เลขที่</th>
                 <th className="p-3">ชื่อ-นามสกุล</th>
                 <th className="p-3">ห้องเรียน</th>
                 <th className="p-3">สถานะ</th>
@@ -544,14 +593,19 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
             <tbody className="divide-y divide-slate-100">
               {filteredRoster.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400 font-medium">
+                  <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">
                     ยังไม่มีข้อมูลนักเรียนในห้องนี้ (กดปุ่ม "เพิ่มนักเรียน" หรือ "นำเข้า CSV" เพื่อเริ่มต้น)
                   </td>
                 </tr>
               ) : (
                 filteredRoster.map((student) => (
                   <tr key={student.studentId} className="hover:bg-blue-50/40 transition">
-                    <td className="p-3 pl-4 font-mono font-black text-slate-700">{student.number}</td>
+                    <td className="p-3 pl-4">
+                      <span className="font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg">
+                        {student.studentCode || '-'}
+                      </span>
+                    </td>
+                    <td className="p-3 font-mono font-black text-slate-700">{student.number}</td>
                     <td className="p-3 font-bold text-slate-900">{student.name}</td>
                     <td className="p-3 font-medium text-slate-600">{student.room}</td>
                     <td className="p-3">
@@ -566,6 +620,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
                           setIsAddingNew(false);
                           setFormData({
                             studentId: student.studentId,
+                            studentCode: student.studentCode || '',
                             name: student.name,
                             room: student.room,
                             number: student.number,

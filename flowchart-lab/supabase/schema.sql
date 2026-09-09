@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS public.students (
 
 
 -- Index for fast lookup
+CREATE INDEX IF NOT EXISTS idx_students_student_code ON public.students (student_code);
 CREATE INDEX IF NOT EXISTS idx_students_classroom ON public.students (classroom);
 CREATE INDEX IF NOT EXISTS idx_students_last_active ON public.students (last_active_at DESC);
 CREATE INDEX IF NOT EXISTS idx_students_name ON public.students (first_name, last_name);

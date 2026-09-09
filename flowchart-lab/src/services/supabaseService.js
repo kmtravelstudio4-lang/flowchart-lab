@@ -13,9 +13,73 @@ export const generateStudentCode = (classroom, studentNumber, firstName) => {
 };
 
 /**
- * 1. STUDENT REGISTRATION & ATOMIC LOOKUP (Prevent Duplicates)
+ * 1. STUDENT LOOKUP BY STUDENT CODE / ID
+ * Fast atomic lookup for student entrance by student_code
+ */
+export const getStudentByCode = async (studentCode) => {
+  const code = (studentCode || '').trim();
+  if (!code) return { success: false, error: 'กรุณากรอกเลขประจำตัวนักเรียน' };
+
+  if (!isSupabaseConfigured) {
+    try {
+      const roster = JSON.parse(localStorage.getItem('flowchart_student_roster') || '[]');
+      const found = roster.find(s => 
+        (s.studentCode && String(s.studentCode).trim().toLowerCase() === code.toLowerCase()) ||
+        (s.studentId && String(s.studentId).trim().toLowerCase() === code.toLowerCase()) ||
+        (s.number && String(s.number).trim() === code)
+      );
+      if (found) {
+        return {
+          success: true,
+          student: {
+            id: found.studentId || `local_${found.number}`,
+            student_code: found.studentCode || found.number,
+            first_name: found.name.split(' ')[0] || found.name,
+            last_name: found.name.split(' ').slice(1).join(' ') || '',
+            classroom: found.room,
+            student_number: parseInt(found.number, 10) || 1,
+            created_at: found.createdAt || new Date().toISOString()
+          }
+        };
+      }
+    } catch { /* ignore */ }
+    return { success: false, error: 'ไม่พบข้อมูลนักเรียนรหัสนี้ในระบบออฟไลน์' };
+  }
+
+  try {
+    let { data: student, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('student_code', code)
+      .maybeSingle();
+
+    if (!student) {
+      const { data: list } = await supabase
+        .from('students')
+        .select('*')
+        .ilike('student_code', code);
+
+      if (list && list.length > 0) {
+        student = list[0];
+      }
+    }
+
+    if (!student) {
+      return { success: false, error: `ไม่พบเลขประจำตัว "${code}" ในระบบทะเบียนนักเรียน` };
+    }
+
+    return { success: true, student };
+  } catch (err) {
+    console.error('[SUPABASE GET STUDENT BY CODE ERROR]:', err);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * 2. STUDENT REGISTRATION & ATOMIC LOOKUP (Prevent Duplicates)
  */
 export const registerOrGetStudent = async ({
+  studentCode = '',
   firstName,
   lastName = '',
   classroom,
@@ -26,19 +90,19 @@ export const registerOrGetStudent = async ({
   const lName = (lastName || '').trim();
   const room = (classroom || '').trim();
   const sNum = parseInt(studentNumber, 10) || 0;
+  const sCode = (studentCode || '').trim() || generateStudentCode(room, sNum, fName);
 
   if (!fName || !room || sNum <= 0) {
     return { success: false, error: 'กรุณากรอกชื่อ ห้องเรียน และเลขที่ให้ถูกต้อง' };
   }
 
   if (!isSupabaseConfigured) {
-    // Offline local fallback object
     const mockId = `local_${Date.now()}`;
     return {
       success: true,
       student: {
         id: mockId,
-        student_code: generateStudentCode(room, sNum, fName),
+        student_code: sCode,
         first_name: fName,
         last_name: lName,
         classroom: room,
@@ -51,14 +115,11 @@ export const registerOrGetStudent = async ({
     };
   }
 
-  const studentCode = generateStudentCode(room, sNum, fName);
-
   try {
-    // 1. Atomic Upsert with ON CONFLICT (classroom, student_number)
     const { data: upserted, error: upsertErr } = await supabase
       .from('students')
       .upsert({
-        student_code: studentCode,
+        student_code: sCode,
         first_name: fName,
         last_name: lName,
         classroom: room,
@@ -86,12 +147,11 @@ export const registerOrGetStudent = async ({
       throw selErr || upsertErr;
     }
 
-    // Log registration event idempotently
     await logEvent({
       studentId: upserted.id,
       eventType: 'student_registered',
       eventName: `นักเรียนเข้าสู่ระบบ: ${fName}`,
-      metadata: { classroom: room, student_number: sNum, source }
+      metadata: { student_code: sCode, classroom: room, student_number: sNum, source }
     });
 
     return { success: true, student: upserted, isNew: true };
@@ -441,6 +501,12 @@ export const fetchAdminDashboardData = async () => {
 
       return {
         ...s,
+        id: s.id,
+        studentId: s.id,
+        studentCode: s.student_code || '',
+        name: `${s.first_name} ${s.last_name}`.trim(),
+        room: s.classroom,
+        number: s.student_number,
         preScore: rawScores.preScore !== undefined ? rawScores.preScore : null,
         postScore: rawScores.postScore !== undefined ? rawScores.postScore : null,
         gainScore: rawScores.gainScore !== undefined ? rawScores.gainScore : 0,
