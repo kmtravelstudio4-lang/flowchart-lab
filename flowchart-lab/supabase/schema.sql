@@ -179,10 +179,11 @@ CREATE POLICY "Public update lessons" ON public.lessons FOR ALL TO anon, authent
 CREATE POLICY "Public read classrooms" ON public.classrooms FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "Public update classrooms" ON public.classrooms FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
--- Allow public student registration & queries
+-- Allow public student registration, queries, updates & deletes
 CREATE POLICY "Allow public insert students" ON public.students FOR INSERT TO anon, authenticated WITH CHECK (true);
 CREATE POLICY "Allow public select students" ON public.students FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "Allow public update students" ON public.students FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public delete students" ON public.students FOR DELETE TO anon, authenticated USING (true);
 
 -- Allow sessions operations
 CREATE POLICY "Allow public sessions" ON public.sessions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);

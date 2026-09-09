@@ -19,37 +19,70 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
     }
   });
 
-  // Fetch & Subscribe to real-time students from Supabase
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roomFilter, setRoomFilter] = useState('ALL');
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [formData, setFormData] = useState({
+    studentId: '',
+    name: '',
+    room: 'ป.6/1',
+    number: '',
+    status: 'ACTIVE'
+  });
+  const [formError, setFormError] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [availableRooms, setAvailableRooms] = useState(['ป.6/1', 'ป.6/2', 'ป.6/3', 'ป.6/4']);
+
+  // Fetch & Subscribe to real-time students & classrooms from Supabase
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
-    const fetchStudents = async () => {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .order('classroom', { ascending: true })
-        .order('student_number', { ascending: true });
+    const fetchStudentsAndRooms = async () => {
+      try {
+        const [studentsRes, roomsRes] = await Promise.all([
+          supabase
+            .from('students')
+            .select('*')
+            .order('classroom', { ascending: true })
+            .order('student_number', { ascending: true }),
+          supabase
+            .from('classrooms')
+            .select('*')
+            .order('code', { ascending: true })
+        ]);
 
-      if (!error && Array.isArray(data)) {
-        const formatted = data.map(s => ({
-          studentId: s.id,
-          name: `${s.first_name} ${s.last_name}`.trim(),
-          room: s.classroom,
-          number: String(s.student_number),
-          status: 'ACTIVE',
-          createdAt: s.created_at,
-          lastActiveAt: s.last_active_at
-        }));
-        setRoster(formatted);
+        if (!studentsRes.error && Array.isArray(studentsRes.data)) {
+          const formatted = studentsRes.data.map(s => ({
+            studentId: s.id,
+            name: `${s.first_name} ${s.last_name}`.trim(),
+            room: s.classroom,
+            number: String(s.student_number),
+            status: 'ACTIVE',
+            createdAt: s.created_at,
+            lastActiveAt: s.last_active_at
+          }));
+          setRoster(formatted);
+        }
+
+        if (!roomsRes.error && Array.isArray(roomsRes.data) && roomsRes.data.length > 0) {
+          const roomNames = roomsRes.data.map(r => r.name);
+          setAvailableRooms(roomNames);
+          if (roomNames.length > 0 && !formData.room) {
+            setFormData(prev => ({ ...prev, room: roomNames[0] }));
+          }
+        }
+      } catch (err) {
+        console.error('[ROSTER FETCH ERROR]:', err);
       }
     };
 
-    fetchStudents();
+    fetchStudentsAndRooms();
 
     const channel = supabase
       .channel('roster_live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'students' }, () => {
-        fetchStudents();
+        fetchStudentsAndRooms();
       })
       .subscribe();
 
@@ -215,6 +248,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
     const file = e.target.files[0];
     if (!file) return;
 
+    setIsImporting(true);
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
@@ -222,33 +256,57 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
         const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
         if (lines.length <= 1) {
           alert('ไฟล์ CSV ไม่มีข้อมูลนักเรียน');
+          setIsImporting(false);
           return;
+        }
+
+        // Detect delimiter: comma, tab, or semicolon
+        const firstLine = lines[0];
+        const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.includes(';') ? ';' : ',');
+
+        const headerParts = firstLine.split(delimiter).map(p => p.trim().replace(/^"|"$/g, '').toLowerCase());
+        
+        // Find column indices
+        let nameIdx = headerParts.findIndex(h => h.includes('ชื่อ') || h.includes('name'));
+        let roomIdx = headerParts.findIndex(h => h.includes('ห้อง') || h.includes('room') || h.includes('class'));
+        let numberIdx = headerParts.findIndex(h => h.includes('เลขที่') || h.includes('no') || h.includes('number'));
+
+        let startRow = 1;
+        if (nameIdx === -1 && numberIdx === -1) {
+          // No header row detected
+          startRow = 0;
+          nameIdx = 0;
+          roomIdx = 1;
+          numberIdx = 2;
+        } else {
+          if (nameIdx === -1) nameIdx = 0;
+          if (roomIdx === -1) roomIdx = 1;
+          if (numberIdx === -1) numberIdx = 2;
         }
 
         let importedCount = 0;
 
-        for (let i = 1; i < lines.length; i++) {
-          const parts = lines[i].split(',').map(p => p.trim().replace(/^"|"$/g, ''));
-          if (parts.length >= 3) {
-            const [name, room, number] = parts;
-            if (name && room && number) {
-              const nameParts = name.trim().split(/\s+/);
-              const firstName = nameParts[0] || name.trim();
-              const lastName = nameParts.slice(1).join(' ') || '';
+        for (let i = startRow; i < lines.length; i++) {
+          const parts = lines[i].split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
+          const name = parts[nameIdx];
+          const room = parts[roomIdx] || 'ป.6/1';
+          const number = parts[numberIdx];
 
-              await registerOrGetStudent({
-                firstName,
-                lastName,
-                classroom: room,
-                studentNumber: number,
-                source: 'csv_import'
-              });
-              importedCount++;
-            }
+          if (name && number) {
+            const nameParts = name.trim().split(/\s+/);
+            const firstName = nameParts[0] || name.trim();
+            const lastName = nameParts.slice(1).join(' ') || '';
+
+            await registerOrGetStudent({
+              firstName,
+              lastName,
+              classroom: room,
+              studentNumber: number,
+              source: 'csv_import'
+            });
+            importedCount++;
           }
         }
-
-
 
         if (importedCount > 0) {
           logActivity({
@@ -257,9 +315,14 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
             result: 'SUCCESS'
           });
           alert(`✅ นำเข้ารายชื่อนักเรียนขึ้นฐานข้อมูลสำเร็จทั้งหมด ${importedCount} คน`);
+        } else {
+          alert('ไม่พบข้อมูลนักเรียนที่สามารถนำเข้าได้จากไฟล์ที่เลือก');
         }
       } catch (err) {
         alert(`เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: ${err.message}`);
+      } finally {
+        setIsImporting(false);
+        e.target.value = '';
       }
     };
     reader.readAsText(file, 'UTF-8');
@@ -327,10 +390,9 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
                 className="appearance-none bg-slate-50 border border-slate-200 rounded-2xl pl-3 pr-8 py-2 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 shadow-2xs cursor-pointer"
               >
                 <option value="ALL">ทุกห้อง ({roster.length})</option>
-                <option value="ป.6/1">ห้อง ป.6/1</option>
-                <option value="ป.6/2">ห้อง ป.6/2</option>
-                <option value="ป.6/3">ห้อง ป.6/3</option>
-                <option value="ป.6/4">ห้อง ป.6/4</option>
+                {Array.from(new Set([...availableRooms, ...roster.map(s => s.room).filter(Boolean)])).map(r => (
+                  <option key={r} value={r}>{r.startsWith('ห้อง') ? r : `ห้อง ${r}`}</option>
+                ))}
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -348,10 +410,10 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
               <span>ดาวน์โหลดแม่แบบ CSV</span>
             </button>
 
-            <label className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold px-3 py-2 rounded-2xl text-xs transition border border-indigo-200 flex items-center space-x-1.5 cursor-pointer shadow-2xs">
+            <label className={`bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold px-3 py-2 rounded-2xl text-xs transition border border-indigo-200 flex items-center space-x-1.5 cursor-pointer shadow-2xs ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
               <Upload className="w-3.5 h-3.5" />
-              <span>นำเข้า CSV</span>
-              <input type="file" accept=".csv" onChange={handleCSVImport} className="hidden" />
+              <span>{isImporting ? 'กำลังนำเข้า...' : 'นำเข้า CSV'}</span>
+              <input type="file" accept=".csv" onChange={handleCSVImport} disabled={isImporting} className="hidden" />
             </label>
 
             {roster.length > 0 && (
@@ -370,7 +432,13 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
               onClick={() => {
                 setIsAddingNew(true);
                 setEditingStudent(null);
-                setFormData({ studentId: '', name: '', room: 'ป.6/1', number: '', status: 'ACTIVE' });
+                setFormData({ 
+                  studentId: '', 
+                  name: '', 
+                  room: availableRooms[0] || 'ป.6/1', 
+                  number: '', 
+                  status: 'ACTIVE' 
+                });
                 setFormError('');
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2 rounded-2xl text-xs transition shadow-md flex items-center space-x-1.5 action-btn-hover"
@@ -424,10 +492,9 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
                   onChange={(e) => setFormData({ ...formData, room: e.target.value })}
                   className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="ป.6/1">ห้อง ป.6/1</option>
-                  <option value="ป.6/2">ห้อง ป.6/2</option>
-                  <option value="ป.6/3">ห้อง ป.6/3</option>
-                  <option value="ป.6/4">ห้อง ป.6/4</option>
+                  {Array.from(new Set([...availableRooms, ...roster.map(s => s.room).filter(Boolean)])).map(r => (
+                    <option key={r} value={r}>{r.startsWith('ห้อง') ? r : `ห้อง ${r}`}</option>
+                  ))}
                 </select>
               </div>
 
