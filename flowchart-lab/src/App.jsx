@@ -8,7 +8,7 @@ import {
   CheckCheck, Download, Settings, Users, FileSpreadsheet, Calendar,
   Image as ImageIcon, Eye, Plus, Edit3, Save, X, Zap,
   Cloud, Database, Copy, LogOut, Upload, FileText, AlertTriangle, TrendingUp,
-  ExternalLink, Key, Hash, Search, Activity
+  ExternalLink, Key, Hash, Search, Activity, UserPlus
 } from 'lucide-react';
 
 
