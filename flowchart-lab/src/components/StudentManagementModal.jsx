@@ -6,6 +6,7 @@ import {
 import { logActivity } from '../utils/auditLogger';
 import { registerOrGetStudent } from '../services/supabaseService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { DEFAULT_STUDENT_ROSTER } from '../data/defaultRoster';
 
 const STORAGE_ROSTER_KEY = 'flowchart_student_roster';
 
@@ -13,10 +14,20 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
   const [roster, setRoster] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_ROSTER_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_STUDENT_ROSTER.map(s => ({
+      studentId: `std_${s.studentCode}`,
+      studentCode: s.studentCode,
+      name: s.name,
+      room: s.room,
+      number: String(s.number),
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString()
+    }));
   });
 
   const [searchQuery, setSearchQuery] = useState('');

@@ -3,6 +3,7 @@
 // Flowchart Quest (Flowchart Lab)
 // ==============================================================================
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
+import { DEFAULT_STUDENT_ROSTER } from '../data/defaultRoster.js';
 
 
 // Generate consistent student code for lookup
@@ -13,26 +14,60 @@ export const generateStudentCode = (classroom, studentNumber, firstName) => {
 };
 
 /**
- * 1. STUDENT LOOKUP BY STUDENT CODE / ID
- * Fast atomic lookup for student entrance by student_code
+ * 1. STUDENT LOOKUP BY STUDENT CODE / ID / NAME
+ * Fast atomic lookup for student entrance by student_code with master roster fallback
  */
 export const getStudentByCode = async (studentCode) => {
-  const code = (studentCode || '').trim();
-  if (!code) return { success: false, error: 'กรุณากรอกเลขประจำตัวนักเรียน' };
+  const raw = (studentCode || '').trim();
+  if (!raw) return { success: false, error: 'กรุณากรอกเลขประจำตัวนักเรียน' };
+
+  const code = raw.toLowerCase();
+
+  // Find in master default roster (121 students from CSV)
+  const masterMatch = DEFAULT_STUDENT_ROSTER.find(s => {
+    const sCode = String(s.studentCode || '').trim().toLowerCase();
+    const sName = String(s.name || '').trim().toLowerCase();
+    const sFirst = String(s.firstName || '').trim().toLowerCase();
+    const sCleanName = sName.replace(/^(เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.)\s*/, '');
+    const rawClean = code.replace(/^(เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.)\s*/, '');
+    
+    return sCode === code ||
+           sName === code ||
+           sFirst === code ||
+           sCleanName === rawClean ||
+           (rawClean.length >= 3 && sCleanName.includes(rawClean)) ||
+           `${s.room}_no${s.number}`.toLowerCase() === code;
+  });
 
   if (!isSupabaseConfigured) {
+    if (masterMatch) {
+      return {
+        success: true,
+        student: {
+          id: `master_${masterMatch.studentCode}`,
+          student_code: masterMatch.studentCode,
+          first_name: masterMatch.firstName,
+          last_name: masterMatch.lastName || '',
+          classroom: masterMatch.room,
+          student_number: masterMatch.number,
+          created_at: new Date().toISOString()
+        }
+      };
+    }
+
     try {
       const roster = JSON.parse(localStorage.getItem('flowchart_student_roster') || '[]');
       const found = roster.find(s => 
-        (s.studentCode && String(s.studentCode).trim().toLowerCase() === code.toLowerCase()) ||
-        (s.studentId && String(s.studentId).trim().toLowerCase() === code.toLowerCase()) ||
+        (s.studentCode && String(s.studentCode).trim().toLowerCase() === code) ||
+        (s.studentId && String(s.studentId).trim().toLowerCase() === code) ||
+        (s.name && String(s.name).trim().toLowerCase() === code) ||
         (s.number && String(s.number).trim() === code)
       );
       if (found) {
         return {
           success: true,
           student: {
-            id: found.studentId || `local_${found.number}`,
+            id: found.studentId || `local_${found.studentCode || found.number}`,
             student_code: found.studentCode || found.number,
             first_name: found.name.split(' ')[0] || found.name,
             last_name: found.name.split(' ').slice(1).join(' ') || '',
@@ -43,34 +78,93 @@ export const getStudentByCode = async (studentCode) => {
         };
       }
     } catch { /* ignore */ }
-    return { success: false, error: 'ไม่พบข้อมูลนักเรียนรหัสนี้ในระบบออฟไลน์' };
+    return { success: false, error: `ไม่พบเลขประจำตัว "${raw}" ในระบบทะเบียนนักเรียน` };
   }
 
   try {
-    let { data: student, error } = await supabase
+    // 1. Direct query in Supabase by student_code
+    let { data: student } = await supabase
       .from('students')
       .select('*')
-      .eq('student_code', code)
+      .eq('student_code', raw)
       .maybeSingle();
 
     if (!student) {
       const { data: list } = await supabase
         .from('students')
         .select('*')
-        .ilike('student_code', code);
+        .ilike('student_code', raw);
 
       if (list && list.length > 0) {
         student = list[0];
       }
     }
 
+    // 2. Query by first name or code match if still not found
     if (!student) {
-      return { success: false, error: `ไม่พบเลขประจำตัว "${code}" ในระบบทะเบียนนักเรียน` };
+      const cleanSearch = raw.replace(/^(เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.)\s*/, '');
+      const { data: nameMatches } = await supabase
+        .from('students')
+        .select('*')
+        .or(`first_name.ilike.%${cleanSearch}%,student_code.ilike.%${raw}%`);
+
+      if (nameMatches && nameMatches.length > 0) {
+        student = nameMatches[0];
+      }
     }
 
-    return { success: true, student };
+    // 3. If found in Supabase database, return
+    if (student) {
+      return { success: true, student };
+    }
+
+    // 4. If not yet in Supabase table but exists in master roster, auto-register to Supabase!
+    if (masterMatch) {
+      const regRes = await registerOrGetStudent({
+        studentCode: masterMatch.studentCode,
+        firstName: masterMatch.firstName,
+        lastName: masterMatch.lastName || '',
+        classroom: masterMatch.room,
+        studentNumber: masterMatch.number,
+        source: 'master_roster_auto'
+      });
+
+      if (regRes && regRes.success && regRes.student) {
+        return { success: true, student: regRes.student };
+      }
+
+      // If network registration had an issue, fallback to master match object
+      return {
+        success: true,
+        student: {
+          id: `master_${masterMatch.studentCode}`,
+          student_code: masterMatch.studentCode,
+          first_name: masterMatch.firstName,
+          last_name: masterMatch.lastName || '',
+          classroom: masterMatch.room,
+          student_number: masterMatch.number,
+          created_at: new Date().toISOString()
+        }
+      };
+    }
+
+    return { success: false, error: `ไม่พบเลขประจำตัว "${raw}" ในระบบทะเบียนนักเรียน` };
   } catch (err) {
     console.error('[SUPABASE GET STUDENT BY CODE ERROR]:', err);
+    if (masterMatch) {
+      return {
+        success: true,
+        student: {
+          id: `master_${masterMatch.studentCode}`,
+          student_code: masterMatch.studentCode,
+          first_name: masterMatch.firstName,
+          last_name: masterMatch.lastName || '',
+          classroom: masterMatch.room,
+          student_number: masterMatch.number,
+          created_at: new Date().toISOString()
+        }
+      };
+    }
     return { success: false, error: err.message };
   }
 };
