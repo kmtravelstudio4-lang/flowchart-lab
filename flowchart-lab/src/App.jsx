@@ -293,32 +293,58 @@ export default function App() {
   const [liveEventsList, setLiveEventsList] = useState([]);
 
   // Supabase Realtime & Initial Data Load
-  // 2. Fetch Initial and Live Admin/Teacher Dashboard Data
   const loadDashboard = useCallback(async () => {
     try {
       const data = await fetchAdminDashboardData();
       if (data && Array.isArray(data.students)) {
-        const mapped = data.students.map(s => ({
-          id: s.id,
-          studentId: s.id,
-          name: `${s.first_name} ${s.last_name}`.trim(),
-          room: s.classroom,
-          number: s.student_number,
-          source: s.registration_source,
-          lastActiveAt: s.last_active_at,
-          createdAt: s.created_at,
-          preScore: s.preScore !== undefined ? s.preScore : null,
-          postScore: s.postScore !== undefined ? s.postScore : null,
-          gainScore: s.gainScore !== undefined ? s.gainScore : 0,
-          m1: s.m1 !== undefined ? s.m1 : 0,
-          m2: s.m2 !== undefined ? s.m2 : 0,
-          m3: s.m3 !== undefined ? s.m3 : 0,
-          m4: s.m4 !== undefined ? s.m4 : 0,
-          m5: s.m5 !== undefined ? s.m5 : 0,
-          totalScore: s.totalScore !== undefined ? s.totalScore : 0,
-          isPassed: s.isPassed !== undefined ? s.isPassed : false
-        }));
-        setStudentRecords(mapped);
+        setStudentRecords(prev => {
+          const merged = data.students.map(s => {
+            const local = prev.find(p => p.id === s.id || p.studentId === s.id || (p.name === s.name && p.room === s.room));
+            
+            const m1 = Math.max(Number(s.m1 || 0), Number(local?.m1 || 0));
+            const m2 = Math.max(Number(s.m2 || 0), Number(local?.m2 || 0));
+            const m3 = Math.max(Number(s.m3 || 0), Number(local?.m3 || 0));
+            const m4 = Math.max(Number(s.m4 || 0), Number(local?.m4 || 0));
+            const m5 = Math.max(Number(s.m5 || 0), Number(local?.m5 || 0));
+            const preScore = s.preScore !== null && s.preScore !== undefined ? s.preScore : (local?.preScore !== undefined ? local?.preScore : null);
+            const postScore = s.postScore !== null && s.postScore !== undefined ? s.postScore : (local?.postScore !== undefined ? local?.postScore : null);
+            const gainScore = (postScore !== null && preScore !== null) ? (postScore - preScore) : (local?.gainScore || 0);
+            const totalScore = Math.max(m1 + m2 + m3 + m4 + m5, Number(s.totalScore || 0), Number(local?.totalScore || 0));
+
+            return {
+              id: s.id,
+              studentId: s.id,
+              studentCode: s.studentCode || s.student_code || local?.studentCode || '',
+              name: s.name || `${s.first_name || ''} ${s.last_name || ''}`.trim() || local?.name,
+              room: s.room || s.classroom || local?.room,
+              number: s.number || s.student_number || local?.number,
+              source: s.source || s.registration_source || local?.source,
+              lastActiveAt: s.lastActiveAt || s.last_active_at || local?.lastActiveAt,
+              createdAt: s.createdAt || s.created_at || local?.createdAt,
+              preScore,
+              postScore,
+              gainScore,
+              m1,
+              m2,
+              m3,
+              m4,
+              m5,
+              totalScore,
+              isPassed: totalScore >= 60
+            };
+          });
+
+          for (const loc of prev) {
+            if (!merged.some(m => m.id === loc.id || m.studentId === loc.id || (m.name === loc.name && m.room === loc.room))) {
+              merged.push(loc);
+            }
+          }
+
+          try {
+            localStorage.setItem('flowchart_student_records', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
       }
       if (data && Array.isArray(data.progress)) {
         setLiveProgressList(data.progress);
@@ -1459,10 +1485,19 @@ export default function App() {
     }
 
     let allCorrect = true;
+    let correctCount = 0;
     m1Targets.forEach(t => {
       const placed = m1PlacedAnswers[t.slotId];
-      if (!placed || placed.id !== t.correctItemId) allCorrect = false;
+      if (placed && placed.id === t.correctItemId) {
+        correctCount += 1;
+      } else {
+        allCorrect = false;
+      }
     });
+
+    const m1Score = Math.round((correctCount / m1Targets.length) * 15);
+    setMissionScores(prev => ({ ...prev, m1: m1Score }));
+    syncLiveStudentScore({ m1: m1Score });
 
     if (studentInfo.studentId) {
       await recordActivityAttempt({
@@ -1481,12 +1516,10 @@ export default function App() {
       playSound('success', soundEnabled);
       setComboCount(prev => prev + 1);
       setUserXP(prev => prev + 150);
-      setMissionScores(prev => ({ ...prev, m1: 15 }));
-      syncLiveStudentScore({ m1: 15 });
       setM1Result({
         success: true,
         canContinue: true,
-        message: '🎉 ยอดเยี่ยมมากครับ! จับคู่สัญลักษณ์ Flowchart กับหน้าที่ได้ถูกต้องครบถ้วน'
+        message: '🎉 ยอดเยี่ยมมากครับ! จับคู่สัญลักษณ์ Flowchart กับหน้าที่ได้ถูกต้องครบถ้วน (+15 คะแนน)'
       });
     } else {
       playSound('error', soundEnabled);
@@ -1494,7 +1527,7 @@ export default function App() {
       setM1Result({
         success: false,
         canContinue: true,
-        message: '💡 มีบางสัญลักษณ์ที่วางสลับที่กัน: สี่เหลี่ยมผืนผ้า = Process (ประมวลผล), สี่เหลี่ยมข้าวหลามตัด = Decision (ตัดสินใจ), วงรี = Terminal (เริ่มต้น/สิ้นสุด) คุณสามารถไปต่อได้ทันที หรือลองจัดวางใหม่อีกครั้งได้ครับ'
+        message: `💡 คุณจับคู่ถูกต้อง ${correctCount}/${m1Targets.length} สัญลักษณ์ (+${m1Score} คะแนน): สี่เหลี่ยมผืนผ้า = Process (ประมวลผล), สี่เหลี่ยมข้าวหลามตัด = Decision (ตัดสินใจ), วงรี = Terminal (เริ่มต้น/สิ้นสุด) คุณสามารถกดจัดวางใหม่ หรือกดภารกิจถัดไปได้ครับ`
       });
     }
   };
@@ -1570,7 +1603,7 @@ export default function App() {
   // --- Mission 3 Handlers (Flow Reader) ---
   const handleVerifyMission3 = async () => {
     const currentLvl = FLOW_READER_LEVELS[m3LevelIdx];
-    const answeredCount = Object.keys(m3Answers).filter(k => k.startsWith(`m3_l${m3LevelIdx + 1}`)).length;
+    const answeredCount = currentLvl.questions.filter(q => m3Answers[q.qId] !== undefined && m3Answers[q.qId] !== null).length;
 
     if (answeredCount < currentLvl.questions.length) {
       playSound('error', soundEnabled);

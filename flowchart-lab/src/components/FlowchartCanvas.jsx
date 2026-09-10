@@ -211,10 +211,11 @@ export const FlowchartCanvas = ({
     }
 
     const refQuestions = scenario?.reflectionQuestions || [];
-    const answeredCount = Object.keys(reflectionAnswers).length;
-    if (answeredCount < refQuestions.length) {
+    const missingIdx = refQuestions.findIndex(q => reflectionAnswers[q.id] === undefined || reflectionAnswers[q.id] === null);
+    if (missingIdx !== -1) {
       playSound('error', soundEnabled);
-      alert(`กรุณาตอบคำถามสะท้อนคิดให้ครบทั้ง ${refQuestions.length} ข้อก่อนส่งประเมินผลครับ 😊`);
+      handleChangeQuestionIdx(missingIdx);
+      alert(`กรุณาตอบคำถามสะท้อนคิดข้อที่ ${missingIdx + 1} ให้เรียบร้อยก่อนส่งประเมินผลครับ 😊 (ระบบพาคุณมายังข้อที่ยังไม่ได้ตอบแล้ว)`);
       return;
     }
 

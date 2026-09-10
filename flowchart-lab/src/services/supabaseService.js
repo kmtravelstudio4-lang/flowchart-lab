@@ -580,7 +580,7 @@ export const fetchAdminDashboardData = async () => {
     const [studentsRes, progressRes, eventsRes, classroomsRes] = await Promise.all([
       supabase.from('students').select('*').order('last_active_at', { ascending: false }),
       supabase.from('progress').select('*'),
-      supabase.from('events').select('*, students(first_name, last_name, classroom, student_number)').order('created_at', { ascending: false }).limit(100),
+      supabase.from('events').select('*, students(first_name, last_name, classroom, student_number)').order('created_at', { ascending: false }).limit(1000),
       supabase.from('classrooms').select('*').order('code', { ascending: true })
     ]);
 
@@ -589,7 +589,7 @@ export const fetchAdminDashboardData = async () => {
 
     // Correlate latest score events onto each student
     const studentsWithScores = students.map(s => {
-      const studentEvents = events.filter(e => e.student_id === s.id && (e.event_type === 'score_updated' || e.event_type === 'COURSE_COMPLETED'));
+      const studentEvents = events.filter(e => (e.student_id === s.id) && (e.event_type === 'score_updated' || e.event_type === 'COURSE_COMPLETED' || e.metadata?.scores));
       const latestScoreEvent = studentEvents[0]; // ordered desc
       const rawScores = latestScoreEvent?.metadata?.scores || latestScoreEvent?.metadata || {};
 
