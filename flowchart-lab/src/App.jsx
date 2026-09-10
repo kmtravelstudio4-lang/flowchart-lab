@@ -665,24 +665,29 @@ export default function App() {
   const [m1Result, setM1Result] = useState(null);
   const [m1DraggedItem, setM1DraggedItem] = useState(null);
 
-  // Mission 2: Step Master State
+  // Mission 2: Step Master State (Per-level persistent storage)
   const [m2LevelIdx, setM2LevelIdx] = useState(0);
-  const [m2AvailableBlocks, setM2AvailableBlocks] = useState([]);
-  const [m2PlacedSlots, setM2PlacedSlots] = useState([]);
-  const [m2Result, setM2Result] = useState(null);
+  const [m2PlacedByLevel, setM2PlacedByLevel] = useState({});
+  const [m2AvailableByLevel, setM2AvailableByLevel] = useState({});
+  const [m2ResultsByLevel, setM2ResultsByLevel] = useState({});
+  const [m2CompletedLevels, setM2CompletedLevels] = useState({});
 
-  // Mission 3: Flow Reader State
+  // Mission 3: Flow Reader State (Per-level tracking)
   const [m3LevelIdx, setM3LevelIdx] = useState(0);
   const [m3Answers, setM3Answers] = useState({});
-  const [m3Result, setM3Result] = useState(null);
+  const [m3ResultsByLevel, setM3ResultsByLevel] = useState({});
+  const [m3CompletedLevels, setM3CompletedLevels] = useState({});
 
-  // Mission 4: Bug Detective State
+  // Mission 4: Bug Detective State (Per-scenario tracking)
   const [m4ScenarioIdx, setM4ScenarioIdx] = useState(0);
-  const [m4Answers, setM4Answers] = useState({ step1: null, step2: null, step3: null });
-  const [m4Result, setM4Result] = useState(null);
+  const [m4AnswersByScenario, setM4AnswersByScenario] = useState({});
+  const [m4ResultsByScenario, setM4ResultsByScenario] = useState({});
+  const [m4CompletedScenarios, setM4CompletedScenarios] = useState({});
 
-  // Final Mission State
+  // Final Mission State (Per-scenario tracking)
   const [finalScenarioIdx, setFinalScenarioIdx] = useState(0);
+  const [m5CompletedScenarios, setM5CompletedScenarios] = useState({});
+  const [m5ResultsByScenario, setM5ResultsByScenario] = useState({});
 
   // Certificate Reference & Export
   const [isExporting, setIsExporting] = useState(false);
@@ -892,13 +897,43 @@ export default function App() {
     setM1Result(null);
   }, []);
 
-  // Init Mission 2
-  const initMission2 = useCallback((levelIdx) => {
-    const lvl = STEP_MASTER_LEVELS[levelIdx] || STEP_MASTER_LEVELS[0];
-    const shuffled = [...lvl.blocks].sort(() => Math.random() - 0.5);
-    setM2AvailableBlocks(shuffled);
-    setM2PlacedSlots([]);
-    setM2Result(null);
+  // Init Mission 2 (Preserves placed items per level)
+  const initMission2 = useCallback((levelIdx = null, forceReset = false) => {
+    if (levelIdx === null || levelIdx === undefined) {
+      setM2AvailableByLevel(prev => {
+        const next = { ...prev };
+        STEP_MASTER_LEVELS.forEach((lvl, idx) => {
+          if (!next[idx] || forceReset) {
+            next[idx] = [...lvl.blocks].sort(() => Math.random() - 0.5);
+          }
+        });
+        return next;
+      });
+      if (forceReset) {
+        setM2PlacedByLevel({});
+        setM2ResultsByLevel({});
+        setM2CompletedLevels({});
+      }
+    } else {
+      const lvl = STEP_MASTER_LEVELS[levelIdx] || STEP_MASTER_LEVELS[0];
+      setM2AvailableByLevel(prev => ({
+        ...prev,
+        [levelIdx]: [...lvl.blocks].sort(() => Math.random() - 0.5)
+      }));
+      setM2PlacedByLevel(prev => ({
+        ...prev,
+        [levelIdx]: []
+      }));
+      setM2ResultsByLevel(prev => ({
+        ...prev,
+        [levelIdx]: null
+      }));
+      setM2CompletedLevels(prev => {
+        const next = { ...prev };
+        delete next[levelIdx];
+        return next;
+      });
+    }
   }, []);
 
   // Save persistent state to localStorage
@@ -933,12 +968,12 @@ export default function App() {
     }
   }, [gameStage, initMission1]);
 
-  // Init Mission 2 on Stage/Level Change
+  // Init Mission 2 on Stage Change (Only initializes uninitialized levels)
   useEffect(() => {
     if (gameStage === 'mission2') {
-      initMission2(m2LevelIdx);
+      initMission2();
     }
-  }, [gameStage, m2LevelIdx, initMission2]);
+  }, [gameStage, initMission2]);
   // --- 1. Student ID Authentication (Fast Student Code Login) ---
   const handleStudentIdLogin = async (e) => {
     if (e) e.preventDefault();
@@ -1467,17 +1502,21 @@ export default function App() {
   // --- Mission 2 Handlers (Step Master) ---
   const handleVerifyMission2 = async () => {
     const currentLvl = STEP_MASTER_LEVELS[m2LevelIdx];
-    if (m2PlacedSlots.length !== currentLvl.blocks.length) {
+    const placed = m2PlacedByLevel[m2LevelIdx] || [];
+    if (placed.length !== currentLvl.blocks.length) {
       playSound('error', soundEnabled);
-      setM2Result({
-        success: false,
-        canContinue: false,
-        message: `กรุณาเลือกวางบล็อกคำสั่งให้ครบทั้ง ${currentLvl.blocks.length} ขั้นตอนก่อนตรวจคำตอบครับ`
-      });
+      setM2ResultsByLevel(prev => ({
+        ...prev,
+        [m2LevelIdx]: {
+          success: false,
+          canContinue: false,
+          message: `กรุณาเลือกวางบล็อกคำสั่งให้ครบทั้ง ${currentLvl.blocks.length} ขั้นตอนก่อนตรวจคำตอบครับ (ปัจจุบันวางแล้ว ${placed.length}/${currentLvl.blocks.length} บล็อก)`
+        }
+      }));
       return;
     }
 
-    const currentIds = m2PlacedSlots.map(b => b.id);
+    const currentIds = placed.map(b => b.id);
     const isMatch = currentIds.every((id, idx) => id === currentLvl.correctOrder[idx]);
 
     if (studentInfo.studentId) {
@@ -1491,29 +1530,40 @@ export default function App() {
       });
     }
 
-    setCompletedStages(prev => ({ ...prev, mission2: true }));
-
     if (isMatch) {
       playSound('success', soundEnabled);
       setM2IsSimulating(true);
-      setM2Result({
-        success: true,
-        canContinue: true,
-        message: `🌟 ถูกต้องสมบูรณ์แบบ! ${currentLvl.feedbackExplanation}`
-      });
+      const updatedCompleted = { ...m2CompletedLevels, [m2LevelIdx]: true };
+      setM2CompletedLevels(updatedCompleted);
 
-      if (m2LevelIdx >= STEP_MASTER_LEVELS.length - 1) {
-        setMissionScores(prev => ({ ...prev, m2: 15 }));
+      const completedCount = Object.values(updatedCompleted).filter(Boolean).length;
+      const calculatedScore = Math.min(15, Math.round((completedCount / STEP_MASTER_LEVELS.length) * 15));
+      setMissionScores(prev => ({ ...prev, m2: calculatedScore }));
+      syncLiveStudentScore({ m2: calculatedScore });
+
+      if (completedCount >= STEP_MASTER_LEVELS.length || m2LevelIdx >= STEP_MASTER_LEVELS.length - 1) {
+        setCompletedStages(prev => ({ ...prev, mission2: true }));
         setUserXP(prev => prev + 150);
-        syncLiveStudentScore({ m2: 15 });
       }
+
+      setM2ResultsByLevel(prev => ({
+        ...prev,
+        [m2LevelIdx]: {
+          success: true,
+          canContinue: true,
+          message: `🌟 ถูกต้องสมบูรณ์แบบ! (ผ่านระดับ ${m2LevelIdx + 1} แล้ว) ${currentLvl.feedbackExplanation}`
+        }
+      }));
     } else {
       playSound('error', soundEnabled);
-      setM2Result({
-        success: false,
-        canContinue: true,
-        message: `💡 ลำดับขั้นตอนยังไม่ตรงกับหลักเหตุผล: ${currentLvl.feedbackExplanation || 'ลำดับผังงานแบบ Sequence ต้องทำงานจากบนลงล่างตามลำดับเวลา'} คุณสามารถไปต่อได้ทันที หรือลองจัดใหม่อีกรอบได้ครับ`
-      });
+      setM2ResultsByLevel(prev => ({
+        ...prev,
+        [m2LevelIdx]: {
+          success: false,
+          canContinue: true,
+          message: `💡 ลำดับขั้นตอนยังไม่ตรงกับหลักเหตุผล: ${currentLvl.feedbackExplanation || 'ลำดับผังงานแบบ Sequence ต้องทำงานจากบนลงล่างตามลำดับเวลา'} คุณสามารถกด "ลองจัดลำดับใหม่" หรือคลิกเพื่อสลับ/จัดวางบล็อกใหม่ได้ครับ`
+        }
+      }));
     }
   };
 
@@ -1524,11 +1574,14 @@ export default function App() {
 
     if (answeredCount < currentLvl.questions.length) {
       playSound('error', soundEnabled);
-      setM3Result({
-        success: false,
-        canContinue: false,
-        message: `กรุณาตอบคำถามให้ครบทั้ง ${currentLvl.questions.length} ข้อก่อนตรวจคำตอบครับ`
-      });
+      setM3ResultsByLevel(prev => ({
+        ...prev,
+        [m3LevelIdx]: {
+          success: false,
+          canContinue: false,
+          message: `กรุณาตอบคำถามให้ครบทั้ง ${currentLvl.questions.length} ข้อก่อนตรวจคำตอบครับ (ตอบแล้ว ${answeredCount}/${currentLvl.questions.length} ข้อ)`
+        }
+      }));
       return;
     }
 
@@ -1550,47 +1603,65 @@ export default function App() {
       });
     }
 
-    setCompletedStages(prev => ({ ...prev, mission3: true }));
-
     if (isAllCorrect) {
       playSound('success', soundEnabled);
-      setM3Result({
-        success: true,
-        canContinue: true,
-        message: `🎉 ถูกต้องครบทุกข้อ! คุณอ่านและวิเคราะห์ผังงานระดับ ${m3LevelIdx + 1} ได้อย่างแม่นยำ`
-      });
+      const updatedCompleted = { ...m3CompletedLevels, [m3LevelIdx]: true };
+      setM3CompletedLevels(updatedCompleted);
 
-      if (m3LevelIdx >= FLOW_READER_LEVELS.length - 1) {
-        setMissionScores(prev => ({ ...prev, m3: 15 }));
+      const completedCount = Object.values(updatedCompleted).filter(Boolean).length;
+      const calculatedScore = Math.min(15, Math.round((completedCount / FLOW_READER_LEVELS.length) * 15));
+      setMissionScores(prev => ({ ...prev, m3: calculatedScore }));
+      syncLiveStudentScore({ m3: calculatedScore });
+
+      if (completedCount >= FLOW_READER_LEVELS.length || m3LevelIdx >= FLOW_READER_LEVELS.length - 1) {
+        setCompletedStages(prev => ({ ...prev, mission3: true }));
         setUserXP(prev => prev + 150);
-        syncLiveStudentScore({ m3: 15 });
       }
+
+      setM3ResultsByLevel(prev => ({
+        ...prev,
+        [m3LevelIdx]: {
+          success: true,
+          canContinue: true,
+          message: `🎉 ถูกต้องครบทุกข้อ! (ผ่านระดับ ${m3LevelIdx + 1} แล้ว) คุณอ่านและวิเคราะห์ผังงานระดับ ${m3LevelIdx + 1} ได้อย่างแม่นยำ`
+        }
+      }));
     } else {
       playSound('error', soundEnabled);
-      setM3Result({
-        success: false,
-        canContinue: true,
-        message: `💡 คุณตอบถูก ${correctCount}/${currentLvl.questions.length} ข้อ: ข้อสังเกตคือ สี่เหลี่ยมข้าวหลามตัดจะแยกออกเป็น 2 ทาง (จริง/เท็จ) คุณสามารถไปต่อได้เลย หรือลองทบทวนใหม่อีกครั้งได้ครับ`
-      });
+      setM3ResultsByLevel(prev => ({
+        ...prev,
+        [m3LevelIdx]: {
+          success: false,
+          canContinue: true,
+          message: `💡 คุณตอบถูก ${correctCount}/${currentLvl.questions.length} ข้อ: ข้อสังเกตคือ สี่เหลี่ยมข้าวหลามตัดจะแยกออกเป็น 2 ทาง (จริง/เท็จ) คุณสามารถกด "ลองตอบใหม่อีกครั้ง" เพื่อแก้ไขคำตอบได้ครับ`
+        }
+      }));
     }
   };
 
-  // --- Mission 4 Handlers (Bug Detective) ---
+  // --- Mission 4 Handlers (Bug Detective - 20 PTS) ---
   const handleVerifyMission4 = async () => {
     const sc = BUG_DETECTIVE_SCENARIOS[m4ScenarioIdx];
-    if (m4Answers.step1 === null || m4Answers.step2 === null || m4Answers.step3 === null) {
+    const currentAnswers = m4AnswersByScenario[m4ScenarioIdx] || {};
+
+    if (currentAnswers.step1 === undefined || currentAnswers.step1 === null ||
+        currentAnswers.step2 === undefined || currentAnswers.step2 === null ||
+        currentAnswers.step3 === undefined || currentAnswers.step3 === null) {
       playSound('error', soundEnabled);
-      setM4Result({
-        success: false,
-        canContinue: false,
-        message: 'กรุณาตอบคำถามให้ครบทั้ง 3 ขั้นตอน (จุดไหนผิด, ผิดเพราะอะไร, ควรแก้อย่างไร) ครับ'
-      });
+      setM4ResultsByScenario(prev => ({
+        ...prev,
+        [m4ScenarioIdx]: {
+          success: false,
+          canContinue: false,
+          message: 'กรุณาตอบคำถามให้ครบทั้ง 3 ขั้นตอน (จุดไหนผิด, ผิดเพราะอะไร, ควรแก้อย่างไร) ก่อนตรวจคำตอบครับ'
+        }
+      }));
       return;
     }
 
-    const s1Ok = m4Answers.step1 === sc.step1_whereBug.correctAnswer;
-    const s2Ok = m4Answers.step2 === sc.step2_whyBug.correctAnswer;
-    const s3Ok = m4Answers.step3 === sc.step3_howToFix.correctAnswer;
+    const s1Ok = currentAnswers.step1 === sc.step1_whereBug.correctAnswer;
+    const s2Ok = currentAnswers.step2 === sc.step2_whyBug.correctAnswer;
+    const s3Ok = currentAnswers.step3 === sc.step3_howToFix.correctAnswer;
     const isAllOk = s1Ok && s2Ok && s3Ok;
 
     if (studentInfo.studentId) {
@@ -1598,42 +1669,65 @@ export default function App() {
         studentId: studentInfo.studentId,
         activityId: `mission4_scenario_${m4ScenarioIdx + 1}`,
         stageId: 'mission4',
-        answer: m4Answers,
+        answer: currentAnswers,
         isCorrect: isAllOk,
         attemptNumber: 1
       });
     }
 
-    setCompletedStages(prev => ({ ...prev, mission4: true }));
-
     if (isAllOk) {
       playSound('success', soundEnabled);
-      setM4Result({
-        success: true,
-        canContinue: true,
-        message: `🕵️‍♂️ ยอดเยี่ยมมาก นักสืบ Bug! คุณค้นพบจุดผิด อธิบายสาเหตุ และเสนอวิธีแก้ไขได้อย่างสมบูรณ์แบบ`
-      });
-      setMissionScores(prev => ({ ...prev, m4: 20 }));
-      setUserXP(prev => prev + 200);
-      syncLiveStudentScore({ m4: 20 });
+      const newCompleted = { ...m4CompletedScenarios, [m4ScenarioIdx]: true };
+      setM4CompletedScenarios(newCompleted);
+
+      // Score: 10 points per completed scenario, max 20 pts
+      const passedCount = Object.keys(newCompleted).filter(k => newCompleted[k]).length;
+      const totalM4Score = Math.min(20, passedCount * 10);
+
+      setMissionScores(prev => ({ ...prev, m4: totalM4Score }));
+      setUserXP(prev => prev + 100);
+      syncLiveStudentScore({ m4: totalM4Score });
+
+      const allDone = BUG_DETECTIVE_SCENARIOS.every((_, idx) => newCompleted[idx]);
+      if (allDone || passedCount >= BUG_DETECTIVE_SCENARIOS.length) {
+        setCompletedStages(prev => ({ ...prev, mission4: true }));
+      }
+
+      setM4ResultsByScenario(prev => ({
+        ...prev,
+        [m4ScenarioIdx]: {
+          success: true,
+          canContinue: true,
+          allDone,
+          message: `🕵️‍♂️ ยอดเยี่ยมมาก นักสืบ Bug! คุณค้นพบจุดผิด อธิบายสาเหตุ และเสนอวิธีแก้ไขคดีที่ ${m4ScenarioIdx + 1} ได้อย่างสมบูรณ์แบบ (+10 คะแนน)`
+        }
+      }));
     } else {
       playSound('error', soundEnabled);
-      setM4Result({
-        success: false,
-        canContinue: true,
-        message: `💡 ข้อคิดจากนักสืบ Bug: จุดผิดของผังงานมักเกิดจาก "ใช้สัญลักษณ์ผิดประเภท" หรือ "เส้นทางลูกศรวนลูปไม่สิ้นสุด" คุณสามารถไปต่อสู่ Final Mission ได้ทันที หรือลองสืบหาใหม่อีกครั้งครับ`
-      });
+      setM4ResultsByScenario(prev => ({
+        ...prev,
+        [m4ScenarioIdx]: {
+          success: false,
+          canContinue: false,
+          message: `💡 ข้อคิดจากนักสืบ Bug: จุดผิดของผังงานมักเกิดจาก "ใช้สัญลักษณ์ผิดประเภท" หรือ "เส้นทางลูกศรวนลูปไม่สิ้นสุด" ลองสังเกตคำใบ้และกดเลือกตอบใหม่อีกครั้งครับ`
+        }
+      }));
     }
   };
 
-
   // --- Final Mission Completion Handler ---
   const handleFinalMissionComplete = (finalScore, rubricDetails, data) => {
+    const scenId = data?.scenarioId || FINAL_MISSION_SCENARIOS[finalScenarioIdx]?.id;
     setFinalMissionData(data);
-    setMissionScores(prev => ({ ...prev, m5: finalScore }));
+    if (scenId) {
+      setM5ResultsByScenario(prev => ({ ...prev, [scenId]: { finalScore, rubricDetails, data } }));
+      setM5CompletedScenarios(prev => ({ ...prev, [scenId]: true }));
+    }
+    const scoreToSet = Math.max(15, Math.min(35, finalScore || 35));
+    setMissionScores(prev => ({ ...prev, m5: scoreToSet }));
     setCompletedStages(prev => ({ ...prev, final: true }));
     setUserXP(prev => prev + 350);
-    syncLiveStudentScore({ m5: finalScore });
+    syncLiveStudentScore({ m5: scoreToSet });
   };
 
   // --- Certificate PNG Download (100% Fail-safe Canvas) ---
@@ -1732,6 +1826,22 @@ export default function App() {
       localStorage.removeItem('flowchart_mission_scores');
       setCompletedStages({});
       localStorage.removeItem('flowchart_completed_stages');
+      setM2PlacedByLevel({});
+      setM2AvailableByLevel({});
+      setM2ResultsByLevel({});
+      setM2CompletedLevels({});
+      setM2LevelIdx(0);
+      setM3Answers({});
+      setM3ResultsByLevel({});
+      setM3CompletedLevels({});
+      setM3LevelIdx(0);
+      setM4AnswersByScenario({});
+      setM4ResultsByScenario({});
+      setM4CompletedScenarios({});
+      setM4ScenarioIdx(0);
+      setFinalScenarioIdx(0);
+      setM5CompletedScenarios({});
+      setM5ResultsByScenario({});
       setUserXP(0);
       setComboCount(0);
       setActiveTab('game');
@@ -3073,130 +3183,192 @@ export default function App() {
                         <button
                           key={lvl.level}
                           onClick={() => { setM2LevelIdx(idx); playSound('click', soundEnabled); }}
-                          className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold transition-all border ${
+                          className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold transition-all border flex items-center space-x-1.5 cursor-pointer ${
                             m2LevelIdx === idx 
                               ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/25 scale-105' 
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                              : m2CompletedLevels[idx]
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
                           }`}
                         >
-                          ระดับ {lvl.level}
+                          <span>ระดับ {lvl.level}</span>
+                          {m2CompletedLevels[idx] && <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded-full font-bold">✓ ผ่าน</span>}
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
-                    {/* Left: Placed Canvas */}
-                    <div className="lg:col-span-7 space-y-4">
-                      <div className="border border-slate-200/80 rounded-3xl p-5 bg-slate-50/60">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-extrabold text-sm text-slate-900">กระดานจัดเรียงขั้นตอน (Canvas)</h4>
-                          <button
-                            onClick={() => initMission2(m2LevelIdx)}
-                            className="text-xs text-slate-500 hover:text-rose-600 flex items-center space-x-1 font-bold transition"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>รีเซ็ต</span>
-                          </button>
-                        </div>
+                  {(() => {
+                    const currentPlaced = m2PlacedByLevel[m2LevelIdx] || [];
+                    const currentAvailable = m2AvailableByLevel[m2LevelIdx] || (STEP_MASTER_LEVELS[m2LevelIdx]?.blocks ? [...STEP_MASTER_LEVELS[m2LevelIdx].blocks] : []);
+                    const currentResult = m2ResultsByLevel[m2LevelIdx] || null;
 
-                        <div className="space-y-2.5 min-h-[300px] bg-white rounded-3xl p-5 border-2 border-dashed border-blue-200 flex flex-col items-center">
-                          {m2PlacedSlots.length === 0 ? (
-                            <p className="my-auto text-xs text-slate-400 font-medium italic">คลิกเลือกบล็อกจากฝั่งขวาเพื่อนำมาเรียงลำดับที่นี่</p>
-                          ) : (
-                            m2PlacedSlots.map((block, idx) => (
-                              <React.Fragment key={block.id}>
-                                {idx > 0 && <ArrowDown className="w-4 h-4 text-blue-500 my-0.5 stroke-[3]" />}
-                                <div
-                                  onClick={() => {
-                                    playSound('click', soundEnabled);
-                                    setM2PlacedSlots(prev => prev.filter(b => b.id !== block.id));
-                                    setM2AvailableBlocks(prev => [...prev, block]);
-                                  }}
-                                  className="w-full max-w-md cursor-pointer group relative card-hover-effect"
-                                >
-                                  <FlowchartShapeSvg shape={block.shape} label={block.text} />
-                                </div>
-                              </React.Fragment>
-                            ))
-                          )}
-                        </div>
-
-                        <div className="mt-4 pt-3 border-t border-slate-200 space-y-3">
-                          <button
-                            onClick={handleVerifyMission2}
-                            className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 text-white font-black py-3.5 rounded-2xl shadow-md text-xs sm:text-sm flex items-center justify-center space-x-2 action-btn-hover"
-                          >
-                            <CheckSquare className="w-4 h-4" />
-                            <span>ตรวจคำตอบการจัดลำดับขั้นตอน</span>
-                          </button>
-
-                          {m2Result && (
-                            <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold animate-fadeIn ${
-                              m2Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
-                            }`}>
-                              <p className="leading-relaxed">{m2Result.message}</p>
-                              <div className="mt-3 flex flex-wrap items-center gap-2">
-                                {m2LevelIdx < STEP_MASTER_LEVELS.length - 1 ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setM2LevelIdx(prev => prev + 1)}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow transition cursor-pointer"
-                                  >
-                                    ไปต่อระดับ {m2LevelIdx + 2} ➔
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => { setGameStage('mission3'); playSound('click', soundEnabled); }}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
-                                  >
-                                    <span>ไป Mission 3 (Flow Reader)</span>
-                                    <ArrowRight className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
-                                {!m2Result.success && (
-                                  <button
-                                    type="button"
-                                    onClick={() => initMission2(m2LevelIdx)}
-                                    className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer"
-                                  >
-                                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>ลองจัดลำดับใหม่</span>
-                                  </button>
-                                )}
+                    return (
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+                        {/* Left: Placed Canvas */}
+                        <div className="lg:col-span-7 space-y-4">
+                          <div className="border border-slate-200/80 rounded-3xl p-5 bg-slate-50/60">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center space-x-2">
+                                <h4 className="font-extrabold text-sm text-slate-900">กระดานจัดเรียงขั้นตอน (Canvas)</h4>
+                                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                                  วางแล้ว {currentPlaced.length} / {STEP_MASTER_LEVELS[m2LevelIdx]?.blocks.length} บล็อก
+                                </span>
                               </div>
+                              <button
+                                onClick={() => {
+                                  initMission2(m2LevelIdx, true);
+                                  playSound('click', soundEnabled);
+                                }}
+                                className="text-xs text-slate-500 hover:text-rose-600 flex items-center space-x-1 font-bold transition cursor-pointer"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>รีเซ็ตระดับนี้</span>
+                              </button>
                             </div>
-                          )}
 
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Available Blocks */}
-                    <div className="lg:col-span-5 space-y-3">
-                      <div className="border border-slate-200/80 rounded-3xl p-5 bg-white shadow-xs">
-                        <h4 className="font-extrabold text-sm text-slate-900 mb-3">บล็อกขั้นตอนที่พร้อมใช้งาน ({m2AvailableBlocks.length})</h4>
-                        <div className="space-y-2.5">
-                          {m2AvailableBlocks.map(block => (
-                            <div
-                              key={block.id}
-                              onClick={() => {
-                                playSound('click', soundEnabled);
-                                setM2AvailableBlocks(prev => prev.filter(b => b.id !== block.id));
-                                setM2PlacedSlots(prev => [...prev, block]);
-                              }}
-                              className="p-3.5 rounded-2xl bg-slate-50 hover:bg-blue-50/80 border border-slate-200/80 cursor-pointer text-xs font-bold text-slate-800 flex items-center justify-between card-hover-effect"
-                            >
-                              <span>{block.text}</span>
-                              <span className="text-blue-700 bg-blue-100 font-bold px-2.5 py-0.5 rounded-lg text-[10px]">เลือก +</span>
+                            <div className="space-y-2.5 min-h-[300px] bg-white rounded-3xl p-5 border-2 border-dashed border-blue-200 flex flex-col items-center">
+                              {currentPlaced.length === 0 ? (
+                                <p className="my-auto text-xs text-slate-400 font-medium italic">คลิกเลือกบล็อกจากฝั่งขวาเพื่อนำมาเรียงลำดับที่นี่</p>
+                              ) : (
+                                currentPlaced.map((block, idx) => (
+                                  <React.Fragment key={block.id}>
+                                    {idx > 0 && <ArrowDown className="w-4 h-4 text-blue-500 my-0.5 stroke-[3]" />}
+                                    <div
+                                      onClick={() => {
+                                        playSound('click', soundEnabled);
+                                        setM2PlacedByLevel(prev => ({
+                                          ...prev,
+                                          [m2LevelIdx]: (prev[m2LevelIdx] || []).filter(b => b.id !== block.id)
+                                        }));
+                                        setM2AvailableByLevel(prev => ({
+                                          ...prev,
+                                          [m2LevelIdx]: [...(prev[m2LevelIdx] || []), block]
+                                        }));
+                                        setM2ResultsByLevel(prev => ({
+                                          ...prev,
+                                          [m2LevelIdx]: null
+                                        }));
+                                      }}
+                                      className="w-full max-w-md cursor-pointer group relative card-hover-effect"
+                                      title="คลิกเพื่อนำบล็อกนี้กลับไปที่ฝั่งขวา"
+                                    >
+                                      <FlowchartShapeSvg shape={block.shape} label={block.text} />
+                                    </div>
+                                  </React.Fragment>
+                                ))
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
 
-                  </div>
+                            <div className="mt-4 pt-3 border-t border-slate-200 space-y-3">
+                              <button
+                                onClick={handleVerifyMission2}
+                                className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 text-white font-black py-3.5 rounded-2xl shadow-md text-xs sm:text-sm flex items-center justify-center space-x-2 action-btn-hover cursor-pointer"
+                              >
+                                <CheckSquare className="w-4 h-4" />
+                                <span>ตรวจคำตอบการจัดลำดับขั้นตอน (ระดับ {m2LevelIdx + 1})</span>
+                              </button>
+
+                              {currentResult && (
+                                <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold animate-fadeIn ${
+                                  currentResult.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
+                                }`}>
+                                  <p className="leading-relaxed">{currentResult.message}</p>
+                                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    {m2LevelIdx < STEP_MASTER_LEVELS.length - 1 ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setM2LevelIdx(prev => prev + 1);
+                                          playSound('click', soundEnabled);
+                                        }}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow transition cursor-pointer flex items-center space-x-1"
+                                      >
+                                        <span>บันทึกและไปต่อระดับ {m2LevelIdx + 2}</span>
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setGameStage('mission3');
+                                          setCompletedStages(prev => ({ ...prev, mission2: true }));
+                                          playSound('click', soundEnabled);
+                                        }}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
+                                      >
+                                        <span>บันทึกและไปต่อ Mission 3 (Flow Reader)</span>
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                    {!currentResult.success && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          initMission2(m2LevelIdx, true);
+                                          playSound('click', soundEnabled);
+                                        }}
+                                        className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                                        <span>ลองจัดลำดับใหม่</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Available Blocks */}
+                        <div className="lg:col-span-5 space-y-3">
+                          <div className="border border-slate-200/80 rounded-3xl p-5 bg-white shadow-xs">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-extrabold text-sm text-slate-900">
+                                บล็อกขั้นตอนที่พร้อมใช้งาน ({currentAvailable.length})
+                              </h4>
+                              <span className="text-[11px] text-slate-400 font-medium">คลิกเพื่อเลือก</span>
+                            </div>
+                            <div className="space-y-2.5">
+                              {currentAvailable.length === 0 ? (
+                                <p className="text-center py-6 text-xs text-slate-400 font-medium italic">
+                                  นำบล็อกทั้งหมดไปวางบน Canvas ครบแล้ว
+                                </p>
+                              ) : (
+                                currentAvailable.map(block => (
+                                  <div
+                                    key={block.id}
+                                    onClick={() => {
+                                      playSound('click', soundEnabled);
+                                      setM2AvailableByLevel(prev => ({
+                                        ...prev,
+                                        [m2LevelIdx]: (prev[m2LevelIdx] || []).filter(b => b.id !== block.id)
+                                      }));
+                                      setM2PlacedByLevel(prev => ({
+                                        ...prev,
+                                        [m2LevelIdx]: [...(prev[m2LevelIdx] || []), block]
+                                      }));
+                                      setM2ResultsByLevel(prev => ({
+                                        ...prev,
+                                        [m2LevelIdx]: null
+                                      }));
+                                    }}
+                                    className="p-3.5 rounded-2xl bg-slate-50 hover:bg-blue-50/80 border border-slate-200/80 cursor-pointer text-xs font-bold text-slate-800 flex items-center justify-between card-hover-effect"
+                                  >
+                                    <span>{block.text}</span>
+                                    <span className="text-blue-700 bg-blue-100 font-bold px-2.5 py-0.5 rounded-lg text-[10px]">เลือก +</span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -3220,111 +3392,138 @@ export default function App() {
                         <button
                           key={lvl.level}
                           onClick={() => { setM3LevelIdx(idx); playSound('click', soundEnabled); }}
-                          className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold border transition-all ${
+                          className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold border transition-all flex items-center space-x-1.5 cursor-pointer ${
                             m3LevelIdx === idx 
                               ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/25 scale-105' 
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                              : m3CompletedLevels[idx]
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
                           }`}
                         >
-                          ระดับ {lvl.level}
+                          <span>ระดับ {lvl.level}</span>
+                          {m3CompletedLevels[idx] && <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded-full font-bold">✓ ผ่าน</span>}
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
-                    {/* Left: Graphic Flowchart Diagram on Screen */}
-                    <div className="lg:col-span-6 bg-slate-50/80 p-6 rounded-3xl border border-slate-200/80 flex flex-col items-center space-y-2 shadow-xs">
-                      <span className="text-xs font-extrabold text-slate-600 mb-2">ผังงานจริงบนหน้าจอ (Graphic Flowchart)</span>
-                      {FLOW_READER_LEVELS[m3LevelIdx]?.flowchartNodes.map((node, i) => (
-                        <React.Fragment key={node.id}>
-                          {i > 0 && <ArrowDown className="w-4 h-4 text-blue-500 my-0.5 stroke-[3]" />}
-                          <div className="w-full max-w-sm">
-                            <FlowchartShapeSvg shape={node.shape} label={node.text} />
-                          </div>
-                        </React.Fragment>
-                      ))}
-                    </div>
+                  {(() => {
+                    const currentM3Result = m3ResultsByLevel[m3LevelIdx] || null;
 
-                    {/* Right: Reading Questions */}
-                    <div className="lg:col-span-6 space-y-4">
-                      {FLOW_READER_LEVELS[m3LevelIdx]?.questions.map((q) => (
-                        <div key={q.qId} className="bg-white p-5 rounded-3xl border border-slate-200/80 space-y-3 shadow-xs">
-                          <h5 className="font-extrabold text-xs sm:text-sm text-slate-900">{q.question}</h5>
-                          <div className="space-y-2">
-                            {q.options.map((opt, optIdx) => {
-                              const isSelected = m3Answers[q.qId] === optIdx;
-
-                              return (
-                                <button
-                                  key={optIdx}
-                                  onClick={() => {
-                                    playSound('click', soundEnabled);
-                                    setM3Answers(prev => ({ ...prev, [q.qId]: optIdx }));
-                                  }}
-                                  className={`w-full p-3 rounded-2xl border text-left text-xs font-semibold transition-all ${
-                                    isSelected 
-                                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-500 shadow-md shadow-amber-500/20 font-bold scale-[1.01]' 
-                                      : 'bg-slate-50/80 hover:bg-amber-50/50 border-slate-200/80 text-slate-800'
-                                  }`}
-                                >
-                                  {opt}
-                                </button>
-                              );
-                            })}
-                          </div>
+                    return (
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+                        {/* Left: Graphic Flowchart Diagram on Screen */}
+                        <div className="lg:col-span-6 bg-slate-50/80 p-6 rounded-3xl border border-slate-200/80 flex flex-col items-center space-y-2 shadow-xs">
+                          <span className="text-xs font-extrabold text-slate-600 mb-2">ผังงานจริงบนหน้าจอ (Graphic Flowchart)</span>
+                          {FLOW_READER_LEVELS[m3LevelIdx]?.flowchartNodes.map((node, i) => (
+                            <React.Fragment key={node.id}>
+                              {i > 0 && <ArrowDown className="w-4 h-4 text-blue-500 my-0.5 stroke-[3]" />}
+                              <div className="w-full max-w-sm">
+                                <FlowchartShapeSvg shape={node.shape} label={node.text} />
+                              </div>
+                            </React.Fragment>
+                          ))}
                         </div>
-                      ))}
 
-                      <button
-                        onClick={handleVerifyMission3}
-                        className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-amber-500/20 text-xs sm:text-sm flex items-center justify-center space-x-2 action-btn-hover"
-                      >
-                        <CheckSquare className="w-4 h-4" />
-                        <span>ตรวจคำตอบการอ่านผังงาน</span>
-                      </button>
+                        {/* Right: Reading Questions */}
+                        <div className="lg:col-span-6 space-y-4">
+                          {FLOW_READER_LEVELS[m3LevelIdx]?.questions.map((q) => (
+                            <div key={q.qId} className="bg-white p-5 rounded-3xl border border-slate-200/80 space-y-3 shadow-xs">
+                              <h5 className="font-extrabold text-xs sm:text-sm text-slate-900">{q.question}</h5>
+                              <div className="space-y-2">
+                                {q.options.map((opt, optIdx) => {
+                                  const isSelected = m3Answers[q.qId] === optIdx;
 
-                      {m3Result && (
-                        <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold animate-fadeIn ${
-                          m3Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
-                        }`}>
-                          <p className="leading-relaxed">{m3Result.message}</p>
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            {m3LevelIdx < FLOW_READER_LEVELS.length - 1 ? (
-                              <button
-                                type="button"
-                                onClick={() => setM3LevelIdx(prev => prev + 1)}
-                                className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow transition cursor-pointer"
-                              >
-                                ไปอ่านผังงานระดับ {m3LevelIdx + 2} ➔
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => { setGameStage('mission4'); playSound('click', soundEnabled); }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
-                              >
-                                <span>ไป Mission 4 (Bug Detective)</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            {!m3Result.success && (
-                              <button
-                                type="button"
-                                onClick={() => setM3Answers({})}
-                                className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-                                <span>ลองตอบใหม่อีกครั้ง</span>
-                              </button>
-                            )}
-                          </div>
+                                  return (
+                                    <button
+                                      key={optIdx}
+                                      onClick={() => {
+                                        playSound('click', soundEnabled);
+                                        setM3Answers(prev => ({ ...prev, [q.qId]: optIdx }));
+                                        setM3ResultsByLevel(prev => ({ ...prev, [m3LevelIdx]: null }));
+                                      }}
+                                      className={`w-full p-3 rounded-2xl border text-left text-xs font-semibold transition-all cursor-pointer ${
+                                        isSelected 
+                                          ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white border-amber-500 shadow-md shadow-amber-500/20 font-bold scale-[1.01]' 
+                                          : 'bg-slate-50/80 hover:bg-amber-50/50 border-slate-200/80 text-slate-800'
+                                      }`}
+                                    >
+                                      {opt}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+
+                          <button
+                            onClick={handleVerifyMission3}
+                            className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 text-white font-black py-3.5 rounded-2xl shadow-lg shadow-amber-500/20 text-xs sm:text-sm flex items-center justify-center space-x-2 action-btn-hover cursor-pointer"
+                          >
+                            <CheckSquare className="w-4 h-4" />
+                            <span>ตรวจคำตอบการอ่านผังงาน (ระดับ {m3LevelIdx + 1})</span>
+                          </button>
+
+                          {currentM3Result && (
+                            <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold animate-fadeIn ${
+                              currentM3Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
+                            }`}>
+                              <p className="leading-relaxed">{currentM3Result.message}</p>
+                              <div className="mt-3 flex flex-wrap items-center gap-2">
+                                {m3LevelIdx < FLOW_READER_LEVELS.length - 1 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setM3LevelIdx(prev => prev + 1);
+                                      playSound('click', soundEnabled);
+                                    }}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-xs font-black shadow transition cursor-pointer flex items-center space-x-1"
+                                  >
+                                    <span>บันทึกและไปอ่านผังงานระดับ {m3LevelIdx + 2}</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setGameStage('mission4');
+                                      setCompletedStages(prev => ({ ...prev, mission3: true }));
+                                      playSound('click', soundEnabled);
+                                    }}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
+                                  >
+                                    <span>บันทึกและไปต่อ Mission 4 (Bug Detective)</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                {!currentM3Result.success && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setM3Answers(prev => {
+                                        const next = { ...prev };
+                                        FLOW_READER_LEVELS[m3LevelIdx]?.questions.forEach(q => {
+                                          delete next[q.qId];
+                                        });
+                                        return next;
+                                      });
+                                      setM3ResultsByLevel(prev => ({ ...prev, [m3LevelIdx]: null }));
+                                      playSound('click', soundEnabled);
+                                    }}
+                                    className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>ลองตอบใหม่อีกครั้ง</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
                         </div>
-                      )}
-
-
-                    </div>
-                  </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -3347,19 +3546,25 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      {BUG_DETECTIVE_SCENARIOS.map((sc, idx) => (
-                        <button
-                          key={sc.id}
-                          onClick={() => { setM4ScenarioIdx(idx); playSound('click', soundEnabled); }}
-                          className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold border transition-all ${
-                            m4ScenarioIdx === idx 
-                              ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-600/25 scale-105' 
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          คดีที่ {idx + 1}
-                        </button>
-                      ))}
+                      {BUG_DETECTIVE_SCENARIOS.map((sc, idx) => {
+                        const isDone = m4CompletedScenarios[idx];
+                        return (
+                          <button
+                            key={sc.id}
+                            onClick={() => { setM4ScenarioIdx(idx); playSound('click', soundEnabled); }}
+                            className={`px-3.5 py-1.5 rounded-2xl text-xs font-extrabold border transition-all flex items-center space-x-1.5 ${
+                              m4ScenarioIdx === idx 
+                                ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-600/25 scale-105' 
+                                : isDone
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            <span>คดีที่ {idx + 1}</span>
+                            {isDone && <span className="text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full font-black">✓ ผ่าน</span>}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -3386,6 +3591,8 @@ export default function App() {
                     <div className="lg:col-span-7 space-y-4">
                       {(() => {
                         const sc = BUG_DETECTIVE_SCENARIOS[m4ScenarioIdx];
+                        const currentAnswers = m4AnswersByScenario[m4ScenarioIdx] || {};
+                        const currentResult = m4ResultsByScenario[m4ScenarioIdx];
 
                         return (
                           <>
@@ -3401,10 +3608,16 @@ export default function App() {
                                     key={idx}
                                     onClick={() => {
                                       playSound('click', soundEnabled);
-                                      setM4Answers(prev => ({ ...prev, step1: idx }));
+                                      setM4AnswersByScenario(prev => ({
+                                        ...prev,
+                                        [m4ScenarioIdx]: {
+                                          ...(prev[m4ScenarioIdx] || {}),
+                                          step1: idx
+                                        }
+                                      }));
                                     }}
                                     className={`w-full p-3 rounded-2xl border text-left text-xs font-semibold transition-all ${
-                                      m4Answers.step1 === idx 
+                                      currentAnswers.step1 === idx 
                                         ? 'bg-blue-600 text-white border-blue-600 shadow-sm font-bold' 
                                         : 'bg-slate-50/80 hover:bg-blue-50/40 border-slate-200/80 text-slate-800'
                                     }`}
@@ -3427,10 +3640,16 @@ export default function App() {
                                     key={idx}
                                     onClick={() => {
                                       playSound('click', soundEnabled);
-                                      setM4Answers(prev => ({ ...prev, step2: idx }));
+                                      setM4AnswersByScenario(prev => ({
+                                        ...prev,
+                                        [m4ScenarioIdx]: {
+                                          ...(prev[m4ScenarioIdx] || {}),
+                                          step2: idx
+                                        }
+                                      }));
                                     }}
                                     className={`w-full p-3 rounded-2xl border text-left text-xs font-semibold transition-all ${
-                                      m4Answers.step2 === idx 
+                                      currentAnswers.step2 === idx 
                                         ? 'bg-amber-600 text-white border-amber-600 shadow-sm font-bold' 
                                         : 'bg-slate-50/80 hover:bg-amber-50/40 border-slate-200/80 text-slate-800'
                                     }`}
@@ -3453,10 +3672,16 @@ export default function App() {
                                     key={idx}
                                     onClick={() => {
                                       playSound('click', soundEnabled);
-                                      setM4Answers(prev => ({ ...prev, step3: idx }));
+                                      setM4AnswersByScenario(prev => ({
+                                        ...prev,
+                                        [m4ScenarioIdx]: {
+                                          ...(prev[m4ScenarioIdx] || {}),
+                                          step3: idx
+                                        }
+                                      }));
                                     }}
                                     className={`w-full p-3 rounded-2xl border text-left text-xs font-semibold transition-all ${
-                                      m4Answers.step3 === idx 
+                                      currentAnswers.step3 === idx 
                                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm font-bold' 
                                         : 'bg-slate-50/80 hover:bg-emerald-50/40 border-slate-200/80 text-slate-800'
                                     }`}
@@ -3472,15 +3697,28 @@ export default function App() {
                               className="w-full bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-rose-600/20 text-xs sm:text-sm flex items-center justify-center space-x-2 action-btn-hover"
                             >
                               <CheckSquare className="w-4 h-4" />
-                              <span>ตรวจคำตอบการสืบหา Bug (20 คะแนน)</span>
+                              <span>ตรวจคำตอบการสืบหา Bug (คดีที่ {m4ScenarioIdx + 1})</span>
                             </button>
 
-                            {m4Result && (
+                            {currentResult && (
                               <div className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold animate-fadeIn ${
-                                m4Result.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
+                                currentResult.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-950'
                               }`}>
-                                <p className="leading-relaxed">{m4Result.message}</p>
+                                <p className="leading-relaxed">{currentResult.message}</p>
                                 <div className="mt-3 flex flex-wrap items-center gap-2">
+                                  {currentResult.success && m4ScenarioIdx < BUG_DETECTIVE_SCENARIOS.length - 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setM4ScenarioIdx(m4ScenarioIdx + 1);
+                                        playSound('click', soundEnabled);
+                                      }}
+                                      className="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
+                                    >
+                                      <span>บันทึกและไปสืบคดีที่ {m4ScenarioIdx + 2}</span>
+                                      <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => { setGameStage('final'); playSound('click', soundEnabled); }}
@@ -3489,10 +3727,20 @@ export default function App() {
                                     <span>ไปสู่ FINAL MISSION (Algorithm Forge)</span>
                                     <ArrowRight className="w-3.5 h-3.5" />
                                   </button>
-                                  {!m4Result.success && (
+                                  {!currentResult.success && (
                                     <button
                                       type="button"
-                                      onClick={() => setM4Answers({ step1: null, step2: null, step3: null })}
+                                      onClick={() => {
+                                        setM4AnswersByScenario(prev => ({
+                                          ...prev,
+                                          [m4ScenarioIdx]: { step1: null, step2: null, step3: null }
+                                        }));
+                                        setM4ResultsByScenario(prev => {
+                                          const copy = { ...prev };
+                                          delete copy[m4ScenarioIdx];
+                                          return copy;
+                                        });
+                                      }}
                                       className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition inline-flex items-center space-x-1 cursor-pointer"
                                     >
                                       <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
@@ -3531,19 +3779,25 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center space-x-2 overflow-x-auto pb-1 sm:pb-0">
-                      {FINAL_MISSION_SCENARIOS.map((scen, idx) => (
-                        <button
-                          key={scen.id}
-                          onClick={() => { setFinalScenarioIdx(idx); playSound('click', soundEnabled); }}
-                          className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all border shrink-0 ${
-                            finalScenarioIdx === idx 
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/25 scale-105' 
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
-                          }`}
-                        >
-                          โจทย์ที่ {idx + 1}
-                        </button>
-                      ))}
+                      {FINAL_MISSION_SCENARIOS.map((scen, idx) => {
+                        const isDone = m5CompletedScenarios[scen.id];
+                        return (
+                          <button
+                            key={scen.id}
+                            onClick={() => { setFinalScenarioIdx(idx); playSound('click', soundEnabled); }}
+                            className={`px-4 py-2 rounded-2xl text-xs font-extrabold transition-all border shrink-0 flex items-center space-x-1.5 ${
+                              finalScenarioIdx === idx 
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/25 scale-105' 
+                                : isDone
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200'
+                            }`}
+                          >
+                            <span>โจทย์ที่ {idx + 1}</span>
+                            {isDone && <span className="text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded-full font-black">✓ ผ่าน</span>}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

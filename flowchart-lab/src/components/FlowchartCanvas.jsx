@@ -12,7 +12,10 @@ export const FlowchartCanvas = ({
   onComplete, 
   soundEnabled = true 
 }) => {
-  // Available block pool from scenario (shuffled)
+  // Scenario-based persistent cache map
+  const [scenarioStates, setScenarioStates] = useState({});
+
+  // Available block pool from scenario
   const [availableBlocks, setAvailableBlocks] = useState([]);
   
   // Placed blocks on canvas
@@ -31,31 +34,69 @@ export const FlowchartCanvas = ({
   // Evaluation Rubric & Submission Result
   const [rubricResult, setRubricResult] = useState(null);
 
-  // Initialize blocks when scenario changes
+  // Helper to sync changes to per-scenario persistent state
+  const saveScenarioState = (partial) => {
+    if (!scenario?.id) return;
+    setScenarioStates(prev => ({
+      ...prev,
+      [scenario.id]: {
+        ...(prev[scenario.id] || {}),
+        ...partial
+      }
+    }));
+  };
+
+  // Initialize or restore blocks when scenario changes
   useEffect(() => {
-    if (scenario && scenario.availableBlocks) {
+    if (!scenario?.id) return;
+
+    if (scenarioStates[scenario.id]) {
+      const saved = scenarioStates[scenario.id];
+      setAvailableBlocks(saved.availableBlocks || []);
+      setPlacedNodes(saved.placedNodes || []);
+      setReflectionAnswers(saved.reflectionAnswers || {});
+      setCurrentQuestionIdx(saved.currentQuestionIdx || 0);
+      setRubricResult(saved.rubricResult || null);
+      setSimLogs(saved.simLogs || []);
+      setIsSimulating(false);
+      setActiveSimIndex(-1);
+    } else if (scenario.availableBlocks) {
       const shuffled = [...scenario.availableBlocks].sort(() => Math.random() - 0.5);
-      setAvailableBlocks(shuffled);
-      setPlacedNodes([]);
-      setReflectionAnswers({});
-      setCurrentQuestionIdx(0);
-      setRubricResult(null);
-      setSimLogs([]);
+      const initial = {
+        availableBlocks: shuffled,
+        placedNodes: [],
+        reflectionAnswers: {},
+        currentQuestionIdx: 0,
+        rubricResult: null,
+        simLogs: []
+      };
+      setAvailableBlocks(initial.availableBlocks);
+      setPlacedNodes(initial.placedNodes);
+      setReflectionAnswers(initial.reflectionAnswers);
+      setCurrentQuestionIdx(initial.currentQuestionIdx);
+      setRubricResult(initial.rubricResult);
+      setSimLogs(initial.simLogs);
+      setIsSimulating(false);
+      setActiveSimIndex(-1);
+      setScenarioStates(prev => ({ ...prev, [scenario.id]: initial }));
     }
-  }, [scenario]);
+  }, [scenario?.id]);
 
   // Click to add block from available pool to canvas
   const handleAddBlockToCanvas = (block) => {
     playSound('drop', soundEnabled);
-    setPlacedNodes(prev => [...prev, { ...block, instanceId: `node_${Date.now()}_${Math.random()}` }]);
-    setAvailableBlocks(prev => prev.filter(b => b.id !== block.id));
+    const newPlaced = [...placedNodes, { ...block, instanceId: `node_${Date.now()}_${Math.random()}` }];
+    const newAvailable = availableBlocks.filter(b => b.id !== block.id);
+    setPlacedNodes(newPlaced);
+    setAvailableBlocks(newAvailable);
+    saveScenarioState({ placedNodes: newPlaced, availableBlocks: newAvailable });
   };
 
   // Remove block from canvas back to available pool
   const handleRemoveBlockFromCanvas = (node) => {
     playSound('click', soundEnabled);
-    setPlacedNodes(prev => prev.filter(n => n.instanceId !== node.instanceId));
-    setAvailableBlocks(prev => [...prev, { 
+    const newPlaced = placedNodes.filter(n => n.instanceId !== node.instanceId);
+    const newAvailable = [...availableBlocks, { 
       id: node.id, 
       shape: node.shape, 
       text: node.text, 
@@ -63,7 +104,10 @@ export const FlowchartCanvas = ({
       noText: node.noText, 
       isCorrect: node.isCorrect, 
       correctOrder: node.correctOrder 
-    }]);
+    }];
+    setPlacedNodes(newPlaced);
+    setAvailableBlocks(newAvailable);
+    saveScenarioState({ placedNodes: newPlaced, availableBlocks: newAvailable });
   };
 
   // Move node up or down
@@ -77,6 +121,7 @@ export const FlowchartCanvas = ({
     newNodes[index] = newNodes[targetIdx];
     newNodes[targetIdx] = temp;
     setPlacedNodes(newNodes);
+    saveScenarioState({ placedNodes: newNodes });
   };
 
   // Reset Canvas
@@ -88,6 +133,12 @@ export const FlowchartCanvas = ({
       setPlacedNodes([]);
       setRubricResult(null);
       setSimLogs([]);
+      saveScenarioState({
+        availableBlocks: shuffled,
+        placedNodes: [],
+        rubricResult: null,
+        simLogs: []
+      });
     }
   };
 
@@ -101,7 +152,8 @@ export const FlowchartCanvas = ({
     playSound('click', soundEnabled);
     setIsSimulating(true);
     setActiveSimIndex(0);
-    setSimLogs([`🚀 เริ่มต้นจำลองการรันผังงาน: "${scenario?.title || 'ผังงานของคุณ'}"`]);
+    const initLogs = [`🚀 เริ่มต้นจำลองการรันผังงาน: "${scenario?.title || 'ผังงานของคุณ'}"`];
+    setSimLogs(initLogs);
 
     let step = 0;
     const interval = setInterval(() => {
@@ -114,12 +166,20 @@ export const FlowchartCanvas = ({
         if (currentNode.shape === 'decision') {
           logMsg += ` ➔ ผลลัพธ์กิ่ง [${simBranchChoice}]: ${simBranchChoice === 'YES' ? (currentNode.yesText || 'จริง') : (currentNode.noText || 'เท็จ')}`;
         }
-        setSimLogs(prev => [...prev, logMsg]);
+        setSimLogs(prev => {
+          const updated = [...prev, logMsg];
+          saveScenarioState({ simLogs: updated });
+          return updated;
+        });
         step++;
       } else {
         clearInterval(interval);
         playSound('success', soundEnabled);
-        setSimLogs(prev => [...prev, '🏁 สิ้นสุดการทำงานของผังงาน (Execution Completed Successfully)']);
+        setSimLogs(prev => {
+          const updated = [...prev, '🏁 สิ้นสุดการทำงานของผังงาน (Execution Completed Successfully)'];
+          saveScenarioState({ simLogs: updated });
+          return updated;
+        });
         setIsSimulating(false);
         setActiveSimIndex(-1);
       }
@@ -129,7 +189,15 @@ export const FlowchartCanvas = ({
   // Select Multiple Choice Reflection Answer
   const handleSelectReflection = (questionId, optionIdx) => {
     playSound('click', soundEnabled);
-    setReflectionAnswers(prev => ({ ...prev, [questionId]: optionIdx }));
+    const updated = { ...reflectionAnswers, [questionId]: optionIdx };
+    setReflectionAnswers(updated);
+    saveScenarioState({ reflectionAnswers: updated });
+  };
+
+  // Change Active Reflection Question Index
+  const handleChangeQuestionIdx = (idx) => {
+    setCurrentQuestionIdx(idx);
+    saveScenarioState({ currentQuestionIdx: idx });
   };
 
   // Evaluate Flowchart & Reflection Answers against Rubric (35 Points Max)
@@ -186,10 +254,11 @@ export const FlowchartCanvas = ({
     };
 
     setRubricResult(rubricDetail);
+    saveScenarioState({ rubricResult: rubricDetail });
     playSound('success', soundEnabled);
 
     if (onComplete) {
-      onComplete(finalScaledScore, rubricDetail, { placedNodes, reflectionAnswers });
+      onComplete(finalScaledScore, rubricDetail, { scenarioId: scenario?.id, placedNodes, reflectionAnswers });
     }
   };
 
@@ -491,7 +560,7 @@ export const FlowchartCanvas = ({
                       key={q.id}
                       type="button"
                       onClick={() => {
-                        setCurrentQuestionIdx(qIdx);
+                        handleChangeQuestionIdx(qIdx);
                         playSound('click', soundEnabled);
                       }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center space-x-1 ${
@@ -568,7 +637,7 @@ export const FlowchartCanvas = ({
                   type="button"
                   disabled={safeQIdx === 0}
                   onClick={() => {
-                    setCurrentQuestionIdx(prev => Math.max(0, prev - 1));
+                    handleChangeQuestionIdx(Math.max(0, safeQIdx - 1));
                     playSound('click', soundEnabled);
                   }}
                   className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:hover:bg-slate-100 text-slate-700 font-extrabold text-xs transition flex items-center space-x-1.5"
@@ -581,7 +650,7 @@ export const FlowchartCanvas = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setCurrentQuestionIdx(prev => Math.min(questions.length - 1, prev + 1));
+                      handleChangeQuestionIdx(Math.min(questions.length - 1, safeQIdx + 1));
                       playSound('click', soundEnabled);
                     }}
                     className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs transition flex items-center space-x-1.5 shadow-xs action-btn-hover"

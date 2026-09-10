@@ -97,7 +97,7 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
 
   // Handle Download CSV Template (With Student Code)
   const handleDownloadCSVTemplate = () => {
-    const csvContent = "\uFEFFรหัสนักเรียน,ชื่อ-นามสกุล,ห้อง,เลขที่\n60101,ด.ช. สมชาย ใจดี,ป.6/1,1\n60102,ด.ญ. สมหญิง รักเรียน,ป.6/1,2\n60201,ด.ช. กิตติศักดิ์ มุ่งมั่น,ป.6/2,1";
+    const csvContent = "\uFEFFรหัสนักเรียน,ชื่อ-นามสกุล,ห้อง,เลขที่\n15431,เด็กชายสงกรานต์,ป.6/1,1\n15438,เด็กชายอภินันท์ นรเอี่ยม,ป.6/2,1\n15428,เด็กชายวีรพงษ์ พันหนองบัว,ป.6/3,1\n15436,เด็กชายปิยทัศน์ บัวแก้ว,ป.6/4,1";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -361,9 +361,22 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
   };
 
 
+  // Helper to normalize room name for matching (e.g. 'ห้อง ป.6/1' <-> 'ป.6/1')
+  const normalizeRoom = (r) => (r || '').replace(/^ห้อง\s*/, '').trim();
+
+  // Classroom definition map with PIN codes
+  const roomMetaList = [
+    { code: '601', name: 'ห้อง ป.6/1', raw: 'ป.6/1' },
+    { code: '602', name: 'ห้อง ป.6/2', raw: 'ป.6/2' },
+    { code: '603', name: 'ห้อง ป.6/3', raw: 'ป.6/3' },
+    { code: '604', name: 'ห้อง ป.6/4', raw: 'ป.6/4' }
+  ];
+
   // Filtered Roster
   const filteredRoster = roster.filter(s => {
-    const matchRoom = roomFilter === 'ALL' || s.room === roomFilter;
+    const matchRoom = roomFilter === 'ALL' || 
+      s.room === roomFilter || 
+      normalizeRoom(s.room) === normalizeRoom(roomFilter);
     const q = searchQuery.trim().toLowerCase();
     const matchQuery = !q || 
       (s.studentCode && s.studentCode.toLowerCase().includes(q)) ||
@@ -423,10 +436,15 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
                 onChange={(e) => setRoomFilter(e.target.value)}
                 className="appearance-none bg-slate-50 border border-slate-200 rounded-2xl pl-3 pr-8 py-2 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-blue-500 shadow-2xs cursor-pointer"
               >
-                <option value="ALL">ทุกห้อง ({roster.length})</option>
-                {Array.from(new Set([...availableRooms, ...roster.map(s => s.room).filter(Boolean)])).map(r => (
-                  <option key={r} value={r}>{r.startsWith('ห้อง') ? r : `ห้อง ${r}`}</option>
-                ))}
+                <option value="ALL">ทุกห้อง ({roster.length} คน)</option>
+                {roomMetaList.map(rm => {
+                  const count = roster.filter(s => normalizeRoom(s.room) === rm.raw).length;
+                  return (
+                    <option key={rm.code} value={rm.raw}>
+                      {rm.name} (รหัส {rm.code}) ({count} คน)
+                    </option>
+                  );
+                })}
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
@@ -540,8 +558,8 @@ export default function StudentManagementModal({ onClose, onSelectStudentProfile
                   onChange={(e) => setFormData({ ...formData, room: e.target.value })}
                   className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-blue-500"
                 >
-                  {Array.from(new Set([...availableRooms, ...roster.map(s => s.room).filter(Boolean)])).map(r => (
-                    <option key={r} value={r}>{r.startsWith('ห้อง') ? r : `ห้อง ${r}`}</option>
+                  {roomMetaList.map(rm => (
+                    <option key={rm.code} value={rm.raw}>{rm.name} (รหัส {rm.code})</option>
                   ))}
                 </select>
               </div>

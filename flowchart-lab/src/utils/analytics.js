@@ -28,6 +28,22 @@ export function classifyStudentRisk(studentRecord) {
   const m4 = studentRecord.m4 || 0;
   const m5 = studentRecord.m5 || 0;
 
+  const hasAttempted = (studentRecord.preScore !== null && studentRecord.preScore !== undefined) ||
+                       (studentRecord.postScore !== null && studentRecord.postScore !== undefined) ||
+                       (total > 0) || (m1 > 0) || (m2 > 0) || (m3 > 0) || (m4 > 0) || (m5 > 0);
+
+  if (!hasAttempted) {
+    return {
+      level: 'NOT_STARTED',
+      tier: 'NOT_STARTED',
+      label: 'พร้อมเริ่มเรียน (Not Started)',
+      color: 'text-slate-600',
+      badgeBg: 'bg-slate-100 text-slate-700 border-slate-300',
+      summary: 'นักเรียนลงทะเบียนในระบบเรียบร้อยแล้ว ยังไม่ได้เริ่มการประเมินหรือทำกิจกรรม',
+      recommendations: ['เข้าสู่ระบบด้วยรหัสนักเรียนเพื่อเริ่มทำแบบทดสอบก่อนเรียน (Pre-Test) และศึกษาบทเรียน']
+    };
+  }
+
   const recommendations = [];
 
   // Individual mission heuristics
