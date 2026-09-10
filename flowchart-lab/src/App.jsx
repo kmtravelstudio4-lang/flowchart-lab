@@ -1078,6 +1078,42 @@ export default function App() {
           localStorage.setItem('flowchart_current_student', JSON.stringify(fullStudentProfile));
         } catch { /* ignore */ }
 
+        // Find if this student has existing progress in database records
+        const existingRecord = (studentRecords || []).find(r => 
+          (r.studentCode && String(r.studentCode).trim() === String(student.student_code || code).trim()) || 
+          (r.studentId && r.studentId === studentId) || 
+          (r.id && r.id === studentId)
+        );
+
+        const initialScores = {
+          preScore: (existingRecord?.preScore !== undefined && existingRecord?.preScore !== null && existingRecord?.preScore !== '-' && existingRecord?.preScore !== '') ? Number(existingRecord.preScore) : null,
+          postScore: (existingRecord?.postScore !== undefined && existingRecord?.postScore !== null && existingRecord?.postScore !== '-' && existingRecord?.postScore !== '') ? Number(existingRecord.postScore) : null,
+          m1: Number(existingRecord?.m1 || 0),
+          m2: Number(existingRecord?.m2 || 0),
+          m3: Number(existingRecord?.m3 || 0),
+          m4: Number(existingRecord?.m4 || 0),
+          m5: Number(existingRecord?.m5 || 0),
+          total: Number(existingRecord?.totalScore || existingRecord?.total || 0)
+        };
+
+        const initialCompleted = {
+          learning: true,
+          pretest: Boolean(initialScores.preScore !== null && initialScores.preScore !== undefined),
+          mission1: Boolean(initialScores.m1 > 0),
+          mission2: Boolean(initialScores.m2 > 0),
+          mission3: Boolean(initialScores.m3 > 0),
+          mission4: Boolean(initialScores.m4 > 0),
+          final: Boolean(initialScores.m5 > 0),
+          posttest: Boolean(initialScores.postScore !== null && initialScores.postScore !== undefined)
+        };
+
+        setMissionScores(initialScores);
+        setCompletedStages(initialCompleted);
+        try {
+          localStorage.setItem('flowchart_mission_scores', JSON.stringify(initialScores));
+          localStorage.setItem('flowchart_completed_stages', JSON.stringify(initialCompleted));
+        } catch { /* ignore */ }
+
         // Start Initial Progress in Supabase
         updateStudentProgress({
           studentId,
@@ -1168,6 +1204,24 @@ export default function App() {
           localStorage.setItem('flowchart_current_student', JSON.stringify(fullStudentProfile));
         } catch { /* ignore */ }
 
+        const initialScores = {
+          preScore: null,
+          postScore: null,
+          m1: 0,
+          m2: 0,
+          m3: 0,
+          m4: 0,
+          m5: 0,
+          total: 0
+        };
+        const initialCompleted = { learning: true };
+        setMissionScores(initialScores);
+        setCompletedStages(initialCompleted);
+        try {
+          localStorage.setItem('flowchart_mission_scores', JSON.stringify(initialScores));
+          localStorage.setItem('flowchart_completed_stages', JSON.stringify(initialCompleted));
+        } catch { /* ignore */ }
+
         // Start Initial Progress in Supabase
         updateStudentProgress({
           studentId,
@@ -1222,6 +1276,23 @@ export default function App() {
       number: '-'
     };
     setStudentInfo(guestUser);
+    const initialScores = {
+      preScore: null,
+      postScore: null,
+      m1: 0,
+      m2: 0,
+      m3: 0,
+      m4: 0,
+      m5: 0,
+      total: 0
+    };
+    const initialCompleted = { learning: true };
+    setMissionScores(initialScores);
+    setCompletedStages(initialCompleted);
+    try {
+      localStorage.setItem('flowchart_mission_scores', JSON.stringify(initialScores));
+      localStorage.setItem('flowchart_completed_stages', JSON.stringify(initialCompleted));
+    } catch { /* ignore */ }
     setIsProfileEntered(true);
     setGameStage('learning');
     playSound('success', soundEnabled);
