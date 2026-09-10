@@ -222,6 +222,47 @@ export default function App() {
     return {};
   });
 
+  // Stage Progression Lock / Unlock Validator (Strict Sequential Progression)
+  const isStageUnlocked = useCallback((stageId) => {
+    switch (stageId) {
+      case 'intro':
+      case 'learning':
+        return true;
+      case 'pretest':
+        return true;
+      case 'mission1':
+        return Boolean(completedStages.pretest || (missionScores.preScore !== null && missionScores.preScore !== undefined));
+      case 'mission2':
+        return Boolean(completedStages.mission1 || (missionScores.m1 !== null && missionScores.m1 > 0));
+      case 'mission3':
+        return Boolean(completedStages.mission2 || (missionScores.m2 !== null && missionScores.m2 > 0));
+      case 'mission4':
+        return Boolean(completedStages.mission3 || (missionScores.m3 !== null && missionScores.m3 > 0));
+      case 'final':
+        return Boolean(completedStages.mission4 || (missionScores.m4 !== null && missionScores.m4 > 0));
+      case 'posttest':
+        return Boolean(completedStages.final || (missionScores.m5 !== null && missionScores.m5 > 0));
+      case 'summary':
+        return Boolean(completedStages.posttest || (missionScores.postScore !== null && missionScores.postScore !== undefined));
+      default:
+        return true;
+    }
+  }, [completedStages, missionScores]);
+
+  // Automatic Safety Guard: Fallback if attempting to access a locked stage
+  useEffect(() => {
+    if (!isProfileEntered || gameStage === 'intro' || gameStage === 'learning' || gameStage === 'pretest') return;
+    if (!isStageUnlocked(gameStage)) {
+      if (isStageUnlocked('final')) setGameStage('final');
+      else if (isStageUnlocked('mission4')) setGameStage('mission4');
+      else if (isStageUnlocked('mission3')) setGameStage('mission3');
+      else if (isStageUnlocked('mission2')) setGameStage('mission2');
+      else if (isStageUnlocked('mission1')) setGameStage('mission1');
+      else if (isStageUnlocked('pretest')) setGameStage('pretest');
+      else setGameStage('learning');
+    }
+  }, [gameStage, isStageUnlocked, isProfileEntered]);
+
   // User XP & Combo
   const [userXP, setUserXP] = useState(0);
   const [comboCount, setComboCount] = useState(0);
@@ -2260,15 +2301,15 @@ export default function App() {
                 {/* Tier 2: 9-Stage Progress Timeline Stepper */}
                 <div className="flex items-center space-x-2 overflow-x-auto py-1 text-xs font-bold scrollbar-none">
                   {[
-                    { id: 'learning', label: '1. บทเรียน', isUnlocked: true },
-                    { id: 'pretest', label: '2. Pre-Test', isUnlocked: true },
-                    { id: 'mission1', label: '3. M1: สัญลักษณ์', isUnlocked: true },
-                    { id: 'mission2', label: '4. M2: ลำดับ', isUnlocked: true },
-                    { id: 'mission3', label: '5. M3: อ่านผัง', isUnlocked: true },
-                    { id: 'mission4', label: '6. M4: แก้บั๊ก', isUnlocked: true },
-                    { id: 'final', label: '7. Final: ออกแบบ', isUnlocked: true },
-                    { id: 'posttest', label: '8. Post-Test', isUnlocked: true },
-                    { id: 'summary', label: '9. สรุปผล & เกียรติบัตร', isUnlocked: Boolean(completedStages.posttest || missionScores.postScore !== null) }
+                    { id: 'learning', label: '1. บทเรียน', isUnlocked: isStageUnlocked('learning') },
+                    { id: 'pretest', label: '2. Pre-Test', isUnlocked: isStageUnlocked('pretest') },
+                    { id: 'mission1', label: '3. M1: สัญลักษณ์', isUnlocked: isStageUnlocked('mission1') },
+                    { id: 'mission2', label: '4. M2: ลำดับ', isUnlocked: isStageUnlocked('mission2') },
+                    { id: 'mission3', label: '5. M3: อ่านผัง', isUnlocked: isStageUnlocked('mission3') },
+                    { id: 'mission4', label: '6. M4: แก้บั๊ก', isUnlocked: isStageUnlocked('mission4') },
+                    { id: 'final', label: '7. Final: ออกแบบ', isUnlocked: isStageUnlocked('final') },
+                    { id: 'posttest', label: '8. Post-Test', isUnlocked: isStageUnlocked('posttest') },
+                    { id: 'summary', label: '9. สรุปผล & เกียรติบัตร', isUnlocked: isStageUnlocked('summary') }
                   ].map((stage) => {
                     const isCurrent = gameStage === stage.id;
                     const isDone = completedStages[stage.id];
@@ -2277,7 +2318,13 @@ export default function App() {
                     return (
                       <button
                         key={stage.id}
+                        disabled={!isUnlocked}
                         onClick={() => { 
+                          if (!isUnlocked) {
+                            playSound('error', soundEnabled);
+                            alert('🔒 ด่านนี้ยังถูกล็อกอยู่ครับ! กรุณาทำด่านก่อนหน้าให้ผ่านก่อนนะ');
+                            return;
+                          }
                           setGameStage(stage.id); 
                           playSound('click', soundEnabled); 
                         }}
@@ -2286,9 +2333,13 @@ export default function App() {
                             ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-600 text-white shadow-md shadow-blue-600/25 scale-[1.02]'
                             : isDone
                             ? 'bg-emerald-50/90 border-emerald-300 text-emerald-800 hover:bg-emerald-100 shadow-2xs'
-                            : 'bg-white/90 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 shadow-2xs'
+                            : isUnlocked
+                            ? 'bg-white/90 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 shadow-2xs'
+                            : 'bg-slate-100/80 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed shadow-none'
                         }`}
+                        title={!isUnlocked ? 'ด่านนี้ถูกล็อกอยู่ ต้องทำด่านก่อนหน้าให้ผ่านก่อน' : stage.label}
                       >
+                        {!isUnlocked && <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
                         <span>{stage.label}</span>
                         {isDone && <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
                       </button>
@@ -2990,10 +3041,17 @@ export default function App() {
 
                           <button
                             onClick={() => {
-                              if (ch.targetMissionIdx === 0) setGameStage('mission1');
-                              else if (ch.targetMissionIdx === 1) setGameStage('mission2');
-                              else if (ch.targetMissionIdx === 2) setGameStage('mission3');
-                              else if (ch.targetMissionIdx === 3) setGameStage('mission4');
+                              let target = 'mission1';
+                              if (ch.targetMissionIdx === 1) target = 'mission2';
+                              else if (ch.targetMissionIdx === 2) target = 'mission3';
+                              else if (ch.targetMissionIdx === 3) target = 'mission4';
+
+                              if (!isStageUnlocked(target)) {
+                                playSound('error', soundEnabled);
+                                alert('🔒 ภารกิจนี้ยังถูกล็อกอยู่ครับ! กรุณาทำภารกิจและแบบทดสอบตามลำดับให้ผ่านก่อนนะ');
+                                return;
+                              }
+                              setGameStage(target);
                               playSound('click', soundEnabled);
                             }}
                             className="bg-white hover:bg-blue-50 text-blue-800 font-black px-6 py-3 rounded-2xl shadow-md text-xs shrink-0 flex items-center space-x-2 action-btn-hover"
@@ -3752,14 +3810,20 @@ export default function App() {
                                       <ArrowRight className="w-3.5 h-3.5" />
                                     </button>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => { setGameStage('final'); playSound('click', soundEnabled); }}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
-                                  >
-                                    <span>ไปสู่ FINAL MISSION (Algorithm Forge)</span>
-                                    <ArrowRight className="w-3.5 h-3.5" />
-                                  </button>
+                                  {currentResult.success && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { 
+                                        setCompletedStages(prev => ({ ...prev, mission4: true }));
+                                        setGameStage('final'); 
+                                        playSound('click', soundEnabled); 
+                                      }}
+                                      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5 transition cursor-pointer"
+                                    >
+                                      <span>ไปสู่ FINAL MISSION (Algorithm Forge)</span>
+                                      <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
                                   {!currentResult.success && (
                                     <button
                                       type="button"
