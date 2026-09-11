@@ -342,30 +342,28 @@ export default function App() {
     try {
       const data = await fetchAdminDashboardData();
       if (data && Array.isArray(data.students)) {
-        setStudentRecords(prev => {
+        setStudentRecords(() => {
           const merged = data.students.map(s => {
-            const local = prev.find(p => p.id === s.id || p.studentId === s.id || (p.name === s.name && p.room === s.room));
-            
-            const m1 = Math.max(Number(s.m1 || 0), Number(local?.m1 || 0));
-            const m2 = Math.max(Number(s.m2 || 0), Number(local?.m2 || 0));
-            const m3 = Math.max(Number(s.m3 || 0), Number(local?.m3 || 0));
-            const m4 = Math.max(Number(s.m4 || 0), Number(local?.m4 || 0));
-            const m5 = Math.max(Number(s.m5 || 0), Number(local?.m5 || 0));
-            const preScore = s.preScore !== null && s.preScore !== undefined ? s.preScore : (local?.preScore !== undefined ? local?.preScore : null);
-            const postScore = s.postScore !== null && s.postScore !== undefined ? s.postScore : (local?.postScore !== undefined ? local?.postScore : null);
-            const gainScore = (postScore !== null && preScore !== null) ? (postScore - preScore) : (local?.gainScore || 0);
-            const totalScore = Math.max(m1 + m2 + m3 + m4 + m5, Number(s.totalScore || 0), Number(local?.totalScore || 0));
+            const m1 = Number(s.m1 || 0);
+            const m2 = Number(s.m2 || 0);
+            const m3 = Number(s.m3 || 0);
+            const m4 = Number(s.m4 || 0);
+            const m5 = Number(s.m5 || 0);
+            const preScore = s.preScore !== null && s.preScore !== undefined ? Number(s.preScore) : null;
+            const postScore = s.postScore !== null && s.postScore !== undefined ? Number(s.postScore) : null;
+            const gainScore = (postScore !== null && preScore !== null) ? (postScore - preScore) : (s.gainScore || 0);
+            const totalScore = (m1 + m2 + m3 + m4 + m5) > 0 ? (m1 + m2 + m3 + m4 + m5) : Number(s.totalScore || 0);
 
             return {
               id: s.id,
               studentId: s.id,
-              studentCode: s.studentCode || s.student_code || local?.studentCode || '',
-              name: s.name || `${s.first_name || ''} ${s.last_name || ''}`.trim() || local?.name,
-              room: s.room || s.classroom || local?.room,
-              number: s.number || s.student_number || local?.number,
-              source: s.source || s.registration_source || local?.source,
-              lastActiveAt: s.lastActiveAt || s.last_active_at || local?.lastActiveAt,
-              createdAt: s.createdAt || s.created_at || local?.createdAt,
+              studentCode: s.studentCode || s.student_code || '',
+              name: s.name || `${s.first_name || ''} ${s.last_name || ''}`.trim(),
+              room: s.room || s.classroom,
+              number: String(s.number || s.student_number),
+              source: s.source || s.registration_source,
+              lastActiveAt: s.lastActiveAt || s.last_active_at,
+              createdAt: s.createdAt || s.created_at,
               preScore,
               postScore,
               gainScore,
@@ -375,15 +373,10 @@ export default function App() {
               m4,
               m5,
               totalScore,
-              isPassed: totalScore >= 60
+              isPassed: totalScore >= 60,
+              performanceLevel: s.performanceLevel || (totalScore >= 90 ? 'ดีเยี่ยม / ผ่าน' : totalScore >= 80 ? 'ดี / ผ่าน' : totalScore >= 60 ? 'พอใช้ / ผ่าน' : 'ปรับปรุง')
             };
           });
-
-          for (const loc of prev) {
-            if (!merged.some(m => m.id === loc.id || m.studentId === loc.id || (m.name === loc.name && m.room === loc.room))) {
-              merged.push(loc);
-            }
-          }
 
           try {
             localStorage.setItem('flowchart_student_records', JSON.stringify(merged));
