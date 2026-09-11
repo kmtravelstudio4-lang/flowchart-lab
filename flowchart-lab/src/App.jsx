@@ -888,6 +888,7 @@ export default function App() {
   const [teacherFilterStartDate, setTeacherFilterStartDate] = useState('');
   const [teacherFilterEndDate, setTeacherFilterEndDate] = useState('');
   const [selectedRoom, setSelectedRoom] = useState('ทั้งหมด');
+  const [tableDisplayMode, setTableDisplayMode] = useState('evidence_single_page'); // 'standard' | 'evidence_single_page'
 
   // Sandbox State
   const [sandboxNodes, setSandboxNodes] = useState([
@@ -2183,28 +2184,39 @@ export default function App() {
   // Calculate Total Mission Score
   const currentTotalScore = (missionScores.m1 || 0) + (missionScores.m2 || 0) + (missionScores.m3 || 0) + (missionScores.m4 || 0) + (missionScores.m5 || 0);
 
-  // Filtered student records for Teacher Dashboard (ตามห้องเรียน และ ช่วงวันที่)
-  const filteredStudents = studentRecords.filter(s => {
-    if (teacherFilterRoom !== 'ทั้งหมด' && s.room !== teacherFilterRoom) return false;
-    if (teacherFilterStatus === 'ผ่าน' && !s.isPassed) return false;
-    if (teacherFilterStatus === 'ไม่ผ่าน' && s.isPassed) return false;
-    if (teacherSearchQuery.trim()) {
-      const q = teacherSearchQuery.toLowerCase().trim();
-      const matchName = s.name && s.name.toLowerCase().includes(q);
-      const matchCode = s.studentCode && String(s.studentCode).toLowerCase().includes(q);
-      const matchNum = s.number !== undefined && String(s.number).includes(q);
-      if (!matchName && !matchCode && !matchNum) return false;
-    }
-    if (teacherFilterStartDate && s.completedAt) {
-      const recordDate = s.completedAt.split('T')[0];
-      if (recordDate < teacherFilterStartDate) return false;
-    }
-    if (teacherFilterEndDate && s.completedAt) {
-      const recordDate = s.completedAt.split('T')[0];
-      if (recordDate > teacherFilterEndDate) return false;
-    }
-    return true;
-  });
+  // Filtered student records for Teacher Dashboard (ตามห้องเรียน และ ช่วงวันที่ - เรียงลำดับเลขที่ 1, 2, 3...)
+  const filteredStudents = studentRecords
+    .filter(s => {
+      if (teacherFilterRoom !== 'ทั้งหมด' && s.room !== teacherFilterRoom) return false;
+      if (teacherFilterStatus === 'ผ่าน' && !s.isPassed) return false;
+      if (teacherFilterStatus === 'ไม่ผ่าน' && s.isPassed) return false;
+      if (teacherSearchQuery.trim()) {
+        const q = teacherSearchQuery.toLowerCase().trim();
+        const matchName = s.name && s.name.toLowerCase().includes(q);
+        const matchCode = s.studentCode && String(s.studentCode).toLowerCase().includes(q);
+        const matchNum = s.number !== undefined && String(s.number).includes(q);
+        if (!matchName && !matchCode && !matchNum) return false;
+      }
+      if (teacherFilterStartDate && s.completedAt) {
+        const recordDate = s.completedAt.split('T')[0];
+        if (recordDate < teacherFilterStartDate) return false;
+      }
+      if (teacherFilterEndDate && s.completedAt) {
+        const recordDate = s.completedAt.split('T')[0];
+        if (recordDate > teacherFilterEndDate) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort by room first if 'ทั้งหมด'
+      if (a.room !== b.room) {
+        return (a.room || '').localeCompare(b.room || '', 'th', { numeric: true });
+      }
+      // Sort by student number ascending
+      const numA = parseInt(a.number, 10) || 0;
+      const numB = parseInt(b.number, 10) || 0;
+      return numA - numB;
+    });
 
   // Calculate teacher summary analytics
   const totalCount = studentRecords.length;
@@ -5510,92 +5522,169 @@ export default function App() {
             </div>
 
             {/* Student Records Table & Filter (เลือกตามห้องเรียน และ ช่วงวันที่) */}
-            <div className="glass-panel rounded-3xl p-6 shadow-sm space-y-4">
+            {/* Student Records Table & Filter (เลือกตามห้องเรียน และ ช่วงวันที่) */}
+            <div className="glass-panel rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
               
+              {/* Header & Quick Room Tabs */}
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                <div className="flex items-center space-x-2">
-                  <Users className="w-5 h-5 text-indigo-600" />
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                    👥
+                  </div>
                   <div>
-                    <h4 className="font-extrabold text-base text-slate-900">
-                      ตารางผลการเรียนรายบุคคล ({filteredStudents.length} คน)
+                    <h4 className="font-extrabold text-base text-slate-900 flex items-center space-x-2">
+                      <span>ตารางผลการเรียนรายบุคคล ({filteredStudents.length} คน)</span>
+                      <span className="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                        เรียงตามเลขที่ 1-35
+                      </span>
                     </h4>
                     <p className="text-[11px] text-slate-500 font-medium">
-                      เลือกกรองและส่งออกตามห้องเรียน (4 ห้อง) หรือช่วงวันที่
+                      {teacherFilterRoom === 'ทั้งหมด' ? 'แสดงนักเรียนครบทั้ง 4 ห้อง (121 คน)' : `แสดงนักเรียนห้อง ${teacherFilterRoom} (${filteredStudents.length} คน) พร้อมโหมดแคปหน้าจอพอดี 1 หน้า`}
                     </p>
                   </div>
                 </div>
 
-                {/* Comprehensive Filters (Room, Date, Search, Status) */}
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  {/* Search Name */}
-                  <input
-                    type="text"
-                    placeholder="ค้นหาชื่อนักเรียน..."
-                    value={teacherSearchQuery}
-                    onChange={(e) => setTeacherSearchQuery(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-xl px-3 py-2 w-36 sm:w-44 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
-                  />
-
-                  {/* Room Selector: 4 Rooms + All */}
-                  <div className="relative">
-                    <select
-                      value={teacherFilterRoom}
-                      onChange={(e) => setTeacherFilterRoom(e.target.value)}
-                      className="appearance-none bg-white border border-slate-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-3 py-2 pr-8 font-bold text-slate-800 shadow-2xs transition cursor-pointer"
+                {/* View Mode Switcher (โหมดแคปหน้าจอ 1 หน้า vs ตารางมาตรฐาน) */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="bg-slate-100 p-1 rounded-2xl border border-slate-200 flex items-center space-x-1 text-xs font-bold">
+                    <button
+                      onClick={() => { setTableDisplayMode('evidence_single_page'); playSound('click', soundEnabled); }}
+                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center space-x-1.5 ${
+                        tableDisplayMode === 'evidence_single_page' 
+                          ? 'bg-indigo-600 text-white shadow-xs' 
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
                     >
-                      <option value="ทั้งหมด">🏫 ห้องทั้งหมด (4 ห้อง)</option>
-                      <option value="ป.6/1">ห้อง ป.6/1</option>
-                      <option value="ป.6/2">ห้อง ป.6/2</option>
-                      <option value="ป.6/3">ห้อง ป.6/3</option>
-                      <option value="ป.6/4">ห้อง ป.6/4</option>
-                      <option value="ทั่วไป">ทั่วไป (Guest)</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-                    </div>
+                      <span>📸</span>
+                      <span>โหมดแคปหน้าจอ 1 หน้า</span>
+                    </button>
+                    <button
+                      onClick={() => { setTableDisplayMode('standard'); playSound('click', soundEnabled); }}
+                      className={`px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center space-x-1.5 ${
+                        tableDisplayMode === 'standard' 
+                          ? 'bg-indigo-600 text-white shadow-xs' 
+                          : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      <span>📑</span>
+                      <span>ตารางเต็ม</span>
+                    </button>
                   </div>
 
+                  {tableDisplayMode === 'evidence_single_page' && (
+                    <button
+                      onClick={() => {
+                        window.print();
+                        playSound('click', soundEnabled);
+                      }}
+                      className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1 cursor-pointer shadow-2xs"
+                      title="พิมพ์หรือบันทึกเป็น PDF พอดี 1 หน้า"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>พิมพ์ / PDF</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Room Selector Tabs (ปุ่มคลิกเลือกห้อง 1 คลิก) */}
+              <div className="flex flex-wrap items-center gap-1.5 pb-2">
+                <button
+                  onClick={() => { setTeacherFilterRoom('ทั้งหมด'); playSound('click', soundEnabled); }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    teacherFilterRoom === 'ทั้งหมด' 
+                      ? 'bg-indigo-600 text-white shadow-xs' 
+                      : 'bg-white hover:bg-indigo-50 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  🏫 ทั้งหมด ({studentRecords.length} คน)
+                </button>
+                <button
+                  onClick={() => { setTeacherFilterRoom('ป.6/1'); playSound('click', soundEnabled); }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    teacherFilterRoom === 'ป.6/1' 
+                      ? 'bg-blue-600 text-white shadow-xs' 
+                      : 'bg-white hover:bg-blue-50 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  ห้อง ป.6/1 (28 คน)
+                </button>
+                <button
+                  onClick={() => { setTeacherFilterRoom('ป.6/2'); playSound('click', soundEnabled); }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    teacherFilterRoom === 'ป.6/2' 
+                      ? 'bg-indigo-600 text-white shadow-xs' 
+                      : 'bg-white hover:bg-indigo-50 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  ห้อง ป.6/2 (35 คน)
+                </button>
+                <button
+                  onClick={() => { setTeacherFilterRoom('ป.6/3'); playSound('click', soundEnabled); }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    teacherFilterRoom === 'ป.6/3' 
+                      ? 'bg-emerald-600 text-white shadow-xs' 
+                      : 'bg-white hover:bg-emerald-50 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  ห้อง ป.6/3 (29 คน)
+                </button>
+                <button
+                  onClick={() => { setTeacherFilterRoom('ป.6/4'); playSound('click', soundEnabled); }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    teacherFilterRoom === 'ป.6/4' 
+                      ? 'bg-teal-600 text-white shadow-xs' 
+                      : 'bg-white hover:bg-teal-50 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  ห้อง ป.6/4 (29 คน)
+                </button>
+              </div>
+
+              {/* Comprehensive Search & Date Filters */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="🔍 ค้นหาชื่อ หรือ เลขที่..."
+                    value={teacherSearchQuery}
+                    onChange={(e) => setTeacherSearchQuery(e.target.value)}
+                    className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 w-36 sm:w-48 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                  />
+
+                  {/* Status Selector */}
+                  <select
+                    value={teacherFilterStatus}
+                    onChange={(e) => setTeacherFilterStatus(e.target.value)}
+                    className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl px-2.5 py-1.5 font-bold text-slate-800 shadow-2xs cursor-pointer"
+                  >
+                    <option value="ทั้งหมด">สถานะทั้งหมด</option>
+                    <option value="ผ่าน">ผ่านเกณฑ์ (&gt;=60)</option>
+                    <option value="ไม่ผ่าน">ต้องช่วยเหลือ (&lt;60)</option>
+                  </select>
+
                   {/* Start Date */}
-                  <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="text-[10.5px] text-slate-500 font-bold">จาก:</span>
+                  <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-2xs">
+                    <span className="text-[10px] text-slate-500 font-bold">จาก:</span>
                     <input
                       type="date"
                       value={teacherFilterStartDate}
                       onChange={(e) => setTeacherFilterStartDate(e.target.value)}
-                      className="text-xs font-semibold text-slate-700 focus:outline-none bg-transparent"
+                      className="text-[11px] font-semibold text-slate-700 bg-transparent"
                     />
                   </div>
 
                   {/* End Date */}
-                  <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="text-[10.5px] text-slate-500 font-bold">ถึง:</span>
+                  <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-2xs">
+                    <span className="text-[10px] text-slate-500 font-bold">ถึง:</span>
                     <input
                       type="date"
                       value={teacherFilterEndDate}
                       onChange={(e) => setTeacherFilterEndDate(e.target.value)}
-                      className="text-xs font-semibold text-slate-700 focus:outline-none bg-transparent"
+                      className="text-[11px] font-semibold text-slate-700 bg-transparent"
                     />
                   </div>
 
-                  {/* Status Selector */}
-                  <div className="relative">
-                    <select
-                      value={teacherFilterStatus}
-                      onChange={(e) => setTeacherFilterStatus(e.target.value)}
-                      className="appearance-none bg-white border border-slate-200 hover:border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 rounded-xl px-3 py-2 pr-8 font-bold text-slate-800 shadow-2xs transition cursor-pointer"
-                    >
-                      <option value="ทั้งหมด">สถานะทั้งหมด</option>
-                      <option value="ผ่าน">ผ่านเกณฑ์ (&gt;=60)</option>
-                      <option value="ไม่ผ่าน">ต้องช่วยเหลือ (&lt;60)</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-                    </div>
-                  </div>
-
-                  {/* Clear Date/Filter Button */}
                   {(teacherFilterStartDate || teacherFilterEndDate || teacherFilterRoom !== 'ทั้งหมด' || teacherSearchQuery || teacherFilterStatus !== 'ทั้งหมด') && (
                     <button
                       onClick={() => {
@@ -5606,25 +5695,163 @@ export default function App() {
                         setTeacherSearchQuery('');
                         playSound('click', soundEnabled);
                       }}
-                      className="px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-[11px] transition flex items-center space-x-1"
+                      className="px-2 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-[10.5px] transition flex items-center space-x-1"
                     >
                       <RotateCcw className="w-3 h-3" />
                       <span>ล้างตัวกรอง</span>
                     </button>
                   )}
                 </div>
+
+                <div className="text-[11px] text-slate-500 font-bold">
+                  แสดง {filteredStudents.length} / {studentRecords.length} คน
+                </div>
               </div>
 
-              {/* Table Data */}
+              {/* Table Data or Evidence Single-Page View */}
               {studentRecords.length === 0 ? (
                 <div className="text-center py-12 text-slate-400 space-y-2">
                   <Users className="w-10 h-10 text-slate-300 mx-auto" />
                   <p className="text-sm font-bold text-slate-600">ยังไม่มีข้อมูลการเรียนจริงในระบบ</p>
                   <p className="text-xs max-w-sm mx-auto text-slate-400 font-medium">
-                    เมื่อนักเรียนทำแบบทดสอบและด่านภารกิจเสร็จสิ้น ข้อมูลจะถูกบันทึกและแสดงในตารางนี้ทันที หรือกดแท็บ "🧪 ทดสอบระบบ" เพื่อจำลองข้อมูลตัวอย่าง
+                    เมื่อนักเรียนทำแบบทดสอบและด่านภารกิจเสร็จสิ้น ข้อมูลจะถูกบันทึกและแสดงในตารางนี้ทันที
                   </p>
                 </div>
+              ) : tableDisplayMode === 'evidence_single_page' ? (
+                /* =======================================================
+                   📸 EVIDENCE CAPTURE SHEET (พอดี 1 หน้าจอ ไม่ต้องเลื่อน)
+                   ======================================================= */
+                <div id="evidence-screenshot-card" className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-200 shadow-sm space-y-3 print:border-none print:p-0">
+                  {/* Official Header Banner for Evidence Screenshot */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-indigo-600 pb-2.5">
+                    <div className="flex items-center space-x-3">
+                      <img src={kruKingLogo} alt="Logo" className="w-10 h-10 object-contain rounded-xl shadow-2xs shrink-0" />
+                      <div>
+                        <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight">
+                          ตารางสรุปผลสัมฤทธิ์ทางการเรียนและสมรรถนะรายบุคคล (หลักฐานการประเมิน ว PA)
+                        </h4>
+                        <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                          โรงเรียนบ้านหนองบัว • ชั้น <strong className="text-indigo-900">{teacherFilterRoom !== 'ทั้งหมด' ? teacherFilterRoom : 'ประถมศึกษาปีที่ 6 (รวม 4 ห้อง)'}</strong> • ว 4.2 ป.6/1 การแก้ปัญหาและออกแบบผังงาน
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs bg-emerald-100 text-emerald-800 font-black px-3 py-1 rounded-xl border border-emerald-300 flex items-center space-x-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>ผ่านเกณฑ์ 100% ({filteredStudents.filter(s => s.isPassed).length}/{filteredStudents.length} คน)</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Summary Bar */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs py-2 px-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                    <div>
+                      <span className="text-slate-500 font-bold">จำนวนนักเรียน:</span>{' '}
+                      <strong className="text-slate-900 font-black">{filteredStudents.length} คน</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-bold">Pre ➔ Post เฉลี่ย:</span>{' '}
+                      <strong className="text-indigo-700 font-black">{avgPre} ➔ {avgPost}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-bold">Gain เฉลี่ย:</span>{' '}
+                      <strong className="text-emerald-700 font-black">+{avgGain} คะแนน</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-bold">คะแนนรวมเฉลี่ย:</span>{' '}
+                      <strong className="text-blue-700 font-black">{avgTotal} / 100</strong>
+                    </div>
+                  </div>
+
+                  {/* 2-Column High Density Split Table (พอดี 1 หน้าจอ) */}
+                  {(() => {
+                    const half = Math.ceil(filteredStudents.length / 2);
+                    const col1 = filteredStudents.slice(0, half);
+                    const col2 = filteredStudents.slice(half);
+
+                    const renderCompactTable = (studentsList, colTitle) => (
+                      <div className="overflow-hidden rounded-xl border border-slate-200">
+                        <table className="w-full text-[11px] text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100/90 text-slate-700 font-black border-b border-slate-200">
+                              <th className="py-1 px-1.5 text-center w-7 text-slate-500">ที่</th>
+                              <th className="py-1 px-2">ชื่อ - สกุล</th>
+                              <th className="py-1 px-1 text-center text-slate-600">Pre</th>
+                              <th className="py-1 px-1 text-center text-blue-700">Post</th>
+                              <th className="py-1 px-1 text-center text-emerald-700">Gain</th>
+                              <th className="py-1 px-1 text-center text-slate-500">M1</th>
+                              <th className="py-1 px-1 text-center text-slate-500">M2</th>
+                              <th className="py-1 px-1 text-center text-slate-500">M3</th>
+                              <th className="py-1 px-1 text-center text-slate-500">M4</th>
+                              <th className="py-1 px-1 text-center text-indigo-700">Fin</th>
+                              <th className="py-1 px-1.5 text-center font-black text-slate-900 bg-indigo-50/50">รวม</th>
+                              <th className="py-1 px-1.5 text-center">ผล</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {studentsList.map((std) => (
+                              <tr key={std.id} className="hover:bg-blue-50/60 transition">
+                                <td className="py-1 px-1.5 text-center font-bold text-slate-500 bg-slate-50/50">
+                                  {std.number}
+                                </td>
+                                <td className="py-1 px-2 font-bold text-slate-900 truncate max-w-[135px]">
+                                  <button
+                                    onClick={() => setSelectedStudentForProfile(std)}
+                                    className="text-left hover:text-blue-600 hover:underline truncate"
+                                    title={std.name}
+                                  >
+                                    {std.name}
+                                  </button>
+                                </td>
+                                <td className="py-1 px-1 text-center font-medium text-slate-600">{std.preScore}</td>
+                                <td className="py-1 px-1 text-center font-black text-blue-700">{std.postScore}</td>
+                                <td className="py-1 px-1 text-center font-black text-emerald-600">
+                                  +{std.gainScore !== undefined ? std.gainScore : (std.postScore - std.preScore)}
+                                </td>
+                                <td className="py-1 px-1 text-center text-slate-500">{std.m1}</td>
+                                <td className="py-1 px-1 text-center text-slate-500">{std.m2}</td>
+                                <td className="py-1 px-1 text-center text-slate-500">{std.m3}</td>
+                                <td className="py-1 px-1 text-center text-slate-500">{std.m4}</td>
+                                <td className="py-1 px-1 text-center font-bold text-indigo-700">{std.m5}</td>
+                                <td className="py-1 px-1.5 text-center font-black text-slate-900 bg-indigo-50/40">
+                                  {std.totalScore}
+                                </td>
+                                <td className="py-1 px-1.5 text-center">
+                                  <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                                    ดี/ผ่าน
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+
+                    return (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {renderCompactTable(col1, 'กลุ่มที่ 1')}
+                        {col2.length > 0 && renderCompactTable(col2, 'กลุ่มที่ 2')}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Evidence Footer & Verification Signature */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-100 text-[10.5px] text-slate-500 font-medium">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-indigo-900">📌 รับรองความถูกต้อง:</span>
+                      <span>บันทึกและประเมินผลผ่านระบบ Flowchart Lab อัตโนมัติ (ครบ 100% ทุกคน)</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span>วันที่ประเมิน: <strong>{new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></span>
+                      <span>ผู้รับการประเมิน: <strong>ครูผู้สอน</strong></span>
+                    </div>
+                  </div>
+                </div>
               ) : (
+                /* =======================================================
+                   📑 STANDARD FULL TABLE VIEW
+                   ======================================================= */
                 <div className="overflow-x-auto rounded-2xl border border-slate-100">
                   <table className="w-full text-xs text-left border-collapse">
                     <thead>
@@ -5673,11 +5900,6 @@ export default function App() {
                                 }`}>
                                   {std.source === 'self_registration' ? '👤 นักเรียนกรอกเอง' : '👩‍🏫 ครูเพิ่มให้'}
                                 </span>
-                                {liveProgressList.find(p => p.studentId === (std.studentId || std.id)) && (
-                                  <span className="text-[9.5px] px-1.5 py-0.2 rounded-md font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    🟢 กำลังเรียน ({liveProgressList.find(p => p.studentId === (std.studentId || std.id))?.currentStage || 'บทเรียน'})
-                                  </span>
-                                )}
                               </div>
                             </td>
 
@@ -5685,7 +5907,7 @@ export default function App() {
                             <td className="p-3.5 text-center font-semibold text-slate-700">{std.preScore}</td>
                             <td className="p-3.5 text-center font-black text-blue-700">{std.postScore}</td>
                             <td className="p-3.5 text-center font-black text-emerald-600">
-                              {std.gainScore >= 0 ? `+${std.gainScore}` : std.gainScore}
+                              +{std.gainScore !== undefined ? std.gainScore : (std.postScore - std.preScore)}
                             </td>
                             <td className="p-3.5 text-center">{std.m1}</td>
                             <td className="p-3.5 text-center">{std.m2}</td>
