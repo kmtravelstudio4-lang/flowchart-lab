@@ -800,7 +800,6 @@ export default function App() {
   const [customYoutubeUrl, setCustomYoutubeUrl] = useState('');
   const [customVideoId, setCustomVideoId] = useState(null);
 
-  // Admin State
   const [adminPin, setAdminPin] = useState(() => {
     try {
       return localStorage.getItem('flowchart_admin_pin') || 'admin1234';
@@ -808,7 +807,13 @@ export default function App() {
       return 'admin1234';
     }
   });
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(() => {
+    try {
+      const saved = localStorage.getItem('flowchart_admin_unlocked');
+      if (saved !== null) return saved === 'true';
+    } catch {}
+    return true; // Default unlocked so teacher can directly view reports & dashboard
+  });
   const [adminPinInput, setAdminPinInput] = useState('');
   const [adminPinError, setAdminPinError] = useState('');
 
@@ -2003,12 +2008,16 @@ export default function App() {
     const input = (adminPinInput || '').trim();
     const targetPin = (adminPin || 'admin1234').trim();
     
-    if (input && input === targetPin) {
+    // Support targetPin, default admin1234, admin, 1234, kruking, king, 0000, or empty submit
+    if (!input || input === targetPin || input === 'admin1234' || input === 'admin' || input === '1234' || input === 'kruking' || input === 'king' || input === '0000') {
       setIsAdminUnlocked(true);
+      try {
+        localStorage.setItem('flowchart_admin_unlocked', 'true');
+      } catch {}
       setAdminPinError('');
       playSound('success', soundEnabled);
     } else {
-      setAdminPinError('❌ รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+      setAdminPinError('❌ รหัสผ่านไม่ถูกต้อง (รหัสผ่านเริ่มต้น: admin1234)');
       playSound('error', soundEnabled);
     }
   };
@@ -2172,7 +2181,13 @@ export default function App() {
 
                 {/* Teacher Dashboard Tab */}
                 <button
-                  onClick={() => { setActiveTab('teacher'); playSound('click', soundEnabled); }}
+                  onClick={() => { 
+                    setActiveTab('teacher'); 
+                    setIsAdminUnlocked(true); 
+                    try { localStorage.setItem('flowchart_admin_unlocked', 'true'); } catch {}
+                    loadDashboard();
+                    playSound('click', soundEnabled); 
+                  }}
                   className={`px-3.5 py-2 rounded-xl transition-all duration-200 flex items-center space-x-1.5 ${
                     activeTab === 'teacher' 
                       ? 'bg-gradient-to-r from-indigo-600 to-blue-700 text-white shadow-md shadow-indigo-600/30' 
@@ -4590,6 +4605,17 @@ export default function App() {
                       className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-md transition text-sm action-btn-hover cursor-pointer"
                     >
                       เข้าสู่ระบบแดชบอร์ดคุณครู
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdminUnlocked(true);
+                        try { localStorage.setItem('flowchart_admin_unlocked', 'true'); } catch {}
+                        playSound('success', soundEnabled);
+                      }}
+                      className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-2.5 px-4 rounded-xl transition text-xs flex items-center justify-center space-x-1 cursor-pointer border border-indigo-200 shadow-2xs"
+                    >
+                      <span>🔓 เข้าใช้งานแดชบอร์ดทันที (สำหรับครูผู้สอน)</span>
                     </button>
                   </div>
                 </form>
