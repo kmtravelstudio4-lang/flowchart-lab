@@ -348,8 +348,41 @@ export default function App() {
     return {};
   });
 
-  // Stage Progression Lock / Unlock Validator (Strict Sequential Progression)
+  // Test Mode State: Allows viewing/testing all missions freely from the test page
+  const [isTestMode, setIsTestMode] = useState(() => {
+    try {
+      return localStorage.getItem('flowchart_test_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const enableTestMode = (stage = null) => {
+    setIsTestMode(true);
+    try { localStorage.setItem('flowchart_test_mode', 'true'); } catch {}
+    setIsProfileEntered(true);
+    if (!studentInfo.name) {
+      setStudentInfo({
+        id: 'test_user_qa',
+        studentId: 'test_user_qa',
+        studentCode: '99999',
+        name: 'ครูผู้สอน / ผู้ทดสอบระบบ (QA Tester)',
+        room: 'ป.6/1',
+        number: '99'
+      });
+    }
+    setActiveTab('game');
+    if (stage) setGameStage(stage);
+  };
+
+  const disableTestMode = () => {
+    setIsTestMode(false);
+    try { localStorage.removeItem('flowchart_test_mode'); } catch {}
+  };
+
+  // Stage Progression Lock / Unlock Validator (Strict Sequential Progression for Students, Unlocked in Test Mode)
   const isStageUnlocked = useCallback((stageId) => {
+    if (isTestMode) return true; // In test mode, all stages are unlocked for inspection
     switch (stageId) {
       case 'intro':
       case 'learning':
@@ -373,10 +406,11 @@ export default function App() {
       default:
         return true;
     }
-  }, [completedStages, missionScores]);
+  }, [completedStages, missionScores, isTestMode]);
 
-  // Automatic Safety Guard: Fallback if attempting to access a locked stage
+  // Automatic Safety Guard: Fallback if attempting to access a locked stage (Skipped in test mode)
   useEffect(() => {
+    if (isTestMode) return;
     if (!isProfileEntered || gameStage === 'intro' || gameStage === 'learning' || gameStage === 'pretest') return;
     if (!isStageUnlocked(gameStage)) {
       if (isStageUnlocked('final')) setGameStage('final');
@@ -387,7 +421,7 @@ export default function App() {
       else if (isStageUnlocked('pretest')) setGameStage('pretest');
       else setGameStage('learning');
     }
-  }, [gameStage, isStageUnlocked, isProfileEntered]);
+  }, [gameStage, isStageUnlocked, isProfileEntered, isTestMode]);
 
   // User XP & Combo
   const [userXP, setUserXP] = useState(0);
@@ -2091,6 +2125,7 @@ export default function App() {
   const handleStudentLogout = () => {
     if (window.confirm('คุณต้องการออกจากระบบเพื่อสลับผู้เรียน หรือเริ่มรอบใหม่หรือไม่? (ข้อมูลคะแนนที่บันทึกไว้ในแดชบอร์ดคุณครูจะไม่สูญหาย)')) {
       playSound('click', soundEnabled);
+      disableTestMode();
       setStudentInfo({ name: '', room: 'ป.6/1', number: '' });
       localStorage.removeItem('flowchart_current_student');
       setIsProfileEntered(false);
@@ -2517,6 +2552,33 @@ export default function App() {
             {/* Student Info Bar & Quest Navigation Stepper (Ultra-Clean Modern Glass Design) */}
             {isProfileEntered && (
               <div className="glass-panel rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5 border border-white/80 no-print">
+                
+                {/* Floating Test Mode QA Banner if in Test Mode */}
+                {isTestMode && (
+                  <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white px-4 py-2.5 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-md border border-emerald-400/40 text-xs animate-fadeIn">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-base bg-white/20 p-1 rounded-xl">🧪</span>
+                      <div>
+                        <strong className="text-amber-200">โหมดทดสอบระบบ (QA Test Mode Active):</strong>{' '}
+                        <span className="text-emerald-50">สามารถคลิกเลือกดูและทดสอบได้ทุกภารกิจในแถบด้านล่างอย่างอิสระ</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => { setActiveTab('test'); playSound('click', soundEnabled); }}
+                        className="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-xl font-bold text-[11.5px] transition flex items-center space-x-1 cursor-pointer"
+                      >
+                        <span>↩ กลับหน้าทดสอบ</span>
+                      </button>
+                      <button
+                        onClick={() => { disableTestMode(); playSound('click', soundEnabled); }}
+                        className="bg-white text-emerald-950 hover:bg-emerald-50 px-3 py-1 rounded-xl font-black text-[11.5px] transition shadow-xs flex items-center space-x-1 cursor-pointer"
+                      >
+                        <span>🔒 สิ้นสุดโหมดทดสอบ</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Tier 1: Player Profile + XP & Score Badges */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
@@ -6550,6 +6612,258 @@ export default function App() {
               </div>
             </div>
 
+            {/* All Missions QA & Inspection Hub (เมนูกดดูและทดสอบทุกภารกิจ) */}
+            <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-sm space-y-5 border border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/20 to-teal-50/20">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-emerald-100">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                    🎮
+                  </div>
+                  <div>
+                    <h3 className="font-black text-base text-slate-900">
+                      ศูนย์รวมการเข้าดูและทดสอบทุกภารกิจ (All Missions QA & Inspection Hub)
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      กดเข้าสู่ภารกิจใดก็ได้เพื่อทดสอบระบบได้ทันทีโดยไม่ต้องผ่านเงื่อนไขล็อก (เปิดโหมดทดสอบอัตโนมัติ)
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-xl border border-emerald-300 flex items-center space-x-1 self-start sm:self-center">
+                  <span>✨ ปลดล็อกทุกด่านสำหรับทดสอบ</span>
+                </span>
+              </div>
+
+              {/* 5 Missions + Pre/Post/Final Interactive QA Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                {/* 1. Pre-Test */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-indigo-300 shadow-2xs hover:shadow-md transition space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-900 flex items-center space-x-1.5">
+                        <span>📝</span>
+                        <span>1. แบบทดสอบก่อนเรียน (Pre-Test)</span>
+                      </span>
+                      <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-md">
+                        10 ข้อ (10p)
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      วัดพื้นฐานความรู้เดิมเกี่ยวกับสัญลักษณ์และกระบวนการคิดเชิงตรรกะก่อนเข้าเรียน
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { enableTestMode('pretest'); playSound('click', soundEnabled); }}
+                    className="w-full bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700 font-black py-2 px-3 rounded-xl text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer action-btn-hover"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>เข้าทดสอบ Pre-Test</span>
+                  </button>
+                </div>
+
+                {/* 2. Learning Chapters */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-blue-300 shadow-2xs hover:shadow-md transition space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-blue-900 flex items-center space-x-1.5">
+                        <span>📚</span>
+                        <span>2. บทเรียนผังงาน 5 บท</span>
+                      </span>
+                      <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-md border border-blue-200">
+                        Interactive
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      สื่อเนื้อหาความรู้สัญลักษณ์ ANSI, ลำดับขั้นตอน, เงื่อนไข If-Else, การ Debug และการนำไปใช้
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { enableTestMode('learning'); playSound('click', soundEnabled); }}
+                    className="w-full bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 font-black py-2 px-3 rounded-xl text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer action-btn-hover"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>เข้าดูบทเรียน 5 เรื่อง</span>
+                  </button>
+                </div>
+
+                {/* 3. Mission 1: Symbol Hunter */}
+                <div className="p-4 rounded-2xl bg-white border border-blue-100 hover:border-blue-400 shadow-2xs hover:shadow-md transition space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-blue-800 flex items-center space-x-1.5">
+                        <span>🔍</span>
+                        <span>3. M1: Symbol Hunter</span>
+                      </span>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 font-black px-2 py-0.5 rounded-md">
+                        15 คะแนน
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      จับคู่สัญลักษณ์ผังงานตามมาตรฐานสากล (ANSI) 5 ชนิด เช่น Start/End, Process, Decision
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { enableTestMode('mission1'); playSound('click', soundEnabled); }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-2 px-3 rounded-xl text-xs shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer action-btn-hover"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>ทดสอบด่านที่ 1 (Symbol Hunter)</span>
+                  </button>
+                </div>
+
+                {/* 4. Mission 2: Step Master */}
+                <div className="p-4 rounded-2xl bg-white border border-indigo-100 hover:border-indigo-400 shadow-2xs hover:shadow-md transition space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-indigo-800 flex items-center space-x-1.5">
+                        <span>⚡</span>
+                        <span>4. M2: Step Master</span>
+                      </span>
+                      <span className="text-[10px] bg-indigo-100 text-indigo-800 font-black px-2 py-0.5 rounded-md">
+                        15 คะแนน (3 ด่าน)
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      เรียงลำดับขั้นตอนอัลกอริทึม (Sequencing) ชงนม, ซักผ้า, และซื้อของร้านสะดวกซื้อ
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { enableTestMode('mission2'); playSound('click', soundEnabled); }}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2 px-3 rounded-xl text-xs shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer action-btn-hover"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>ทดสอบด่านที่ 2 (Step Master)</span>
+                  </button>
+                </div>
+
+                {/* 5. Mission 3: Flow Reader */}
+                <div className="p-4 rounded-2xl bg-white border border-purple-100 hover:border-purple-400 shadow-2xs hover:shadow-md transition space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-purple-800 flex items-center space-x-1.5">
+                        <span>🔀</span>
+                        <span>5. M3: Flow Reader</span>
+                      </span>
+                      <span className="text-[10px] bg-purple-100 text-purple-800 font-black px-2 py-0.5 rounded-md">
+                        15 คะแนน (3 ผัง)
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      อ่านและวิเคราะห์ผังงานเงื่อนไขการตัดสินใจ (If-Else) ร่มกันฝน, วัดไข้, และส่วนลดสินค้า
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { enableTestMode('mission3'); playSound('click', soundEnabled); }}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-black py-2 px-3 rounded-xl text-xs shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer action-btn-hover"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>ทดสอบด่านที่ 3 (Flow Reader)</span>
+                  </button>
+                </div>
+
+                {/* 6. Mission 4: Bug Detective */}
+                <div className="p-4 rounded-2xl bg-white border border-amber-100 hover:border-amber-400 shadow-2xs hover:shadow-md transition space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-amber-800 flex items-center space-x-1.5">
+                        <span>🐞</span>
+                        <span>6. M4: Bug Detective</span>
+                      </span>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded-md">
+                        20 คะแนน (3 สเต็ป)
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      สืบหาจุดผิดพลาด ให้เหตุผล และแก้ไขผังงาน (Locate, Reason, Fix) ให้ถูกต้องสมบูรณ์
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { enableTestMode('mission4'); playSound('click', soundEnabled); }}
+                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-2 px-3 rounded-xl text-xs shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer action-btn-hover"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>ทดสอบด่านที่ 4 (Bug Detective)</span>
+                  </button>
+                </div>
+
+                {/* 7. Final Mission: Flowchart Designer */}
+                <div className="p-4 rounded-2xl bg-white border border-teal-100 hover:border-teal-400 shadow-2xs hover:shadow-md transition space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-teal-800 flex items-center space-x-1.5">
+                        <span>🚀</span>
+                        <span>7. Final Mission: Flowchart Designer</span>
+                      </span>
+                      <span className="text-[10px] bg-teal-100 text-teal-800 font-black px-2 py-0.5 rounded-md">
+                        35 คะแนน (Rubrics)
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      สร้างและออกแบบผังงานจริงเพื่อแก้ปัญหาในชีวิตประจำวัน พร้อมบันทึกภาพ PNG และส่งตรวจ
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { enableTestMode('final'); playSound('click', soundEnabled); }}
+                    className="w-full bg-teal-600 hover:bg-teal-700 text-white font-black py-2 px-3 rounded-xl text-xs shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer action-btn-hover"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>ทดสอบ Final Mission (Designer)</span>
+                  </button>
+                </div>
+
+                {/* 8. Post-Test */}
+                <div className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-emerald-300 shadow-2xs hover:shadow-md transition space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-900 flex items-center space-x-1.5">
+                        <span>🎯</span>
+                        <span>8. แบบทดสอบหลังเรียน (Post-Test)</span>
+                      </span>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md">
+                        10 ข้อ (10p)
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      ประเมินผลสัมฤทธิ์หลังเรียนและคำนวณค่าพัฒนาการ (Gain Score) เปรียบเทียบกับ Pre-Test
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { enableTestMode('posttest'); playSound('click', soundEnabled); }}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2 px-3 rounded-xl text-xs shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer action-btn-hover"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    <span>เข้าทดสอบ Post-Test</span>
+                  </button>
+                </div>
+
+                {/* 9. Certificate & Summary */}
+                <div className="p-4 rounded-2xl bg-white border border-amber-200 hover:border-amber-400 shadow-2xs hover:shadow-md transition space-y-2.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-amber-900 flex items-center space-x-1.5">
+                        <span>🏆</span>
+                        <span>9. สรุปผล & เกียรติบัตร</span>
+                      </span>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded-md">
+                        Certificate
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                      หน้าสรุปคะแนนรวม 100 คะแนน ตราสัญลักษณ์ความสำเร็จ 5 ด้าน และดาวน์โหลดใบประกาศ PNG
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { enableTestMode('summary'); playSound('click', soundEnabled); }}
+                    className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black py-2 px-3 rounded-xl text-xs shadow-xs transition flex items-center justify-center space-x-1.5 cursor-pointer action-btn-hover"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    <span>เข้าดูหน้าสรุปผล & ใบประกาศ</span>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
             {/* Quick Navigation Jump Matrix */}
             <div className="glass-panel rounded-3xl p-6 sm:p-8 shadow-sm space-y-4">
               <div className="flex items-center space-x-2">
@@ -6559,86 +6873,86 @@ export default function App() {
                 </h3>
               </div>
               <p className="text-xs text-slate-500 font-medium">
-                คลิกปุ่มเพื่อทดสอบระบบในแต่ละด่านได้ทันทีโดยไม่ต้องผ่านเงื่อนไขล็อก
+                คลิกปุ่มเพื่อเปิดโหมดทดสอบและเข้าสู่ด่านที่ต้องการได้ทันที
               </p>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 pt-2">
                 
                 <button
-                  onClick={() => { setActiveTab('game'); setGameStage('intro'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('intro'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
                   <div className="text-xs font-black text-slate-900">1. หน้าแรก / ลงทะเบียน</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">กรอกชื่อ ชั้น เลขที่</div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('game'); setIsProfileEntered(true); setGameStage('pretest'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('pretest'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
                   <div className="text-xs font-black text-slate-900">2. Pre-Test (10 ข้อ)</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">แบบทดสอบก่อนเรียน</div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('game'); setIsProfileEntered(true); setGameStage('learning'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('learning'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
                   <div className="text-xs font-black text-slate-900">3. บทเรียน 5 เรื่อง</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">Learning Chapters</div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('game'); setIsProfileEntered(true); setGameStage('mission1'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('mission1'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
                   <div className="text-xs font-black text-blue-700">4. M1: Symbol Hunter</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">จับคู่สัญลักษณ์ (15p)</div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('game'); setIsProfileEntered(true); setGameStage('mission2'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('mission2'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
                   <div className="text-xs font-black text-indigo-700">5. M2: Step Master</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">เรียงลำดับ 3 ระดับ (15p)</div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('game'); setIsProfileEntered(true); setGameStage('mission3'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('mission3'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
-                  <div className="text-xs font-black text-amber-700">6. M3: Flow Reader</div>
+                  <div className="text-xs font-black text-purple-700">6. M3: Flow Reader</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">อ่านผังงานจริง (15p)</div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('game'); setIsProfileEntered(true); setGameStage('mission4'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('mission4'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
-                  <div className="text-xs font-black text-rose-700">7. M4: Bug Detective</div>
+                  <div className="text-xs font-black text-amber-700">7. M4: Bug Detective</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">สืบหา Bug 3 สเต็ป (20p)</div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('game'); setIsProfileEntered(true); setGameStage('final'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('final'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
-                  <div className="text-xs font-black text-emerald-700">8. Final Mission</div>
+                  <div className="text-xs font-black text-teal-700">8. Final Mission</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">Flowchart Designer (35p)</div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('game'); setIsProfileEntered(true); setGameStage('posttest'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('posttest'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
-                  <div className="text-xs font-black text-slate-900">9. Post-Test (10 ข้อ)</div>
+                  <div className="text-xs font-black text-emerald-700">9. Post-Test (10 ข้อ)</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">วัดคะแนนพัฒนาการ</div>
                 </button>
 
                 <button
-                  onClick={() => { setActiveTab('game'); setIsProfileEntered(true); setGameStage('summary'); playSound('click', soundEnabled); }}
-                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect"
+                  onClick={() => { enableTestMode('summary'); playSound('click', soundEnabled); }}
+                  className="p-3.5 rounded-2xl bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 text-left transition card-hover-effect cursor-pointer"
                 >
                   <div className="text-xs font-black text-amber-700">10. ใบประกาศ PNG</div>
                   <div className="text-[10px] text-slate-500 mt-0.5">Certificate & 5 Badges</div>
