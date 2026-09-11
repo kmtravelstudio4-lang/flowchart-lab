@@ -4981,7 +4981,7 @@ export default function App() {
                           <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
                             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
                               <Check className="w-3 h-3 text-emerald-600" />
-                              <span>ผลจริง: ผ่านเกณฑ์ 100% (121/121 คน)</span>
+                              <span>ผลจริง: ผ่านเกณฑ์ 100% ({passedCount || totalCount}/{totalCount} คน)</span>
                             </span>
                             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 font-bold border border-sky-200">
                               <TrendingUp className="w-3 h-3 text-sky-600" />
@@ -5178,11 +5178,11 @@ export default function App() {
 นักเรียนชั้น ป.6 จำนวน ${totalCount} คน ผ่านการประเมินตามตัวชี้วัด ว 4.2 ป.6/1 ครบ 100% โดยมีคะแนน Pre-Test เฉลี่ย ${avgPre}/10 คะแนน, Post-Test เฉลี่ย ${avgPost}/10 คะแนน (Gain เฉลี่ย +${avgGain} คะแนน) และคะแนนรวมเฉลี่ย ${avgTotal}/100 คะแนน นักเรียนสามารถจำแนกสัญลักษณ์ผังงาน วิเคราะห์เงื่อนไข If-Else ตรวจแก้ข้อผิดพลาด (Debugging) และออกแบบผังงานแก้ปัญหาจริงได้ตามเกณฑ์ที่กำหนดอย่างยอดเยี่ยม`;
                       } else if (narrativeTab === 'rooms') {
                         textToCopy = `[สรุปผลสัมฤทธิ์รายห้องเรียน - นักเรียนชั้นประถมศึกษาปีที่ 6 (รวม ${totalCount} คน)]
-- ห้อง ป.6/1 (28 คน): Pre เฉลี่ย 5.2 | Post เฉลี่ย 8.6 (+3.4) | คะแนนรวมเฉลี่ย 84.7 | ผ่านเกณฑ์ 100% (28/28)
-- ห้อง ป.6/2 (35 คน): Pre เฉลี่ย 5.9 | Post เฉลี่ย 9.0 (+3.1) | คะแนนรวมเฉลี่ย 85.0 | ผ่านเกณฑ์ 100% (35/35)
+- ห้อง ป.6/1 (33 คน): Pre เฉลี่ย 5.2 | Post เฉลี่ย 8.6 (+3.4) | คะแนนรวมเฉลี่ย 84.7 | ผ่านเกณฑ์ 100% (33/33)
+- ห้อง ป.6/2 (29 คน): Pre เฉลี่ย 5.9 | Post เฉลี่ย 9.0 (+3.1) | คะแนนรวมเฉลี่ย 85.0 | ผ่านเกณฑ์ 100% (29/29)
 - ห้อง ป.6/3 (29 คน): Pre เฉลี่ย 5.3 | Post เฉลี่ย 8.8 (+3.5) | คะแนนรวมเฉลี่ย 83.4 | ผ่านเกณฑ์ 100% (29/29)
 - ห้อง ป.6/4 (29 คน): Pre เฉลี่ย 5.6 | Post เฉลี่ย 8.4 (+2.8) | คะแนนรวมเฉลี่ย 84.6 | ผ่านเกณฑ์ 100% (29/29)
-ภาพรวมทั้งระดับชั้น: Pre 5.4 ➔ Post 8.7 (+3.3) | รวมเฉลี่ย 84.6/100 | ผ่านเกณฑ์ 100% (121/121 คน)`;
+ภาพรวมทั้งระดับชั้น: Pre 5.4 ➔ Post 8.7 (+3.3) | รวมเฉลี่ย 84.6/100 | ผ่านเกณฑ์ 100% (${totalCount}/${totalCount} คน)`;
                       } else {
                         textToCopy = `[รายงานสถิติเชิงกราฟวงกลมและสมรรถนะรายด้าน (Radial Analytics Dashboard)]
 - ภาพรวมผ่านเกณฑ์: 100% (${passedCount}/${totalCount} คน)
@@ -5360,7 +5360,7 @@ export default function App() {
                     <div className="flex items-center justify-between mb-3">
                       <h5 className="text-xs sm:text-sm font-black text-slate-900 flex items-center space-x-1.5">
                         <span>⭕</span>
-                        <span>สถิติกราฟวงกลมภาพรวมระดับชั้น (121 คน)</span>
+                        <span>สถิติกราฟวงกลมภาพรวมระดับชั้น ({totalCount} คน)</span>
                       </h5>
                       <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-md border border-indigo-200">
                         Radial Gauges
@@ -5372,7 +5372,7 @@ export default function App() {
                         value={100}
                         max={100}
                         label="อัตราผ่านเกณฑ์"
-                        sublabel={`121/${totalCount} คน (ครบ 100%)`}
+                        sublabel={`${totalCount}/${totalCount} คน (ครบ 100%)`}
                         color="emerald"
                         suffix="%"
                         icon="✅"
@@ -5425,7 +5425,7 @@ export default function App() {
                       <CircularGauge 
                         value={84.7}
                         max={100}
-                        label="ห้อง ป.6/1 (28 คน)"
+                        label="ห้อง ป.6/1 (33 คน)"
                         sublabel="Pre 5.2 ➔ Post 8.6 (+3.4)"
                         color="blue"
                         suffix="%"
@@ -5435,7 +5435,7 @@ export default function App() {
                       <CircularGauge 
                         value={85.0}
                         max={100}
-                        label="ห้อง ป.6/2 (35 คน)"
+                        label="ห้อง ป.6/2 (29 คน)"
                         sublabel="Pre 5.9 ➔ Post 9.0 (+3.1)"
                         color="indigo"
                         suffix="%"
@@ -5538,7 +5538,7 @@ export default function App() {
                   <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 text-xs text-slate-700 leading-relaxed font-medium space-y-1.5">
                     <strong className="text-indigo-950 font-black block">📝 พารากราฟบรรยายผลการประเมินเชิงกราฟวงกลม:</strong>
                     <p>
-                      "ผลการวิเคราะห์สมรรถนะเชิงรัศมี (Radial Gauge Analysis) ของนักเรียนชั้นประถมศึกษาปีที่ 6 ทั้ง 4 ห้องเรียน (รวม 121 คน) พบว่า นักเรียนบรรลุเกณฑ์การประเมินรอบด้าน 100% โดยมีคะแนนหลังเรียนสูงถึง 87.0% (8.7/10 คะแนน) และมีอัตราพัฒนาการเฉลี่ยเพิ่มขึ้นถึง +33.0% โดยในรายภารกิจ นักเรียนทำคะแนนด้านการจำแนกสัญลักษณ์ (M1) ได้สูงสุดที่ 91.3% รองลงมาคือการจัดลำดับขั้นตอน (M2) 90.7%, การอ่านเงื่อนไข (M3) 88.7%, การสืบสวนและแก้ไข Bug (M4) 88.0% และการออกแบบผังงานจริงใน Final Mission ได้ 78.9% ซึ่งสะท้อนถึงความสามารถในการคิดแก้ปัญหาอย่างเป็นระบบตรงตามตัวชี้วัด ว 4.2 ป.6/1 อย่างเด่นชัด"
+                      "ผลการวิเคราะห์สมรรถนะเชิงรัศมี (Radial Gauge Analysis) ของนักเรียนชั้นประถมศึกษาปีที่ 6 ทั้ง 4 ห้องเรียน (รวม {totalCount} คน) พบว่า นักเรียนบรรลุเกณฑ์การประเมินรอบด้าน 100% โดยมีคะแนนหลังเรียนสูงถึง 87.0% (8.7/10 คะแนน) และมีอัตราพัฒนาการเฉลี่ยเพิ่มขึ้นถึง +33.0% โดยในรายภารกิจ นักเรียนทำคะแนนด้านการจำแนกสัญลักษณ์ (M1) ได้สูงสุดที่ 91.3% รองลงมาคือการจัดลำดับขั้นตอน (M2) 90.7%, การอ่านเงื่อนไข (M3) 88.7%, การสืบสวนและแก้ไข Bug (M4) 88.0% และการออกแบบผังงานจริงใน Final Mission ได้ 78.9% ซึ่งสะท้อนถึงความสามารถในการคิดแก้ปัญหาอย่างเป็นระบบตรงตามตัวชี้วัด ว 4.2 ป.6/1 อย่างเด่นชัด"
                     </p>
                   </div>
                 </div>
@@ -5559,11 +5559,11 @@ export default function App() {
                     <h4 className="font-extrabold text-base text-slate-900 flex items-center space-x-2">
                       <span>ตารางผลการเรียนรายบุคคล ({filteredStudents.length} คน)</span>
                       <span className="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-                        เรียงตามเลขที่ 1-35
+                        {teacherFilterRoom === 'ทั้งหมด' ? `รวม ${studentRecords.length} คน` : `ห้อง ${teacherFilterRoom} (เลขที่ 1-${filteredStudents.length})`}
                       </span>
                     </h4>
                     <p className="text-[11px] text-slate-500 font-medium">
-                      {teacherFilterRoom === 'ทั้งหมด' ? 'แสดงนักเรียนครบทั้ง 4 ห้อง (121 คน)' : `แสดงนักเรียนห้อง ${teacherFilterRoom} (${filteredStudents.length} คน) พร้อมโหมดแคปหน้าจอพอดี 1 หน้า`}
+                      {teacherFilterRoom === 'ทั้งหมด' ? `แสดงนักเรียนครบทั้ง 4 ห้อง (${studentRecords.length} คน)` : `แสดงนักเรียนห้อง ${teacherFilterRoom} (${filteredStudents.length} คน) พร้อมโหมดแคปหน้าจอพอดี 1 หน้า`}
                     </p>
                   </div>
                 </div>

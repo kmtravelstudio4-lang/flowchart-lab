@@ -24,7 +24,7 @@ export const getStudentByCode = async (studentCode) => {
 
   const code = raw.toLowerCase();
 
-  // Find in master default roster (121 students from CSV)
+  // Find in master default roster (120 students from CSV)
   const masterMatch = DEFAULT_STUDENT_ROSTER.find(s => {
     const sCode = String(s.studentCode || '').trim().toLowerCase();
     const sName = String(s.name || '').trim().toLowerCase();

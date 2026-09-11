@@ -306,7 +306,7 @@ export const MASTERY_LEVELS_SCALE = [
 export const PA_SUCCESS_CRITERIA = {
   standardCode: 'ว 4.2 ป.6/1',
   standardTitle: 'การออกแบบและเขียนผังงานเพื่อแก้ปัญหาในชีวิตประจำวันอย่างเป็นขั้นตอนและมีเหตุผล',
-  targetAudience: 'นักเรียนชั้นประถมศึกษาปีที่ 6 (จำนวน 4 ห้องเรียน รวม 121 คน)',
+  targetAudience: 'นักเรียนชั้นประถมศึกษาปีที่ 6 (จำนวน 4 ห้องเรียน รวม 120 คน)',
   quantitative: [
     {
       id: 'q1',
