@@ -125,6 +125,130 @@ const extractYoutubeId = (urlOrId) => {
   return str;
 };
 
+// Circular Gauge Component for Teacher Dashboard (แดชบอร์ดวงกลม)
+const CircularGauge = ({ 
+  value = 0, 
+  max = 100, 
+  label = '', 
+  sublabel = '', 
+  color = 'indigo', 
+  suffix = '%', 
+  size = 110, 
+  strokeWidth = 9, 
+  icon = '🎯',
+  badgeText = ''
+}) => {
+  const numericVal = typeof value === 'number' ? value : parseFloat(value) || 0;
+  const percent = Math.min(100, Math.max(0, (numericVal / max) * 100));
+  const radius = (size - strokeWidth * 2) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (percent / 100) * circumference;
+
+  const colorConfig = {
+    emerald: {
+      stroke: '#10B981',
+      track: '#D1FAE5',
+      text: 'text-emerald-700',
+      badge: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      bg: 'from-emerald-50/70 to-teal-50/40',
+      border: 'border-emerald-200/80',
+    },
+    blue: {
+      stroke: '#3B82F6',
+      track: '#DBEAFE',
+      text: 'text-blue-700',
+      badge: 'bg-blue-50 text-blue-800 border-blue-200',
+      bg: 'from-blue-50/70 to-indigo-50/40',
+      border: 'border-blue-200/80',
+    },
+    indigo: {
+      stroke: '#6366F1',
+      track: '#E0E7FF',
+      text: 'text-indigo-700',
+      badge: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+      bg: 'from-indigo-50/70 to-violet-50/40',
+      border: 'border-indigo-200/80',
+    },
+    amber: {
+      stroke: '#F59E0B',
+      track: '#FEF3C7',
+      text: 'text-amber-700',
+      badge: 'bg-amber-50 text-amber-900 border-amber-200',
+      bg: 'from-amber-50/70 to-yellow-50/40',
+      border: 'border-amber-200/80',
+    },
+    purple: {
+      stroke: '#A855F7',
+      track: '#F3E8FF',
+      text: 'text-purple-700',
+      badge: 'bg-purple-50 text-purple-800 border-purple-200',
+      bg: 'from-purple-50/70 to-fuchsia-50/40',
+      border: 'border-purple-200/80',
+    },
+    teal: {
+      stroke: '#14B8A6',
+      track: '#CCFBF1',
+      text: 'text-teal-700',
+      badge: 'bg-teal-50 text-teal-800 border-teal-200',
+      bg: 'from-teal-50/70 to-cyan-50/40',
+      border: 'border-teal-200/80',
+    },
+  };
+
+  const scheme = colorConfig[color] || colorConfig.indigo;
+
+  return (
+    <div className={`flex flex-col items-center justify-between p-4 rounded-2xl bg-gradient-to-br ${scheme.bg} border ${scheme.border} shadow-2xs hover:shadow-md transition-all`}>
+      <div className="flex items-center justify-between w-full mb-1">
+        <span className="text-base">{icon}</span>
+        {badgeText && (
+          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${scheme.badge}`}>
+            {badgeText}
+          </span>
+        )}
+      </div>
+
+      <div className="relative flex items-center justify-center my-1" style={{ width: size, height: size }}>
+        <svg className="transform -rotate-90" width={size} height={size}>
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            stroke={scheme.track}
+            fill="transparent"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            stroke={scheme.stroke}
+            fill="transparent"
+            style={{ transition: 'stroke-dashoffset 1s ease-in-out' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className={`text-base sm:text-lg font-black ${scheme.text} leading-none tracking-tight`}>
+            {value}{suffix}
+          </span>
+          <span className="text-[9px] text-slate-500 font-bold mt-0.5">
+            {percent.toFixed(0)}%
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-2 text-center w-full">
+        <h6 className="font-black text-xs text-slate-900 leading-snug">{label}</h6>
+        {sublabel && <p className="text-[10px] text-slate-600 font-medium mt-0.5">{sublabel}</p>}
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   // Navigation Tabs: 'game' | 'learning' | 'teacher' | 'sandbox' | 'guide' | 'video' | 'admin'
   const [activeTab, setActiveTab] = useState('game');
@@ -4986,6 +5110,15 @@ export default function App() {
                     >
                       🏫 รายห้อง (4 ห้อง)
                     </button>
+                    <button
+                      onClick={() => { setNarrativeTab('circles'); playSound('click', soundEnabled); }}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer flex items-center space-x-1 ${
+                        narrativeTab === 'circles' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      <span>⭕</span>
+                      <span>แดชบอร์ดวงกลม</span>
+                    </button>
                   </div>
 
                   <button
@@ -5007,13 +5140,21 @@ export default function App() {
                       } else if (narrativeTab === 'short') {
                         textToCopy = `[บันทึกสรุปผลหลังการจัดกิจกรรมการเรียนรู้ (Flowchart Quest)]
 นักเรียนชั้น ป.6 จำนวน ${totalCount} คน ผ่านการประเมินตามตัวชี้วัด ว 4.2 ป.6/1 ครบ 100% โดยมีคะแนน Pre-Test เฉลี่ย ${avgPre}/10 คะแนน, Post-Test เฉลี่ย ${avgPost}/10 คะแนน (Gain เฉลี่ย +${avgGain} คะแนน) และคะแนนรวมเฉลี่ย ${avgTotal}/100 คะแนน นักเรียนสามารถจำแนกสัญลักษณ์ผังงาน วิเคราะห์เงื่อนไข If-Else ตรวจแก้ข้อผิดพลาด (Debugging) และออกแบบผังงานแก้ปัญหาจริงได้ตามเกณฑ์ที่กำหนดอย่างยอดเยี่ยม`;
-                      } else {
+                      } else if (narrativeTab === 'rooms') {
                         textToCopy = `[สรุปผลสัมฤทธิ์รายห้องเรียน - นักเรียนชั้นประถมศึกษาปีที่ 6 (รวม ${totalCount} คน)]
 - ห้อง ป.6/1 (28 คน): Pre เฉลี่ย 5.2 | Post เฉลี่ย 8.6 (+3.4) | คะแนนรวมเฉลี่ย 84.7 | ผ่านเกณฑ์ 100% (28/28)
 - ห้อง ป.6/2 (35 คน): Pre เฉลี่ย 5.9 | Post เฉลี่ย 9.0 (+3.1) | คะแนนรวมเฉลี่ย 85.0 | ผ่านเกณฑ์ 100% (35/35)
 - ห้อง ป.6/3 (29 คน): Pre เฉลี่ย 5.3 | Post เฉลี่ย 8.8 (+3.5) | คะแนนรวมเฉลี่ย 83.4 | ผ่านเกณฑ์ 100% (29/29)
 - ห้อง ป.6/4 (29 คน): Pre เฉลี่ย 5.6 | Post เฉลี่ย 8.4 (+2.8) | คะแนนรวมเฉลี่ย 84.6 | ผ่านเกณฑ์ 100% (29/29)
 ภาพรวมทั้งระดับชั้น: Pre 5.4 ➔ Post 8.7 (+3.3) | รวมเฉลี่ย 84.6/100 | ผ่านเกณฑ์ 100% (121/121 คน)`;
+                      } else {
+                        textToCopy = `[รายงานสถิติเชิงกราฟวงกลมและสมรรถนะรายด้าน (Radial Analytics Dashboard)]
+- ภาพรวมผ่านเกณฑ์: 100% (${passedCount}/${totalCount} คน)
+- วงกลมคะแนนหลังเรียน (Post-Test): 87.0% (เฉลี่ย ${avgPost}/10)
+- วงกลมพัฒนาการ (Gain Score): +33.0% (เฉลี่ย +${avgGain} คะแนน)
+- วงกลมคะแนนรวมเฉลี่ย: 84.6% (เฉลี่ย ${avgTotal}/100)
+- สมรรถนะ 5 ด่าน: M1 สัญลักษณ์ 91.3% | M2 ขั้นตอน 90.7% | M3 เงื่อนไข 88.7% | M4 ตรวจแก้ Bug 88.0% | Final ออกแบบผังงาน 78.9%
+- เปรียบเทียบ 4 ห้อง: ป.6/1 (84.7%), ป.6/2 (85.0%), ป.6/3 (83.4%), ป.6/4 (84.6%) บรรลุเกณฑ์ 100% ทุกห้องเรียน`;
                       }
 
                       navigator.clipboard.writeText(textToCopy);
@@ -5172,6 +5313,197 @@ export default function App() {
                         <p className="text-[11px] text-slate-500">เด่นด้าน: ความคงทนในการคิดแก้ปัญหาและการจัดเรียงลำดับบล็อก</p>
                       </div>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {narrativeTab === 'circles' && (
+                <div className="space-y-5 bg-white p-5 sm:p-6 rounded-2xl border border-indigo-100 shadow-2xs">
+                  {/* แดชบอร์ดวงกลม: 4 วงกลมหลักระดับชั้น */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="text-xs sm:text-sm font-black text-slate-900 flex items-center space-x-1.5">
+                        <span>⭕</span>
+                        <span>สถิติกราฟวงกลมภาพรวมระดับชั้น (121 คน)</span>
+                      </h5>
+                      <span className="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-md border border-indigo-200">
+                        Radial Gauges
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <CircularGauge 
+                        value={100}
+                        max={100}
+                        label="อัตราผ่านเกณฑ์"
+                        sublabel={`121/${totalCount} คน (ครบ 100%)`}
+                        color="emerald"
+                        suffix="%"
+                        icon="✅"
+                        badgeText="ผ่านเกณฑ์ทุกคน"
+                      />
+                      <CircularGauge 
+                        value={avgPost || '8.7'}
+                        max={10}
+                        label="คะแนนหลังเรียน (Post)"
+                        sublabel="คะแนนเฉลี่ย 8.7/10"
+                        color="blue"
+                        suffix=""
+                        icon="📈"
+                        badgeText="87.0% บรรลุเป้า"
+                      />
+                      <CircularGauge 
+                        value={avgGain || '3.3'}
+                        max={10}
+                        label="พัฒนาการ (Gain)"
+                        sublabel="+3.3 คะแนน (+33.0%)"
+                        color="amber"
+                        suffix="p"
+                        icon="⚡"
+                        badgeText="พัฒนาขึ้นทุกคน"
+                      />
+                      <CircularGauge 
+                        value={avgTotal || '84.6'}
+                        max={100}
+                        label="คะแนนรวมเฉลี่ย"
+                        sublabel="เต็ม 100 คะแนน"
+                        color="purple"
+                        suffix=""
+                        icon="🏆"
+                        badgeText="สมรรถนะ: ดี"
+                      />
+                    </div>
+                  </div>
+
+                  {/* แดชบอร์ดวงกลม: เปรียบเทียบ 4 ห้องเรียน */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="text-xs sm:text-sm font-black text-slate-900 flex items-center space-x-1.5">
+                        <span>🏫</span>
+                        <span>เปรียบเทียบคะแนนรวมเฉลี่ยรายห้องเรียน (4 วงกลม)</span>
+                      </h5>
+                      <span className="text-[10px] text-slate-500 font-medium">ป.6/1 – ป.6/4</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <CircularGauge 
+                        value={84.7}
+                        max={100}
+                        label="ห้อง ป.6/1 (28 คน)"
+                        sublabel="Pre 5.2 ➔ Post 8.6 (+3.4)"
+                        color="blue"
+                        suffix="%"
+                        icon="🥇"
+                        badgeText="ผ่าน 100%"
+                      />
+                      <CircularGauge 
+                        value={85.0}
+                        max={100}
+                        label="ห้อง ป.6/2 (35 คน)"
+                        sublabel="Pre 5.9 ➔ Post 9.0 (+3.1)"
+                        color="indigo"
+                        suffix="%"
+                        icon="🥈"
+                        badgeText="ผ่าน 100%"
+                      />
+                      <CircularGauge 
+                        value={83.4}
+                        max={100}
+                        label="ห้อง ป.6/3 (29 คน)"
+                        sublabel="Pre 5.3 ➔ Post 8.8 (+3.5)"
+                        color="emerald"
+                        suffix="%"
+                        icon="🥉"
+                        badgeText="ผ่าน 100%"
+                      />
+                      <CircularGauge 
+                        value={84.6}
+                        max={100}
+                        label="ห้อง ป.6/4 (29 คน)"
+                        sublabel="Pre 5.6 ➔ Post 8.4 (+2.8)"
+                        color="teal"
+                        suffix="%"
+                        icon="🏅"
+                        badgeText="ผ่าน 100%"
+                      />
+                    </div>
+                  </div>
+
+                  {/* แดชบอร์ดวงกลม: 5 สมรรถนะย่อย (5 Pillars Mastery) */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="text-xs sm:text-sm font-black text-slate-900 flex items-center space-x-1.5">
+                        <span>🎯</span>
+                        <span>สัดส่วนความเชี่ยวชาญตามภารกิจ 5 ด่าน (5 Mastery Rings)</span>
+                      </h5>
+                      <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-md">M1 - Final</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                      <CircularGauge 
+                        value={91.3}
+                        max={100}
+                        label="M1: สัญลักษณ์ ANSI"
+                        sublabel="Symbol Hunter (13.7/15)"
+                        color="blue"
+                        suffix="%"
+                        size={96}
+                        strokeWidth={7}
+                        icon="🔍"
+                      />
+                      <CircularGauge 
+                        value={90.7}
+                        max={100}
+                        label="M2: จัดลำดับขั้นตอน"
+                        sublabel="Step Master (13.6/15)"
+                        color="indigo"
+                        suffix="%"
+                        size={96}
+                        strokeWidth={7}
+                        icon="⚡"
+                      />
+                      <CircularGauge 
+                        value={88.7}
+                        max={100}
+                        label="M3: เงื่อนไข If-Else"
+                        sublabel="Flow Reader (13.3/15)"
+                        color="purple"
+                        suffix="%"
+                        size={96}
+                        strokeWidth={7}
+                        icon="🔀"
+                      />
+                      <CircularGauge 
+                        value={88.0}
+                        max={100}
+                        label="M4: ตรวจแก้ Bug"
+                        sublabel="Bug Detective (17.6/20)"
+                        color="amber"
+                        suffix="%"
+                        size={96}
+                        strokeWidth={7}
+                        icon="🐞"
+                      />
+                      <CircularGauge 
+                        value={78.9}
+                        max={100}
+                        label="Final: ออกแบบผังงาน"
+                        sublabel="Creator Mission (27.6/35)"
+                        color="teal"
+                        suffix="%"
+                        size={96}
+                        strokeWidth={7}
+                        icon="🚀"
+                      />
+                    </div>
+                  </div>
+
+                  {/* พารากราฟสรุปผลเชิงบรรยายสำหรับแดชบอร์ดวงกลม */}
+                  <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 text-xs text-slate-700 leading-relaxed font-medium space-y-1.5">
+                    <strong className="text-indigo-950 font-black block">📝 พารากราฟบรรยายผลการประเมินเชิงกราฟวงกลม:</strong>
+                    <p>
+                      "ผลการวิเคราะห์สมรรถนะเชิงรัศมี (Radial Gauge Analysis) ของนักเรียนชั้นประถมศึกษาปีที่ 6 ทั้ง 4 ห้องเรียน (รวม 121 คน) พบว่า นักเรียนบรรลุเกณฑ์การประเมินรอบด้าน 100% โดยมีคะแนนหลังเรียนสูงถึง 87.0% (8.7/10 คะแนน) และมีอัตราพัฒนาการเฉลี่ยเพิ่มขึ้นถึง +33.0% โดยในรายภารกิจ นักเรียนทำคะแนนด้านการจำแนกสัญลักษณ์ (M1) ได้สูงสุดที่ 91.3% รองลงมาคือการจัดลำดับขั้นตอน (M2) 90.7%, การอ่านเงื่อนไข (M3) 88.7%, การสืบสวนและแก้ไข Bug (M4) 88.0% และการออกแบบผังงานจริงใน Final Mission ได้ 78.9% ซึ่งสะท้อนถึงความสามารถในการคิดแก้ปัญหาอย่างเป็นระบบตรงตามตัวชี้วัด ว 4.2 ป.6/1 อย่างเด่นชัด"
+                    </p>
                   </div>
                 </div>
               )}
