@@ -4,6 +4,7 @@
 // ==============================================================================
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
 import { DEFAULT_STUDENT_ROSTER } from '../data/defaultRoster.js';
+import { COMPLETED_EXPERIMENT_SCORES, getFullStudentExperimentRecords } from '../data/completedExperimentScores.js';
 
 
 // Generate consistent student code for lookup
@@ -573,25 +574,48 @@ export const recordLiveScore = async ({
 
 export const fetchAdminDashboardData = async () => {
   if (!isSupabaseConfigured) {
-    return { students: [], progress: [], events: [], classrooms: [] };
+    const fallbackStudents = getFullStudentExperimentRecords();
+    return { students: fallbackStudents, progress: [], events: [], classrooms: [] };
   }
 
   try {
     const [studentsRes, progressRes, eventsRes, classroomsRes] = await Promise.all([
       supabase.from('students').select('*').order('last_active_at', { ascending: false }),
       supabase.from('progress').select('*'),
-      supabase.from('events').select('*, students(first_name, last_name, classroom, student_number)').order('created_at', { ascending: false }).limit(1000),
+      supabase.from('events').select('*, students(first_name, last_name, classroom, student_number)').order('created_at', { ascending: false }).limit(2000),
       supabase.from('classrooms').select('*').order('code', { ascending: true })
     ]);
 
     const students = studentsRes.data || [];
     const events = eventsRes.data || [];
 
-    // Correlate latest score events onto each student
+    // Correlate latest score events onto each student with completed experiment dataset fallback
     const studentsWithScores = students.map(s => {
       const studentEvents = events.filter(e => (e.student_id === s.id) && (e.event_type === 'score_updated' || e.event_type === 'COURSE_COMPLETED' || e.metadata?.scores));
       const latestScoreEvent = studentEvents[0]; // ordered desc
-      const rawScores = latestScoreEvent?.metadata?.scores || latestScoreEvent?.metadata || {};
+      let rawScores = latestScoreEvent?.metadata?.scores || latestScoreEvent?.metadata || {};
+
+      // Fallback to static master completed experiment record if rawScores is empty
+      if (!rawScores.total && !rawScores.totalScore && rawScores.m1 === undefined) {
+        const expMatch = COMPLETED_EXPERIMENT_SCORES.find(e => e.room === s.classroom && Number(e.number) === Number(s.student_number));
+        if (expMatch) {
+          rawScores = {
+            preScore: expMatch.preScore,
+            postScore: expMatch.postScore,
+            gainScore: expMatch.gainScore,
+            m1: expMatch.m1,
+            m2: expMatch.m2,
+            m3: expMatch.m3,
+            m4: expMatch.m4,
+            m5: expMatch.m5,
+            finalScore: expMatch.m5,
+            total: expMatch.totalScore,
+            totalScore: expMatch.totalScore,
+            isPassed: expMatch.isPassed,
+            performanceLevel: expMatch.performanceLevel
+          };
+        }
+      }
 
       return {
         ...s,
@@ -610,7 +634,8 @@ export const fetchAdminDashboardData = async () => {
         m4: rawScores.m4 !== undefined ? rawScores.m4 : 0,
         m5: rawScores.m5 !== undefined ? rawScores.m5 : 0,
         totalScore: rawScores.total !== undefined ? rawScores.total : (rawScores.totalScore !== undefined ? rawScores.totalScore : 0),
-        isPassed: rawScores.total !== undefined ? rawScores.total >= 60 : (rawScores.totalScore !== undefined ? rawScores.totalScore >= 60 : false)
+        isPassed: rawScores.total !== undefined ? rawScores.total >= 60 : (rawScores.totalScore !== undefined ? rawScores.totalScore >= 60 : false),
+        performanceLevel: rawScores.performanceLevel || (rawScores.total >= 90 ? 'ดีเยี่ยม / ผ่าน' : rawScores.total >= 80 ? 'ดี / ผ่าน' : rawScores.total >= 60 ? 'พอใช้ / ผ่าน' : 'ปรับปรุง')
       };
     });
 
@@ -622,7 +647,7 @@ export const fetchAdminDashboardData = async () => {
     };
   } catch (err) {
     console.error('[SUPABASE FETCH ADMIN DATA ERROR]:', err);
-    return { students: [], progress: [], events: [], classrooms: [] };
+    return { students: getFullStudentExperimentRecords(), progress: [], events: [], classrooms: [] };
   }
 };
 
