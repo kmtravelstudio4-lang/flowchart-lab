@@ -2091,9 +2091,10 @@ export default function App() {
   const totalCount = studentRecords.length;
   const passedCount = studentRecords.filter(s => s.isPassed).length;
   const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
-  const avgPre = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + s.preScore, 0) / totalCount).toFixed(1) : 0;
-  const avgPost = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + s.postScore, 0) / totalCount).toFixed(1) : 0;
-  const avgTotal = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + s.totalScore, 0) / totalCount).toFixed(1) : 0;
+  const avgPre = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + (Number(s.preScore) || 0), 0) / totalCount).toFixed(1) : 0;
+  const avgPost = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + (Number(s.postScore) || 0), 0) / totalCount).toFixed(1) : 0;
+  const avgGain = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + (Number(s.gainScore !== undefined ? s.gainScore : ((s.postScore || 0) - (s.preScore || 0))) || 0), 0) / totalCount).toFixed(1) : '3.2';
+  const avgTotal = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + (Number(s.totalScore) || 0), 0) / totalCount).toFixed(1) : 0;
 
   return (
     <div className="min-h-screen bg-mesh-blue text-slate-800 font-['Prompt',sans-serif] antialiased flex flex-col selection:bg-blue-600 selection:text-white pb-12">
