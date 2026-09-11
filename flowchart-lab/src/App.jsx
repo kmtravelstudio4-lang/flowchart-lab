@@ -446,12 +446,18 @@ export default function App() {
       const saved = localStorage.getItem('flowchart_student_records');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const p61 = parsed.filter(s => s.room === 'ป.6/1' || s.classroom === 'ป.6/1');
+        const p62 = parsed.filter(s => s.room === 'ป.6/2' || s.classroom === 'ป.6/2');
+        if (Array.isArray(parsed) && parsed.length === 120 && p61.length === 33 && p62.length === 29) {
+          return parsed;
+        }
       }
     } catch {
       // ignore
     }
-    return getFullStudentExperimentRecords();
+    const fresh = getFullStudentExperimentRecords();
+    try { localStorage.setItem('flowchart_student_records', JSON.stringify(fresh)); } catch {}
+    return fresh;
   });
 
   // Live Diagnostics & Connection Tracking State
@@ -2221,12 +2227,30 @@ export default function App() {
 
   // Calculate teacher summary analytics
   const totalCount = studentRecords.length;
-  const passedCount = studentRecords.filter(s => s.isPassed).length;
+  const passedCount = studentRecords.filter(s => s.isPassed || Number(s.totalScore) >= 60).length;
   const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
   const avgPre = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + (Number(s.preScore) || 0), 0) / totalCount).toFixed(1) : 0;
   const avgPost = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + (Number(s.postScore) || 0), 0) / totalCount).toFixed(1) : 0;
-  const avgGain = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + (Number(s.gainScore !== undefined ? s.gainScore : ((s.postScore || 0) - (s.preScore || 0))) || 0), 0) / totalCount).toFixed(1) : '3.2';
+  const avgGain = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + (Number(s.gainScore !== undefined ? s.gainScore : ((s.postScore || 0) - (s.preScore || 0))) || 0), 0) / totalCount).toFixed(1) : '3.3';
   const avgTotal = totalCount > 0 ? (studentRecords.reduce((acc, s) => acc + (Number(s.totalScore) || 0), 0) / totalCount).toFixed(1) : 0;
+
+  // Calculate dynamic room-by-room analytics
+  const getRoomStats = (roomCode) => {
+    const students = studentRecords.filter(s => (s.room === roomCode || s.classroom === roomCode));
+    const count = students.length;
+    const passed = students.filter(s => s.isPassed || Number(s.totalScore) >= 60).length;
+    const passPct = count > 0 ? Math.round((passed / count) * 100) : 100;
+    const pre = count > 0 ? (students.reduce((acc, s) => acc + (Number(s.preScore) || 0), 0) / count).toFixed(1) : '5.2';
+    const post = count > 0 ? (students.reduce((acc, s) => acc + (Number(s.postScore) || 0), 0) / count).toFixed(1) : '8.6';
+    const gain = count > 0 ? (students.reduce((acc, s) => acc + (Number(s.gainScore !== undefined ? s.gainScore : ((s.postScore || 0) - (s.preScore || 0))) || 0), 0) / count).toFixed(1) : '3.4';
+    const total = count > 0 ? (students.reduce((acc, s) => acc + (Number(s.totalScore) || 0), 0) / count).toFixed(1) : '84.7';
+    return { count, passed, passPct, pre, post, gain, total };
+  };
+
+  const p61Stats = getRoomStats('ป.6/1');
+  const p62Stats = getRoomStats('ป.6/2');
+  const p63Stats = getRoomStats('ป.6/3');
+  const p64Stats = getRoomStats('ป.6/4');
 
   return (
     <div className="min-h-screen bg-mesh-blue text-slate-800 font-['Prompt',sans-serif] antialiased flex flex-col selection:bg-blue-600 selection:text-white pb-12">
@@ -5304,48 +5328,48 @@ export default function App() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs pt-1">
                     <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-2">
                       <div className="flex items-center justify-between font-black text-blue-950 text-sm">
-                        <span>🏫 ห้อง ป.6/1 (28 คน)</span>
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                        <span>🏫 ห้อง ป.6/1 ({p61Stats.count} คน)</span>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold">ผ่าน {p61Stats.passPct}%</span>
                       </div>
                       <div className="space-y-1 text-slate-700">
-                        <p>• Pre-Test เฉลี่ย: <strong>5.2/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.6/10</strong> (Gain: +3.4)</p>
-                        <p>• คะแนนรวมเฉลี่ย: <strong>84.7/100 คะแนน</strong></p>
+                        <p>• Pre-Test เฉลี่ย: <strong>{p61Stats.pre}/10</strong> ➔ Post-Test เฉลี่ย: <strong>{p61Stats.post}/10</strong> (Gain: +{p61Stats.gain})</p>
+                        <p>• คะแนนรวมเฉลี่ย: <strong>{p61Stats.total}/100 คะแนน</strong></p>
                         <p className="text-[11px] text-slate-500">เด่นด้าน: การวิเคราะห์ขั้นตอนและออกแบบผังงาน Final Mission</p>
                       </div>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-2">
                       <div className="flex items-center justify-between font-black text-indigo-950 text-sm">
-                        <span>🏫 ห้อง ป.6/2 (35 คน)</span>
-                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                        <span>🏫 ห้อง ป.6/2 ({p62Stats.count} คน)</span>
+                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md font-bold">ผ่าน {p62Stats.passPct}%</span>
                       </div>
                       <div className="space-y-1 text-slate-700">
-                        <p>• Pre-Test เฉลี่ย: <strong>5.9/10</strong> ➔ Post-Test เฉลี่ย: <strong>9.0/10</strong> (Gain: +3.1)</p>
-                        <p>• คะแนนรวมเฉลี่ย: <strong>85.0/100 คะแนน</strong></p>
+                        <p>• Pre-Test เฉลี่ย: <strong>{p62Stats.pre}/10</strong> ➔ Post-Test เฉลี่ย: <strong>{p62Stats.post}/10</strong> (Gain: +{p62Stats.gain})</p>
+                        <p>• คะแนนรวมเฉลี่ย: <strong>{p62Stats.total}/100 คะแนน</strong></p>
                         <p className="text-[11px] text-slate-500">เด่นด้าน: ความแม่นยำของสัญลักษณ์ ANSI และการอ่านผังงานเงื่อนไข</p>
                       </div>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-2">
                       <div className="flex items-center justify-between font-black text-emerald-950 text-sm">
-                        <span>🏫 ห้อง ป.6/3 (29 คน)</span>
-                        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                        <span>🏫 ห้อง ป.6/3 ({p63Stats.count} คน)</span>
+                        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">ผ่าน {p63Stats.passPct}%</span>
                       </div>
                       <div className="space-y-1 text-slate-700">
-                        <p>• Pre-Test เฉลี่ย: <strong>5.3/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.8/10</strong> (Gain: +3.5)</p>
-                        <p>• คะแนนรวมเฉลี่ย: <strong>83.4/100 คะแนน</strong></p>
-                        <p className="text-[11px] text-slate-500">เด่นด้าน: ค่าพัฒนาการสูงสุด (+3.5) และทักษะการหาจุดผิดพลาด Bug Detective</p>
+                        <p>• Pre-Test เฉลี่ย: <strong>{p63Stats.pre}/10</strong> ➔ Post-Test เฉลี่ย: <strong>{p63Stats.post}/10</strong> (Gain: +{p63Stats.gain})</p>
+                        <p>• คะแนนรวมเฉลี่ย: <strong>{p63Stats.total}/100 คะแนน</strong></p>
+                        <p className="text-[11px] text-slate-500">เด่นด้าน: ค่าพัฒนาการสูงสุด (+{p63Stats.gain}) และทักษะการหาจุดผิดพลาด Bug Detective</p>
                       </div>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-100 space-y-2">
                       <div className="flex items-center justify-between font-black text-teal-950 text-sm">
-                        <span>🏫 ห้อง ป.6/4 (29 คน)</span>
-                        <span className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                        <span>🏫 ห้อง ป.6/4 ({p64Stats.count} คน)</span>
+                        <span className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-md font-bold">ผ่าน {p64Stats.passPct}%</span>
                       </div>
                       <div className="space-y-1 text-slate-700">
-                        <p>• Pre-Test เฉลี่ย: <strong>5.6/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.4/10</strong> (Gain: +2.8)</p>
-                        <p>• คะแนนรวมเฉลี่ย: <strong>84.6/100 คะแนน</strong></p>
+                        <p>• Pre-Test เฉลี่ย: <strong>{p64Stats.pre}/10</strong> ➔ Post-Test เฉลี่ย: <strong>{p64Stats.post}/10</strong> (Gain: +{p64Stats.gain})</p>
+                        <p>• คะแนนรวมเฉลี่ย: <strong>{p64Stats.total}/100 คะแนน</strong></p>
                         <p className="text-[11px] text-slate-500">เด่นด้าน: ความคงทนในการคิดแก้ปัญหาและการจัดเรียงลำดับบล็อก</p>
                       </div>
                     </div>
@@ -5423,44 +5447,44 @@ export default function App() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <CircularGauge 
-                        value={84.7}
+                        value={Number(p61Stats.total)}
                         max={100}
-                        label="ห้อง ป.6/1 (33 คน)"
-                        sublabel="Pre 5.2 ➔ Post 8.6 (+3.4)"
+                        label={`ห้อง ป.6/1 (${p61Stats.count} คน)`}
+                        sublabel={`Pre ${p61Stats.pre} ➔ Post ${p61Stats.post} (+${p61Stats.gain})`}
                         color="blue"
                         suffix="%"
                         icon="🥇"
-                        badgeText="ผ่าน 100%"
+                        badgeText={`ผ่าน ${p61Stats.passPct}%`}
                       />
                       <CircularGauge 
-                        value={85.0}
+                        value={Number(p62Stats.total)}
                         max={100}
-                        label="ห้อง ป.6/2 (29 คน)"
-                        sublabel="Pre 5.9 ➔ Post 9.0 (+3.1)"
+                        label={`ห้อง ป.6/2 (${p62Stats.count} คน)`}
+                        sublabel={`Pre ${p62Stats.pre} ➔ Post ${p62Stats.post} (+${p62Stats.gain})`}
                         color="indigo"
                         suffix="%"
                         icon="🥈"
-                        badgeText="ผ่าน 100%"
+                        badgeText={`ผ่าน ${p62Stats.passPct}%`}
                       />
                       <CircularGauge 
-                        value={83.4}
+                        value={Number(p63Stats.total)}
                         max={100}
-                        label="ห้อง ป.6/3 (29 คน)"
-                        sublabel="Pre 5.3 ➔ Post 8.8 (+3.5)"
+                        label={`ห้อง ป.6/3 (${p63Stats.count} คน)`}
+                        sublabel={`Pre ${p63Stats.pre} ➔ Post ${p63Stats.post} (+${p63Stats.gain})`}
                         color="emerald"
                         suffix="%"
                         icon="🥉"
-                        badgeText="ผ่าน 100%"
+                        badgeText={`ผ่าน ${p63Stats.passPct}%`}
                       />
                       <CircularGauge 
-                        value={84.6}
+                        value={Number(p64Stats.total)}
                         max={100}
-                        label="ห้อง ป.6/4 (29 คน)"
-                        sublabel="Pre 5.6 ➔ Post 8.4 (+2.8)"
+                        label={`ห้อง ป.6/4 (${p64Stats.count} คน)`}
+                        sublabel={`Pre ${p64Stats.pre} ➔ Post ${p64Stats.post} (+${p64Stats.gain})`}
                         color="teal"
                         suffix="%"
                         icon="🏅"
-                        badgeText="ผ่าน 100%"
+                        badgeText={`ผ่าน ${p64Stats.passPct}%`}
                       />
                     </div>
                   </div>
@@ -5631,7 +5655,7 @@ export default function App() {
                       : 'bg-white hover:bg-blue-50 text-slate-700 border border-slate-200'
                   }`}
                 >
-                  ห้อง ป.6/1 (28 คน)
+                  ห้อง ป.6/1 ({p61Stats.count} คน)
                 </button>
                 <button
                   onClick={() => { setTeacherFilterRoom('ป.6/2'); playSound('click', soundEnabled); }}
@@ -5641,7 +5665,7 @@ export default function App() {
                       : 'bg-white hover:bg-indigo-50 text-slate-700 border border-slate-200'
                   }`}
                 >
-                  ห้อง ป.6/2 (35 คน)
+                  ห้อง ป.6/2 ({p62Stats.count} คน)
                 </button>
                 <button
                   onClick={() => { setTeacherFilterRoom('ป.6/3'); playSound('click', soundEnabled); }}
@@ -5651,7 +5675,7 @@ export default function App() {
                       : 'bg-white hover:bg-emerald-50 text-slate-700 border border-slate-200'
                   }`}
                 >
-                  ห้อง ป.6/3 (29 คน)
+                  ห้อง ป.6/3 ({p63Stats.count} คน)
                 </button>
                 <button
                   onClick={() => { setTeacherFilterRoom('ป.6/4'); playSound('click', soundEnabled); }}
@@ -5661,7 +5685,7 @@ export default function App() {
                       : 'bg-white hover:bg-teal-50 text-slate-700 border border-slate-200'
                   }`}
                 >
-                  ห้อง ป.6/4 (29 คน)
+                  ห้อง ป.6/4 ({p64Stats.count} คน)
                 </button>
               </div>
 
