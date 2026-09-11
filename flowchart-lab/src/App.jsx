@@ -50,6 +50,7 @@ import StudentProfileModal from './components/StudentProfileModal';
 import StudentManagementModal from './components/StudentManagementModal';
 import LearningEvidenceModal from './components/LearningEvidenceModal';
 import HorizontalPdfViewer from './components/HorizontalPdfViewer';
+import RubricsScoreView from './components/RubricsScoreView';
 import { formatEmbedPdfUrl } from './utils/pdfHelper';
 import kruKingLogo from './assets/kru-king-logo.png';
 import masterSystemConfig from './data/system_config.json';
@@ -2333,6 +2334,19 @@ export default function App() {
                       {studentRecords.length}
                     </span>
                   )}
+                </button>
+
+                {/* Rubrics & Scoring Criteria Tab */}
+                <button
+                  onClick={() => { setActiveTab('rubrics'); playSound('click', soundEnabled); }}
+                  className={`px-3.5 py-2 rounded-xl transition-all duration-200 flex items-center space-x-1.5 ${
+                    activeTab === 'rubrics' 
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/30' 
+                      : 'text-slate-600 hover:text-purple-700 hover:bg-white/60'
+                  }`}
+                >
+                  <Award className="w-4 h-4 text-purple-400" />
+                  <span>ตารางรูบริก & เกณฑ์คะแนน</span>
                 </button>
 
                 {/* Sandbox Tab */}
@@ -4764,13 +4778,23 @@ export default function App() {
                     <span>ย้อนกลับหน้าหลักภารกิจ</span>
                   </button>
 
-                  <button
-                    onClick={() => { setActiveTab('admin'); setAdminSubTab('pilot'); playSound('click', soundEnabled); }}
-                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold px-4 py-2.5 rounded-2xl border border-indigo-200 text-xs flex items-center space-x-1.5 transition shadow-2xs"
-              >
-                <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />
-                <span>เปิดศูนย์ทดลองสอน (Classroom Pilot Hub)</span>
-              </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => { setActiveTab('rubrics'); playSound('click', soundEnabled); }}
+                      className="bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold px-4 py-2.5 rounded-2xl border border-purple-200 text-xs flex items-center space-x-1.5 transition shadow-2xs cursor-pointer"
+                    >
+                      <Award className="w-3.5 h-3.5 text-purple-600" />
+                      <span>ตารางรูบริก & เกณฑ์คะแนน</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setActiveTab('admin'); setAdminSubTab('pilot'); playSound('click', soundEnabled); }}
+                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold px-4 py-2.5 rounded-2xl border border-indigo-200 text-xs flex items-center space-x-1.5 transition shadow-2xs"
+                    >
+                      <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>เปิดศูนย์ทดลองสอน (Classroom Pilot Hub)</span>
+                    </button>
+                  </div>
             </div>
             
             {/* Header Report Banner */}
@@ -6221,6 +6245,20 @@ export default function App() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* ================= TAB 5.5: RUBRICS SCORING & ASSESSMENT CRITERIA ================= */}
+        {activeTab === 'rubrics' && (
+          <RubricsScoreView 
+            onBackToGame={() => setActiveTab('game')}
+            onGoToDashboard={() => {
+              setActiveTab('teacher');
+              setIsAdminUnlocked(true);
+              try { localStorage.setItem('flowchart_admin_unlocked', 'true'); } catch {}
+              loadDashboard();
+            }}
+            soundEnabled={soundEnabled}
+          />
         )}
 
         {/* ================= TAB 6: VIDEO LEARNING STUDIO ================= */}
