@@ -882,7 +882,7 @@ export default function App() {
   const certificateRef = useRef(null);
 
 
-  const [teacherFilterRoom, setTeacherFilterRoom] = useState('ทั้งหมด');
+  const [teacherFilterRoom, setTeacherFilterRoom] = useState('ป.6/1');
   const [teacherFilterStatus, setTeacherFilterStatus] = useState('ทั้งหมด');
   const [teacherSearchQuery, setTeacherSearchQuery] = useState('');
   const [teacherFilterStartDate, setTeacherFilterStartDate] = useState('');
@@ -5719,134 +5719,171 @@ export default function App() {
                 </div>
               ) : tableDisplayMode === 'evidence_single_page' ? (
                 /* =======================================================
-                   📸 EVIDENCE CAPTURE SHEET (พอดี 1 หน้าจอ ไม่ต้องเลื่อน)
+                   📸 EVIDENCE CAPTURE SHEET - แยกทีละห้อง (พอดี 1 หน้าจอ)
                    ======================================================= */
-                <div id="evidence-screenshot-card" className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-200 shadow-sm space-y-3 print:border-none print:p-0">
-                  {/* Official Header Banner for Evidence Screenshot */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-indigo-600 pb-2.5">
-                    <div className="flex items-center space-x-3">
-                      <img src={kruKingLogo} alt="Logo" className="w-10 h-10 object-contain rounded-xl shadow-2xs shrink-0" />
-                      <div>
-                        <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight">
-                          ตารางสรุปผลสัมฤทธิ์ทางการเรียนและสมรรถนะรายบุคคล (หลักฐานการประเมิน ว PA)
-                        </h4>
-                        <p className="text-[11px] text-slate-600 font-medium mt-0.5">
-                          โรงเรียนบ้านหนองบัว • ชั้น <strong className="text-indigo-900">{teacherFilterRoom !== 'ทั้งหมด' ? teacherFilterRoom : 'ประถมศึกษาปีที่ 6 (รวม 4 ห้อง)'}</strong> • ว 4.2 ป.6/1 การแก้ปัญหาและออกแบบผังงาน
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs bg-emerald-100 text-emerald-800 font-black px-3 py-1 rounded-xl border border-emerald-300 flex items-center space-x-1">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>ผ่านเกณฑ์ 100% ({filteredStudents.filter(s => s.isPassed).length}/{filteredStudents.length} คน)</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Summary Bar */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs py-2 px-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
-                    <div>
-                      <span className="text-slate-500 font-bold">จำนวนนักเรียน:</span>{' '}
-                      <strong className="text-slate-900 font-black">{filteredStudents.length} คน</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 font-bold">Pre ➔ Post เฉลี่ย:</span>{' '}
-                      <strong className="text-indigo-700 font-black">{avgPre} ➔ {avgPost}</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 font-bold">Gain เฉลี่ย:</span>{' '}
-                      <strong className="text-emerald-700 font-black">+{avgGain} คะแนน</strong>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 font-bold">คะแนนรวมเฉลี่ย:</span>{' '}
-                      <strong className="text-blue-700 font-black">{avgTotal} / 100</strong>
-                    </div>
-                  </div>
-
-                  {/* 2-Column High Density Split Table (พอดี 1 หน้าจอ) */}
+                <div className="space-y-6">
                   {(() => {
-                    const half = Math.ceil(filteredStudents.length / 2);
-                    const col1 = filteredStudents.slice(0, half);
-                    const col2 = filteredStudents.slice(half);
+                    // Determine which rooms to render
+                    const targetRooms = teacherFilterRoom === 'ทั้งหมด' 
+                      ? ['ป.6/1', 'ป.6/2', 'ป.6/3', 'ป.6/4']
+                      : [teacherFilterRoom];
 
-                    const renderCompactTable = (studentsList, colTitle) => (
-                      <div className="overflow-hidden rounded-xl border border-slate-200">
-                        <table className="w-full text-[11px] text-left border-collapse">
-                          <thead>
-                            <tr className="bg-slate-100/90 text-slate-700 font-black border-b border-slate-200">
-                              <th className="py-1 px-1.5 text-center w-7 text-slate-500">ที่</th>
-                              <th className="py-1 px-2">ชื่อ - สกุล</th>
-                              <th className="py-1 px-1 text-center text-slate-600">Pre</th>
-                              <th className="py-1 px-1 text-center text-blue-700">Post</th>
-                              <th className="py-1 px-1 text-center text-emerald-700">Gain</th>
-                              <th className="py-1 px-1 text-center text-slate-500">M1</th>
-                              <th className="py-1 px-1 text-center text-slate-500">M2</th>
-                              <th className="py-1 px-1 text-center text-slate-500">M3</th>
-                              <th className="py-1 px-1 text-center text-slate-500">M4</th>
-                              <th className="py-1 px-1 text-center text-indigo-700">Fin</th>
-                              <th className="py-1 px-1.5 text-center font-black text-slate-900 bg-indigo-50/50">รวม</th>
-                              <th className="py-1 px-1.5 text-center">ผล</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 bg-white">
-                            {studentsList.map((std) => (
-                              <tr key={std.id} className="hover:bg-blue-50/60 transition">
-                                <td className="py-1 px-1.5 text-center font-bold text-slate-500 bg-slate-50/50">
-                                  {std.number}
-                                </td>
-                                <td className="py-1 px-2 font-bold text-slate-900 truncate max-w-[135px]">
-                                  <button
-                                    onClick={() => setSelectedStudentForProfile(std)}
-                                    className="text-left hover:text-blue-600 hover:underline truncate"
-                                    title={std.name}
-                                  >
-                                    {std.name}
-                                  </button>
-                                </td>
-                                <td className="py-1 px-1 text-center font-medium text-slate-600">{std.preScore}</td>
-                                <td className="py-1 px-1 text-center font-black text-blue-700">{std.postScore}</td>
-                                <td className="py-1 px-1 text-center font-black text-emerald-600">
-                                  +{std.gainScore !== undefined ? std.gainScore : (std.postScore - std.preScore)}
-                                </td>
-                                <td className="py-1 px-1 text-center text-slate-500">{std.m1}</td>
-                                <td className="py-1 px-1 text-center text-slate-500">{std.m2}</td>
-                                <td className="py-1 px-1 text-center text-slate-500">{std.m3}</td>
-                                <td className="py-1 px-1 text-center text-slate-500">{std.m4}</td>
-                                <td className="py-1 px-1 text-center font-bold text-indigo-700">{std.m5}</td>
-                                <td className="py-1 px-1.5 text-center font-black text-slate-900 bg-indigo-50/40">
-                                  {std.totalScore}
-                                </td>
-                                <td className="py-1 px-1.5 text-center">
-                                  <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
-                                    ดี/ผ่าน
-                                  </span>
-                                </td>
+                    const renderRoomEvidenceCard = (roomName) => {
+                      const roomStudents = studentRecords
+                        .filter(s => s.room === roomName)
+                        .filter(s => {
+                          if (teacherFilterStatus === 'ผ่าน' && !s.isPassed) return false;
+                          if (teacherFilterStatus === 'ไม่ผ่าน' && s.isPassed) return false;
+                          if (teacherSearchQuery.trim()) {
+                            const q = teacherSearchQuery.toLowerCase().trim();
+                            const matchName = s.name && s.name.toLowerCase().includes(q);
+                            const matchNum = s.number !== undefined && String(s.number).includes(q);
+                            if (!matchName && !matchNum) return false;
+                          }
+                          return true;
+                        })
+                        .sort((a, b) => (parseInt(a.number, 10) || 0) - (parseInt(b.number, 10) || 0));
+
+                      const count = roomStudents.length;
+                      const passed = roomStudents.filter(s => s.isPassed).length;
+                      const rPre = count > 0 ? (roomStudents.reduce((a, s) => a + (Number(s.preScore) || 0), 0) / count).toFixed(1) : '0.0';
+                      const rPost = count > 0 ? (roomStudents.reduce((a, s) => a + (Number(s.postScore) || 0), 0) / count).toFixed(1) : '0.0';
+                      const rGain = (rPost - rPre).toFixed(1);
+                      const rTotal = count > 0 ? (roomStudents.reduce((a, s) => a + (Number(s.totalScore) || 0), 0) / count).toFixed(1) : '0.0';
+
+                      const half = Math.ceil(roomStudents.length / 2);
+                      const col1 = roomStudents.slice(0, half);
+                      const col2 = roomStudents.slice(half);
+
+                      const renderSubTable = (list, subTitle) => (
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          <table className="w-full text-[11px] text-left border-collapse">
+                            <thead>
+                              <tr className="bg-slate-100/90 text-slate-700 font-black border-b border-slate-200">
+                                <th className="py-1 px-1.5 text-center w-7 text-slate-500">ที่</th>
+                                <th className="py-1 px-2">ชื่อ - นามสกุล</th>
+                                <th className="py-1 px-1 text-center text-slate-600">Pre</th>
+                                <th className="py-1 px-1 text-center text-blue-700">Post</th>
+                                <th className="py-1 px-1 text-center text-emerald-700">Gain</th>
+                                <th className="py-1 px-1 text-center text-slate-500">M1</th>
+                                <th className="py-1 px-1 text-center text-slate-500">M2</th>
+                                <th className="py-1 px-1 text-center text-slate-500">M3</th>
+                                <th className="py-1 px-1 text-center text-slate-500">M4</th>
+                                <th className="py-1 px-1 text-center text-indigo-700">Fin</th>
+                                <th className="py-1 px-1.5 text-center font-black text-slate-900 bg-indigo-50/50">รวม</th>
+                                <th className="py-1 px-1.5 text-center">ผล</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    );
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {list.map((std) => (
+                                <tr key={std.id} className="hover:bg-blue-50/60 transition">
+                                  <td className="py-1 px-1.5 text-center font-bold text-slate-500 bg-slate-50/50">
+                                    {std.number}
+                                  </td>
+                                  <td className="py-1 px-2 font-bold text-slate-900 truncate max-w-[135px]">
+                                    <button
+                                      onClick={() => setSelectedStudentForProfile(std)}
+                                      className="text-left hover:text-blue-600 hover:underline truncate"
+                                      title={std.name}
+                                    >
+                                      {std.name}
+                                    </button>
+                                  </td>
+                                  <td className="py-1 px-1 text-center font-medium text-slate-600">{std.preScore}</td>
+                                  <td className="py-1 px-1 text-center font-black text-blue-700">{std.postScore}</td>
+                                  <td className="py-1 px-1 text-center font-black text-emerald-600">
+                                    +{std.gainScore !== undefined ? std.gainScore : (std.postScore - std.preScore)}
+                                  </td>
+                                  <td className="py-1 px-1 text-center text-slate-500">{std.m1}</td>
+                                  <td className="py-1 px-1 text-center text-slate-500">{std.m2}</td>
+                                  <td className="py-1 px-1 text-center text-slate-500">{std.m3}</td>
+                                  <td className="py-1 px-1 text-center text-slate-500">{std.m4}</td>
+                                  <td className="py-1 px-1 text-center font-bold text-indigo-700">{std.m5}</td>
+                                  <td className="py-1 px-1.5 text-center font-black text-slate-900 bg-indigo-50/40">
+                                    {std.totalScore}
+                                  </td>
+                                  <td className="py-1 px-1.5 text-center">
+                                    <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                                      ดี/ผ่าน
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
 
-                    return (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                        {renderCompactTable(col1, 'กลุ่มที่ 1')}
-                        {col2.length > 0 && renderCompactTable(col2, 'กลุ่มที่ 2')}
-                      </div>
-                    );
+                      return (
+                        <div 
+                          key={roomName} 
+                          id={`evidence-sheet-${roomName.replace('/', '_')}`}
+                          className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-indigo-200 shadow-sm space-y-3 print:border-none print:p-0 page-break-always"
+                        >
+                          {/* Official Header Banner for this specific room */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-indigo-600 pb-2.5">
+                            <div className="flex items-center space-x-3">
+                              <img src={kruKingLogo} alt="Logo" className="w-10 h-10 object-contain rounded-xl shadow-2xs shrink-0" />
+                              <div>
+                                <h4 className="text-sm sm:text-base font-black text-slate-900 leading-tight">
+                                  ตารางสรุปผลสัมฤทธิ์ทางการเรียนและสมรรถนะรายบุคคล (หลักฐานการประเมิน ว PA)
+                                </h4>
+                                <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                                  โรงเรียนบ้านหนองบัว • <strong className="text-indigo-900 font-black text-xs sm:text-sm bg-indigo-50 px-2.5 py-0.5 rounded-lg border border-indigo-200">ห้อง {roomName} ({count} คน)</strong> • ว 4.2 ป.6/1 การแก้ปัญหาและออกแบบผังงาน
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs bg-emerald-100 text-emerald-800 font-black px-3 py-1 rounded-xl border border-emerald-300 flex items-center space-x-1">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>ผ่านเกณฑ์ 100% ({passed}/{count} คน)</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Summary Bar */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs py-2 px-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                            <div>
+                              <span className="text-slate-500 font-bold">จำนวนนักเรียน:</span>{' '}
+                              <strong className="text-slate-900 font-black">{count} คน</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 font-bold">Pre ➔ Post เฉลี่ย:</span>{' '}
+                              <strong className="text-indigo-700 font-black">{rPre} ➔ {rPost}</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 font-bold">Gain เฉลี่ย:</span>{' '}
+                              <strong className="text-emerald-700 font-black">+{rGain} คะแนน</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-500 font-bold">คะแนนรวมเฉลี่ย:</span>{' '}
+                              <strong className="text-blue-700 font-black">{rTotal} / 100</strong>
+                            </div>
+                          </div>
+
+                          {/* 2-Column Split Compact Table */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                            {renderSubTable(col1, 'กลุ่มที่ 1')}
+                            {col2.length > 0 && renderSubTable(col2, 'กลุ่มที่ 2')}
+                          </div>
+
+                          {/* Evidence Footer & Verification Signature */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-100 text-[10.5px] text-slate-500 font-medium">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold text-indigo-900">📌 รับรองความถูกต้อง:</span>
+                              <span>นักเรียนห้อง {roomName} บันทึกและประเมินผลผ่านระบบ Flowchart Lab อัตโนมัติ (ครบ 100%)</span>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                              <span>วันที่ประเมิน: <strong>{new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></span>
+                              <span>ผู้รับการประเมิน: <strong>ครูผู้สอน</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    return targetRooms.map(r => renderRoomEvidenceCard(r));
                   })()}
-
-                  {/* Evidence Footer & Verification Signature */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-100 text-[10.5px] text-slate-500 font-medium">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-bold text-indigo-900">📌 รับรองความถูกต้อง:</span>
-                      <span>บันทึกและประเมินผลผ่านระบบ Flowchart Lab อัตโนมัติ (ครบ 100% ทุกคน)</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <span>วันที่ประเมิน: <strong>{new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</strong></span>
-                      <span>ผู้รับการประเมิน: <strong>ครูผู้สอน</strong></span>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 /* =======================================================
