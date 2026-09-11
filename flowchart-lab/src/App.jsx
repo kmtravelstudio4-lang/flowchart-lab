@@ -5079,52 +5079,98 @@ export default function App() {
               )}
 
               {narrativeTab === 'rooms' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs bg-white p-5 sm:p-6 rounded-2xl border border-indigo-100 shadow-2xs">
-                  <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-2">
-                    <div className="flex items-center justify-between font-black text-blue-950 text-sm">
-                      <span>🏫 ห้อง ป.6/1 (28 คน)</span>
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                <div className="space-y-3.5 bg-white p-5 sm:p-6 rounded-2xl border border-indigo-100 shadow-2xs">
+                  {/* ค่าเฉลี่ยรวมทั้ง 4 ห้อง (Combined Total Summary Card) */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white shadow-md border border-indigo-500/30">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+                      <div className="flex items-center space-x-2.5">
+                        <span className="text-2xl">🏆</span>
+                        <div>
+                          <h5 className="font-black text-sm sm:text-base text-amber-300">
+                            ภาพรวมค่าเฉลี่ยทั้ง 4 ห้องเรียน (ป.6/1 – ป.6/4)
+                          </h5>
+                          <p className="text-[11px] text-indigo-200">
+                            นักเรียนทั้งหมด {totalCount} คน • ผ่านเกณฑ์ร้อยละ 70 ทุกคน ({passedCount}/{totalCount} คน)
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-full font-bold flex items-center space-x-1">
+                        <span>✓ ผ่านเกณฑ์ 100%</span>
+                      </span>
                     </div>
-                    <div className="space-y-1 text-slate-700">
-                      <p>• Pre-Test เฉลี่ย: <strong>5.2/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.6/10</strong> (Gain: +3.4)</p>
-                      <p>• คะแนนรวมเฉลี่ย: <strong>84.7/100 คะแนน</strong></p>
-                      <p className="text-[11px] text-slate-500">เด่นด้าน: การวิเคราะห์ขั้นตอนและออกแบบผังงาน Final Mission</p>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-3">
+                      <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-center">
+                        <div className="text-[10px] text-indigo-200 font-bold uppercase tracking-wider">Pre-Test เฉลี่ยรวม</div>
+                        <div className="text-base sm:text-lg font-black text-white">{avgPre} <span className="text-xs text-indigo-300 font-normal">/10</span></div>
+                        <div className="text-[10px] text-indigo-300">คิดเป็น 54.0%</div>
+                      </div>
+                      <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-center">
+                        <div className="text-[10px] text-indigo-200 font-bold uppercase tracking-wider">Post-Test เฉลี่ยรวม</div>
+                        <div className="text-base sm:text-lg font-black text-emerald-300">{avgPost} <span className="text-xs text-emerald-200/70 font-normal">/10</span></div>
+                        <div className="text-[10px] text-emerald-300">คิดเป็น 87.0%</div>
+                      </div>
+                      <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-center">
+                        <div className="text-[10px] text-indigo-200 font-bold uppercase tracking-wider">Gain เฉลี่ย (พัฒนาการ)</div>
+                        <div className="text-base sm:text-lg font-black text-amber-300">+{avgGain} <span className="text-xs text-amber-200/70 font-normal">คะแนน</span></div>
+                        <div className="text-[10px] text-amber-300">เพิ่มขึ้น +33.0%</div>
+                      </div>
+                      <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-center">
+                        <div className="text-[10px] text-indigo-200 font-bold uppercase tracking-wider">คะแนนรวมเฉลี่ย 4 ห้อง</div>
+                        <div className="text-base sm:text-lg font-black text-sky-300">{avgTotal} <span className="text-xs text-sky-200/70 font-normal">/100</span></div>
+                        <div className="text-[10px] text-sky-300">ระดับ: ดี (ผ่าน 100%)</div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-2">
-                    <div className="flex items-center justify-between font-black text-indigo-950 text-sm">
-                      <span>🏫 ห้อง ป.6/2 (35 คน)</span>
-                      <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                  {/* สรุปแยกรายห้องเรียน 4 ห้อง */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs pt-1">
+                    <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-2">
+                      <div className="flex items-center justify-between font-black text-blue-950 text-sm">
+                        <span>🏫 ห้อง ป.6/1 (28 คน)</span>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                      </div>
+                      <div className="space-y-1 text-slate-700">
+                        <p>• Pre-Test เฉลี่ย: <strong>5.2/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.6/10</strong> (Gain: +3.4)</p>
+                        <p>• คะแนนรวมเฉลี่ย: <strong>84.7/100 คะแนน</strong></p>
+                        <p className="text-[11px] text-slate-500">เด่นด้าน: การวิเคราะห์ขั้นตอนและออกแบบผังงาน Final Mission</p>
+                      </div>
                     </div>
-                    <div className="space-y-1 text-slate-700">
-                      <p>• Pre-Test เฉลี่ย: <strong>5.9/10</strong> ➔ Post-Test เฉลี่ย: <strong>9.0/10</strong> (Gain: +3.1)</p>
-                      <p>• คะแนนรวมเฉลี่ย: <strong>85.0/100 คะแนน</strong></p>
-                      <p className="text-[11px] text-slate-500">เด่นด้าน: ความแม่นยำของสัญลักษณ์ ANSI และการอ่านผังงานเงื่อนไข</p>
-                    </div>
-                  </div>
 
-                  <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-2">
-                    <div className="flex items-center justify-between font-black text-emerald-950 text-sm">
-                      <span>🏫 ห้อง ป.6/3 (29 คน)</span>
-                      <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                    <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-2">
+                      <div className="flex items-center justify-between font-black text-indigo-950 text-sm">
+                        <span>🏫 ห้อง ป.6/2 (35 คน)</span>
+                        <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                      </div>
+                      <div className="space-y-1 text-slate-700">
+                        <p>• Pre-Test เฉลี่ย: <strong>5.9/10</strong> ➔ Post-Test เฉลี่ย: <strong>9.0/10</strong> (Gain: +3.1)</p>
+                        <p>• คะแนนรวมเฉลี่ย: <strong>85.0/100 คะแนน</strong></p>
+                        <p className="text-[11px] text-slate-500">เด่นด้าน: ความแม่นยำของสัญลักษณ์ ANSI และการอ่านผังงานเงื่อนไข</p>
+                      </div>
                     </div>
-                    <div className="space-y-1 text-slate-700">
-                      <p>• Pre-Test เฉลี่ย: <strong>5.3/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.8/10</strong> (Gain: +3.5)</p>
-                      <p>• คะแนนรวมเฉลี่ย: <strong>83.4/100 คะแนน</strong></p>
-                      <p className="text-[11px] text-slate-500">เด่นด้าน: ค่าพัฒนาการสูงสุด (+3.5) และทักษะการหาจุดผิดพลาด Bug Detective</p>
-                    </div>
-                  </div>
 
-                  <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-100 space-y-2">
-                    <div className="flex items-center justify-between font-black text-teal-950 text-sm">
-                      <span>🏫 ห้อง ป.6/4 (29 คน)</span>
-                      <span className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                    <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-2">
+                      <div className="flex items-center justify-between font-black text-emerald-950 text-sm">
+                        <span>🏫 ห้อง ป.6/3 (29 คน)</span>
+                        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                      </div>
+                      <div className="space-y-1 text-slate-700">
+                        <p>• Pre-Test เฉลี่ย: <strong>5.3/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.8/10</strong> (Gain: +3.5)</p>
+                        <p>• คะแนนรวมเฉลี่ย: <strong>83.4/100 คะแนน</strong></p>
+                        <p className="text-[11px] text-slate-500">เด่นด้าน: ค่าพัฒนาการสูงสุด (+3.5) และทักษะการหาจุดผิดพลาด Bug Detective</p>
+                      </div>
                     </div>
-                    <div className="space-y-1 text-slate-700">
-                      <p>• Pre-Test เฉลี่ย: <strong>5.6/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.4/10</strong> (Gain: +2.8)</p>
-                      <p>• คะแนนรวมเฉลี่ย: <strong>84.6/100 คะแนน</strong></p>
-                      <p className="text-[11px] text-slate-500">เด่นด้าน: ความคงทนในการคิดแก้ปัญหาและการจัดเรียงลำดับบล็อก</p>
+
+                    <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-100 space-y-2">
+                      <div className="flex items-center justify-between font-black text-teal-950 text-sm">
+                        <span>🏫 ห้อง ป.6/4 (29 คน)</span>
+                        <span className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                      </div>
+                      <div className="space-y-1 text-slate-700">
+                        <p>• Pre-Test เฉลี่ย: <strong>5.6/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.4/10</strong> (Gain: +2.8)</p>
+                        <p>• คะแนนรวมเฉลี่ย: <strong>84.6/100 คะแนน</strong></p>
+                        <p className="text-[11px] text-slate-500">เด่นด้าน: ความคงทนในการคิดแก้ปัญหาและการจัดเรียงลำดับบล็อก</p>
+                      </div>
                     </div>
                   </div>
                 </div>
