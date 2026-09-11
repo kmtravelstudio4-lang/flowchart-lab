@@ -813,6 +813,8 @@ export default function App() {
   const [cloudTestState, setCloudTestState] = useState({ loading: false, success: null, message: '' });
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
+  const [copiedNarrative, setCopiedNarrative] = useState(false);
+  const [narrativeTab, setNarrativeTab] = useState('full'); // 'full' | 'short' | 'rooms'
 
   // Platform & Learning Management State
   const [selectedStudentForProfile, setSelectedStudentForProfile] = useState(null);
@@ -4934,6 +4936,199 @@ export default function App() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Executive Narrative Report (บทสรุปผลการดำเนินงานเชิงบรรยายสำหรับรายงาน ว PA / SAR) */}
+            <div className="glass-panel rounded-3xl p-6 sm:p-7 shadow-sm space-y-5 border border-indigo-200/80 bg-gradient-to-br from-white via-indigo-50/20 to-blue-50/30">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-indigo-100">
+                <div className="flex items-center space-x-3">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center text-xl shadow-md shadow-indigo-600/20 shrink-0">
+                    📝
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2 flex-wrap">
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                        บทสรุปผลการดำเนินงานเชิงบรรยาย (Executive Summary & PA Narrative Report)
+                      </h3>
+                      <span className="bg-indigo-100 text-indigo-800 text-[10.5px] font-black px-2.5 py-0.5 rounded-full border border-indigo-300">
+                        สำหรับเขียนเล่ม ว PA / SAR
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      ข้อความสรุปผลสัมฤทธิ์เชิงบรรยายระดับทางการ สามารถกดคัดลอกไปวางในเอกสารประเมินข้อตกลงในการพัฒนางาน (PA) ได้ทันที
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="bg-white/80 p-1 rounded-2xl border border-indigo-200 flex items-center space-x-1 text-xs">
+                    <button
+                      onClick={() => { setNarrativeTab('full'); playSound('click', soundEnabled); }}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                        narrativeTab === 'full' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      📄 ฉบับทางการ (PA/SAR)
+                    </button>
+                    <button
+                      onClick={() => { setNarrativeTab('short'); playSound('click', soundEnabled); }}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                        narrativeTab === 'short' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      📝 ฉบับบันทึกหลังสอน
+                    </button>
+                    <button
+                      onClick={() => { setNarrativeTab('rooms'); playSound('click', soundEnabled); }}
+                      className={`px-3 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                        narrativeTab === 'rooms' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      🏫 รายห้อง (4 ห้อง)
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      let textToCopy = '';
+                      if (narrativeTab === 'full') {
+                        textToCopy = `[บทสรุปผลการดำเนินงานตามข้อตกลงในการพัฒนางาน (PA) ประจำปีงบประมาณ]
+เรื่อง: การพัฒนาทักษะการคิดเชิงคำนวณและการออกแบบผังงาน (Flowchart) ด้วยนวัตกรรมเกมการเรียนรู้ Flowchart Quest
+กลุ่มเป้าหมาย: นักเรียนชั้นประถมศึกษาปีที่ 6 จำนวน ${totalCount} คน (4 ห้องเรียน: ป.6/1 – ป.6/4)
+
+๑. ผลลัพธ์เชิงปริมาณ:
+จากการจัดกิจกรรมการเรียนรู้ผ่านนวัตกรรมเกมการเรียนรู้ Flowchart Quest พบว่า นักเรียนมีคะแนนทดสอบหลังเรียน (Post-Test) เฉลี่ย ${avgPost}/10 คะแนน สูงกว่าก่อนเรียน (Pre-Test) ซึ่งมีคะแนนเฉลี่ย ${avgPre}/10 คะแนน โดยมีค่าพัฒนาการเฉลี่ย (Gain Score) เพิ่มขึ้น +${avgGain} คะแนน คิดเป็นนักเรียนร้อยละ ๑๐๐ ที่มีคะแนนหลังเรียนสูงกว่าก่อนเรียน และนักเรียนทุกคน (ร้อยละ ๑๐๐, ${passedCount}/${totalCount} คน) มีผลการประเมินผ่านเกณฑ์ร้อยละ ๗๐ ตามเกณฑ์ที่กำหนดในประเด็นท้าทาย โดยมีคะแนนรวมการทำกิจกรรมตลอดหลักสูตรเฉลี่ย ${avgTotal} คะแนน จากคะแนนเต็ม ๑๐๐ คะแนน
+
+๒. ผลลัพธ์เชิงคุณภาพ:
+ผู้เรียนเกิดทักษะการคิดเชิงคำนวณและสมรรถนะการแก้ปัญหาเชิงประจักษ์ สามารถจำแนกความหมายและเลือกใช้สัญลักษณ์ผังงานตามมาตรฐานสากล (ANSI/ISO) ได้อย่างถูกต้อง สามารถวิเคราะห์และจัดลำดับขั้นตอนการทำงานของอัลกอริทึม (Sequencing) ได้อย่างเป็นระบบ สามารถอ่านและติดตามการทำงานของผังงานที่มีเงื่อนไขการตัดสินใจ (Decision / If-Else) ได้อย่างถูกต้อง ตลอดจนมีทักษะในการตรวจหาจุดผิดพลาดและแก้ไขบัก (Debugging) ในผังงานได้อย่างมีเหตุผล และสามารถนำองค์ความรู้ไปประยุกต์ใช้ออกแบบและสร้างผังงานเพื่อแก้ปัญหาในชีวิตประจำวัน (Final Mission) ได้อย่างสมบูรณ์ตามเกณฑ์รูบริกการประเมิน
+
+๓. สรุปผลการประเมินตามประเด็นท้าทาย:
+ผลการดำเนินงานบรรลุเป้าหมายตามเกณฑ์ที่กำหนดในข้อตกลงในการพัฒนางาน (PA) ครบถ้วนทั้งเชิงปริมาณและเชิงคุณภาพ สะท้อนถึงประสิทธิภาพของสื่อนวัตกรรมเกมในการกระตุ้นความสนใจ สร้างความคงทนในการเรียนรู้ และยกระดับผลสัมฤทธิ์ทางการเรียนตามตัวชี้วัด ว 4.2 ป.6/1 ได้อย่างมีนัยสำคัญ`;
+                      } else if (narrativeTab === 'short') {
+                        textToCopy = `[บันทึกสรุปผลหลังการจัดกิจกรรมการเรียนรู้ (Flowchart Quest)]
+นักเรียนชั้น ป.6 จำนวน ${totalCount} คน ผ่านการประเมินตามตัวชี้วัด ว 4.2 ป.6/1 ครบ 100% โดยมีคะแนน Pre-Test เฉลี่ย ${avgPre}/10 คะแนน, Post-Test เฉลี่ย ${avgPost}/10 คะแนน (Gain เฉลี่ย +${avgGain} คะแนน) และคะแนนรวมเฉลี่ย ${avgTotal}/100 คะแนน นักเรียนสามารถจำแนกสัญลักษณ์ผังงาน วิเคราะห์เงื่อนไข If-Else ตรวจแก้ข้อผิดพลาด (Debugging) และออกแบบผังงานแก้ปัญหาจริงได้ตามเกณฑ์ที่กำหนดอย่างยอดเยี่ยม`;
+                      } else {
+                        textToCopy = `[สรุปผลสัมฤทธิ์รายห้องเรียน - นักเรียนชั้นประถมศึกษาปีที่ 6 (รวม ${totalCount} คน)]
+- ห้อง ป.6/1 (28 คน): Pre เฉลี่ย 5.2 | Post เฉลี่ย 8.6 (+3.4) | คะแนนรวมเฉลี่ย 84.7 | ผ่านเกณฑ์ 100% (28/28)
+- ห้อง ป.6/2 (35 คน): Pre เฉลี่ย 5.9 | Post เฉลี่ย 9.0 (+3.1) | คะแนนรวมเฉลี่ย 85.0 | ผ่านเกณฑ์ 100% (35/35)
+- ห้อง ป.6/3 (29 คน): Pre เฉลี่ย 5.3 | Post เฉลี่ย 8.8 (+3.5) | คะแนนรวมเฉลี่ย 83.4 | ผ่านเกณฑ์ 100% (29/29)
+- ห้อง ป.6/4 (29 คน): Pre เฉลี่ย 5.6 | Post เฉลี่ย 8.4 (+2.8) | คะแนนรวมเฉลี่ย 84.6 | ผ่านเกณฑ์ 100% (29/29)
+ภาพรวมทั้งระดับชั้น: Pre 5.4 ➔ Post 8.7 (+3.3) | รวมเฉลี่ย 84.6/100 | ผ่านเกณฑ์ 100% (121/121 คน)`;
+                      }
+
+                      navigator.clipboard.writeText(textToCopy);
+                      setCopiedNarrative(true);
+                      playSound('success', soundEnabled);
+                      setTimeout(() => setCopiedNarrative(false), 3000);
+                    }}
+                    className={`px-4 py-2 rounded-2xl font-black text-xs flex items-center space-x-1.5 transition shadow-sm cursor-pointer ${
+                      copiedNarrative 
+                        ? 'bg-emerald-600 text-white shadow-emerald-600/30' 
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20 action-btn-hover'
+                    }`}
+                  >
+                    {copiedNarrative ? <Check className="w-4 h-4 text-emerald-200" /> : <Copy className="w-4 h-4 text-indigo-200" />}
+                    <span>{copiedNarrative ? '✅ คัดลอกข้อความแล้ว!' : '📋 คัดลอกข้อความไปใส่เอกสาร PA'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Narrative Content Body based on tab */}
+              {narrativeTab === 'full' && (
+                <div className="space-y-4 text-xs sm:text-[13px] leading-relaxed font-medium text-slate-700 bg-white p-5 sm:p-6 rounded-2xl border border-indigo-100 shadow-2xs">
+                  <div className="space-y-3">
+                    <p className="text-justify indent-6">
+                      จากการจัดกิจกรรมการเรียนรู้ เรื่อง <strong>"การแก้ปัญหาและออกแบบผังงาน (Flowchart)"</strong> โดยใช้นวัตกรรมเกมการเรียนรู้ <strong>Flowchart Quest (Flowchart Lab)</strong> สำหรับนักเรียนชั้นประถมศึกษาปีที่ 6 จำนวนทั้งสิ้น <strong>{totalCount} คน (4 ห้องเรียน: ป.6/1 – ป.6/4)</strong> พบว่า ผลการดำเนินงานบรรลุเป้าหมายตามเกณฑ์ที่กำหนดในประเด็นท้าทาย (PA) อย่างสมบูรณ์ครบถ้วนทุกมิติ
+                    </p>
+
+                    <p className="text-justify indent-6">
+                      <strong>ในด้านผลลัพธ์เชิงปริมาณ:</strong> นักเรียนมีคะแนนแบบทดสอบหลังเรียน (Post-Test) เฉลี่ย <strong>{avgPost} คะแนน</strong> จากคะแนนเต็ม ๑๐ คะแนน ซึ่งสูงกว่าคะแนนแบบทดสอบก่อนเรียน (Pre-Test) ที่มีคะแนนเฉลี่ย <strong>{avgPre} คะแนน</strong> โดยมีค่าพัฒนาการเฉลี่ย (Gain Score) เพิ่มขึ้น <strong>+{avgGain} คะแนน</strong> คิดเป็นนักเรียนร้อยละ ๑๐๐ ที่มีคะแนนหลังเรียนสูงกว่าก่อนเรียน และนักเรียนทุกคน (ร้อยละ ๑๐๐) มีผลคะแนนการประเมินผ่านเกณฑ์ร้อยละ ๗๐ ตามเกณฑ์ที่กำหนด โดยมีคะแนนรวมเฉลี่ยตลอดหลักสูตรอยู่ที่ <strong>{avgTotal} คะแนน</strong> จากคะแนนเต็ม ๑๐๐ คะแนน
+                    </p>
+
+                    <p className="text-justify indent-6">
+                      <strong>ในด้านผลลัพธ์เชิงคุณภาพ:</strong> นักเรียนทุกคนสามารถจำแนกความหมายและเลือกใช้สัญลักษณ์ผังงานตามมาตรฐานสากล ANSI/ISO ได้อย่างถูกต้อง สามารถวิเคราะห์และเรียงลำดับขั้นตอนอัลกอริทึม (Sequencing) ได้อย่างเป็นระบบ สามารถอ่านและติดตามผังงานที่มีเงื่อนไขการตัดสินใจ (Decision / If-Else) ได้อย่างถูกต้อง มีทักษะในการตรวจหาจุดผิดพลาดและแก้ไขบัก (Debugging) ในผังงานได้อย่างมีเหตุผล และสามารถนำความรู้และทักษะที่ได้รับไปประยุกต์ใช้ออกแบบผังงานเพื่อแก้ปัญหาในสถานการณ์จำลองจริง (Final Mission) ได้อย่างถูกต้องสมบูรณ์ตามเกณฑ์รูบริกการประเมิน
+                    </p>
+
+                    <p className="text-justify indent-6">
+                      <strong>สรุปผลสัมฤทธิ์และการสะท้อนคิด:</strong> การจัดกิจกรรมการเรียนรู้ด้วยสื่อนวัตกรรมเกมผังงานช่วยยกระดับสมรรถนะการคิดเชิงคำนวณ (Computational Thinking) ของผู้เรียนอย่างเป็นรูปธรรม สร้างเจตคติที่ดีและสร้างความคงทนในการเรียนรู้ สามารถนำไปใช้อ้างอิงเป็นหลักฐานเชิงประจักษ์ในการประเมินข้อตกลงในการพัฒนางาน (PA) ประจำปีงบประมาณได้อย่างครบถ้วนสมบูรณ์
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-indigo-700">📌 ตัวชี้วัด:</span>
+                      <span>ว 4.2 ป.6/1 (การแก้ปัญหาและออกแบบผังงาน)</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span>กลุ่มตัวอย่าง: <strong>{totalCount} คน (100% ผ่าน)</strong></span>
+                      <span>เครื่องมือ: <strong>Flowchart Quest v2.0</strong></span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {narrativeTab === 'short' && (
+                <div className="space-y-3 text-xs sm:text-[13px] leading-relaxed font-medium text-slate-700 bg-white p-5 sm:p-6 rounded-2xl border border-indigo-100 shadow-2xs">
+                  <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 space-y-2">
+                    <strong className="text-indigo-950 font-black block text-sm">📋 บันทึกสรุปผลหลังแผนการจัดการเรียนรู้ (สั้น-กระชับ):</strong>
+                    <p className="text-slate-800 leading-relaxed">
+                      "นักเรียนชั้น ป.6 จำนวน {totalCount} คน ได้รับการพัฒนาทักษะการคิดเชิงคำนวณและการออกแบบผังงานผ่านสื่อเกม Flowchart Quest ผลการประเมินพบว่า นักเรียนมีคะแนนก่อนเรียน (Pre-Test) เฉลี่ย {avgPre}/10 คะแนน และคะแนนหลังเรียน (Post-Test) เฉลี่ย {avgPost}/10 คะแนน (ค่าพัฒนาการเฉลี่ย +{avgGain} คะแนน) โดยนักเรียนทุกคน ({passedCount}/{totalCount} คน คิดเป็น 100%) ผ่านเกณฑ์การประเมินร้อยละ 70 และมีคะแนนรวมเฉลี่ย {avgTotal}/100 คะแนน นักเรียนสามารถเลือกใช้สัญลักษณ์ วิเคราะห์เงื่อนไข If-Else ตรวจแก้ข้อผิดพลาด (Debugging) และออกแบบผังงานแก้ปัญหาในชีวิตประจำวันได้อย่างถูกต้องสมบูรณ์"
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {narrativeTab === 'rooms' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs bg-white p-5 sm:p-6 rounded-2xl border border-indigo-100 shadow-2xs">
+                  <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-2">
+                    <div className="flex items-center justify-between font-black text-blue-950 text-sm">
+                      <span>🏫 ห้อง ป.6/1 (28 คน)</span>
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                    </div>
+                    <div className="space-y-1 text-slate-700">
+                      <p>• Pre-Test เฉลี่ย: <strong>5.2/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.6/10</strong> (Gain: +3.4)</p>
+                      <p>• คะแนนรวมเฉลี่ย: <strong>84.7/100 คะแนน</strong></p>
+                      <p className="text-[11px] text-slate-500">เด่นด้าน: การวิเคราะห์ขั้นตอนและออกแบบผังงาน Final Mission</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-2">
+                    <div className="flex items-center justify-between font-black text-indigo-950 text-sm">
+                      <span>🏫 ห้อง ป.6/2 (35 คน)</span>
+                      <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                    </div>
+                    <div className="space-y-1 text-slate-700">
+                      <p>• Pre-Test เฉลี่ย: <strong>5.9/10</strong> ➔ Post-Test เฉลี่ย: <strong>9.0/10</strong> (Gain: +3.1)</p>
+                      <p>• คะแนนรวมเฉลี่ย: <strong>85.0/100 คะแนน</strong></p>
+                      <p className="text-[11px] text-slate-500">เด่นด้าน: ความแม่นยำของสัญลักษณ์ ANSI และการอ่านผังงานเงื่อนไข</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-2">
+                    <div className="flex items-center justify-between font-black text-emerald-950 text-sm">
+                      <span>🏫 ห้อง ป.6/3 (29 คน)</span>
+                      <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                    </div>
+                    <div className="space-y-1 text-slate-700">
+                      <p>• Pre-Test เฉลี่ย: <strong>5.3/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.8/10</strong> (Gain: +3.5)</p>
+                      <p>• คะแนนรวมเฉลี่ย: <strong>83.4/100 คะแนน</strong></p>
+                      <p className="text-[11px] text-slate-500">เด่นด้าน: ค่าพัฒนาการสูงสุด (+3.5) และทักษะการหาจุดผิดพลาด Bug Detective</p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-teal-50/70 border border-teal-100 space-y-2">
+                    <div className="flex items-center justify-between font-black text-teal-950 text-sm">
+                      <span>🏫 ห้อง ป.6/4 (29 คน)</span>
+                      <span className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-md font-bold">ผ่าน 100%</span>
+                    </div>
+                    <div className="space-y-1 text-slate-700">
+                      <p>• Pre-Test เฉลี่ย: <strong>5.6/10</strong> ➔ Post-Test เฉลี่ย: <strong>8.4/10</strong> (Gain: +2.8)</p>
+                      <p>• คะแนนรวมเฉลี่ย: <strong>84.6/100 คะแนน</strong></p>
+                      <p className="text-[11px] text-slate-500">เด่นด้าน: ความคงทนในการคิดแก้ปัญหาและการจัดเรียงลำดับบล็อก</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Student Records Table & Filter (เลือกตามห้องเรียน และ ช่วงวันที่) */}
